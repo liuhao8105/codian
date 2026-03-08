@@ -261,7 +261,7 @@ src/
 
 - [x] Upstream plugin compatibility
 - [x] Custom agent (subagent) support
-- [x] Claude in Chrome support
+- [x] Chrome compatibility support
 - [x] `/compact` command
 - [x] Plan mode
 - [x] `rewind` and `fork` support (including `/fork` command)

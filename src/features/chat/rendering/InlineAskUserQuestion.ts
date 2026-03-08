@@ -46,7 +46,7 @@ export class InlineAskUserQuestion {
     this.resolveCallback = resolve;
     this.signal = signal;
     this.config = {
-      title: config?.title ?? 'Claude has a question',
+      title: config?.title ?? 'Codian has a question',
       headerEl: config?.headerEl,
       showCustomInput: config?.showCustomInput ?? true,
       immediateSelect: config?.immediateSelect ?? false,
