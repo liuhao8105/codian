@@ -1,5 +1,7 @@
 # Codian
 
+[中文说明](README.zh-CN.md)
+
 ![GitHub stars](https://img.shields.io/github/stars/liuhao8105/codian?style=social)
 ![GitHub release](https://img.shields.io/github/v/release/liuhao8105/codian)
 ![License](https://img.shields.io/github/license/liuhao8105/codian)
