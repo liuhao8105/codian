@@ -303,11 +303,25 @@ export class CodexAgentRuntime implements AgentRuntime {
     this.activeAbortController = new AbortController();
 
     const textByItemId = new Map<string, string>();
+    let activeAgentMessageItemId: string | null = null;
+    let hasStreamedAgentText = false;
+
+    const ensureAgentMessageSeparation = (itemId: string) => {
+      if (!itemId) return;
+      if (activeAgentMessageItemId === itemId) return;
+      if (hasStreamedAgentText) {
+        queue.push({ type: 'text', content: '\n\n' });
+      }
+      activeAgentMessageItemId = itemId;
+    };
+
     const pushDelta = (itemId: string, delta: string) => {
       if (!delta) return;
+      ensureAgentMessageSeparation(itemId);
       const previous = textByItemId.get(itemId) || '';
       textByItemId.set(itemId, previous + delta);
       queue.push({ type: 'text', content: delta });
+      hasStreamedAgentText = true;
     };
 
     const handleNotification = (notification: AppServerNotification) => {
@@ -316,6 +330,12 @@ export class CodexAgentRuntime implements AgentRuntime {
           const item = asRecord(notification.params.item);
           if (item?.type === 'userMessage') {
             queue.push({ type: 'sdk_user_sent', uuid: asString(item.id) || '' });
+          }
+          if (item?.type === 'agentMessage') {
+            const itemId = asString(item.id);
+            if (itemId) {
+              ensureAgentMessageSeparation(itemId);
+            }
           }
           break;
         }
@@ -353,7 +373,11 @@ export class CodexAgentRuntime implements AgentRuntime {
               const suffix = finalText.slice(currentText.length);
               pushDelta(itemId, suffix);
             } else if (!currentText && finalText) {
+              if (itemId) {
+                ensureAgentMessageSeparation(itemId);
+              }
               queue.push({ type: 'text', content: finalText });
+              hasStreamedAgentText = true;
             }
           }
           break;
