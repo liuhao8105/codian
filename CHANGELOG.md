@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### What changed
+
+- Fixed streamed reply rendering so multi-part Codex answers are separated into visible paragraphs instead of being merged into one long block.
+- Fixed image input for the `Codex App Server` adapter by sending the correct `localImage` item type.
+- Added automatic stale-thread recovery: when an old conversation thread cannot continue, `Codian` now rebuilds the request history into a fresh thread and retries once.
+
 ## 1.3.67
 
 Initial public Codian release.
