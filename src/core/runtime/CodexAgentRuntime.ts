@@ -245,7 +245,7 @@ export class CodexAgentRuntime implements AgentRuntime {
     const imagePaths = await this.materializeImages(images);
     for (const imagePath of imagePaths) {
       input.push({
-        type: 'local_image',
+        type: 'localImage',
         path: imagePath,
       });
     }
@@ -428,7 +428,10 @@ export class CodexAgentRuntime implements AgentRuntime {
           }
         }
 
-        if (!this.threadId) {
+        const ensureThreadStarted = async () => {
+          if (this.threadId) {
+            return;
+          }
           const started = await client.request('thread/start', {
             model: selectedModel ?? null,
             cwd: vaultPath,
@@ -439,18 +442,31 @@ export class CodexAgentRuntime implements AgentRuntime {
           });
           const thread = asRecord(started.thread);
           this.threadId = asString(thread?.id);
-        } else {
-          // Keep the restored thread id.
-        }
+        };
 
-        const startedTurn = await client.request('turn/start', {
-          threadId: this.threadId,
-          input: await this.buildInput(request.prompt, request.images || []),
-          cwd: vaultPath,
-          approvalPolicy: this.getApprovalPolicy(),
-          sandboxPolicy: this.buildTurnSandboxPolicy(queryOptions),
-          model: selectedModel ?? null,
-        });
+        const startTurn = async () => {
+          await ensureThreadStarted();
+          return await client.request('turn/start', {
+            threadId: this.threadId,
+            input: await this.buildInput(request.prompt, request.images || []),
+            cwd: vaultPath,
+            approvalPolicy: this.getApprovalPolicy(),
+            sandboxPolicy: this.buildTurnSandboxPolicy(queryOptions),
+            model: selectedModel ?? null,
+          });
+        };
+
+        let startedTurn: Record<string, unknown>;
+        try {
+          startedTurn = await startTurn();
+        } catch (error) {
+          if (!this.threadId) {
+            throw error;
+          }
+          this.threadId = null;
+          request = this.buildHistoryRebuildRequest(prompt, images, conversationHistory);
+          startedTurn = await startTurn();
+        }
 
         const turn = asRecord(startedTurn.turn);
         this.activeTurnId = asString(turn?.id);
