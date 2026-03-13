@@ -3,11 +3,95 @@ import { Modal, Notice, setIcon, Setting } from 'obsidian';
 
 import { DEFAULT_CODEX_MODELS } from '../../../core/types';
 import type { AgentDefinition } from '../../../core/types';
+import {
+  TOOL_BASH,
+  TOOL_EDIT,
+  TOOL_GLOB,
+  TOOL_GREP,
+  TOOL_LIST_MCP_RESOURCES,
+  TOOL_LS,
+  TOOL_MCP,
+  TOOL_NOTEBOOK_EDIT,
+  TOOL_READ,
+  TOOL_READ_MCP_RESOURCE,
+  TOOL_SKILL,
+  TOOL_TASK,
+  TOOL_TODO_WRITE,
+  TOOL_WEB_FETCH,
+  TOOL_WEB_SEARCH,
+  TOOL_WRITE,
+} from '../../../core/tools/toolNames';
 import { t } from '../../../i18n';
 import type CodianPlugin from '../../../main';
 import { confirmDelete } from '../../../shared/modals/ConfirmModal';
 import { validateAgentName } from '../../../utils/agent';
 import { getModelsFromEnvironment, parseEnvironmentVariables } from '../../../utils/env';
+
+const BUILTIN_SUBAGENT_TOOLS = [
+  TOOL_READ,
+  TOOL_WRITE,
+  TOOL_EDIT,
+  TOOL_NOTEBOOK_EDIT,
+  TOOL_BASH,
+  TOOL_GLOB,
+  TOOL_GREP,
+  TOOL_LS,
+  TOOL_WEB_SEARCH,
+  TOOL_WEB_FETCH,
+  TOOL_TODO_WRITE,
+  TOOL_TASK,
+  TOOL_SKILL,
+  TOOL_LIST_MCP_RESOURCES,
+  TOOL_READ_MCP_RESOURCE,
+  TOOL_MCP,
+] as const;
+
+function uniqueSorted(values: Iterable<string>): string[] {
+  return Array.from(new Set(values))
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+}
+
+export function mergeSelectedOptions(selected: Iterable<string>): string[] | undefined {
+  const merged = uniqueSorted(selected);
+  return merged.length > 0 ? merged : undefined;
+}
+
+export function normalizeAgentNameCandidate(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function renderOptionPicker(
+  setting: Setting,
+  options: string[],
+  selected: Set<string>
+): void {
+  setting.settingEl.addClass('claudian-sp-multiselect-setting');
+  const optionsEl = setting.settingEl.createDiv({ cls: 'claudian-sp-option-list' });
+
+  for (const option of uniqueSorted(options)) {
+    const itemEl = optionsEl.createEl('label', { cls: 'claudian-sp-option-item' });
+    const checkboxEl = itemEl.createEl('input', {
+      type: 'checkbox',
+      cls: 'claudian-sp-option-checkbox',
+    });
+    checkboxEl.checked = selected.has(option);
+    checkboxEl.addEventListener('change', () => {
+      if (checkboxEl.checked) {
+        selected.add(option);
+      } else {
+        selected.delete(option);
+      }
+    });
+    itemEl.createSpan({ text: option, cls: 'claudian-sp-option-label' });
+  }
+}
 
 class AgentModal extends Modal {
   private plugin: CodianPlugin;
@@ -48,9 +132,9 @@ class AgentModal extends Modal {
     let nameInput: HTMLInputElement;
     let descInput: HTMLInputElement;
     let modelValue: string = this.existingAgent?.model ?? 'inherit';
-    let toolsInput: HTMLInputElement;
-    let disallowedToolsInput: HTMLInputElement;
-    let skillsInput: HTMLInputElement;
+    const selectedTools = new Set(this.existingAgent?.tools ?? []);
+    const selectedDisallowedTools = new Set(this.existingAgent?.disallowedTools ?? []);
+    const selectedSkills = new Set(this.existingAgent?.skills ?? []);
 
     new Setting(contentEl)
       .setName(t('settings.subagents.modal.name'))
@@ -94,29 +178,57 @@ class AgentModal extends Modal {
           .onChange(value => { modelValue = value; });
       });
 
-    new Setting(details)
+    const toolsSetting = new Setting(details)
       .setName(t('settings.subagents.modal.tools'))
-      .setDesc(t('settings.subagents.modal.toolsDesc'))
-      .addText(text => {
-        toolsInput = text.inputEl;
-        text.setValue(this.existingAgent?.tools?.join(', ') || '');
-      });
+      .setDesc(t('settings.subagents.modal.toolsDesc'));
 
-    new Setting(details)
+    const disallowedToolsSetting = new Setting(details)
       .setName(t('settings.subagents.modal.disallowedTools'))
-      .setDesc(t('settings.subagents.modal.disallowedToolsDesc'))
-      .addText(text => {
-        disallowedToolsInput = text.inputEl;
-        text.setValue(this.existingAgent?.disallowedTools?.join(', ') || '');
-      });
+      .setDesc(t('settings.subagents.modal.disallowedToolsDesc'));
 
-    new Setting(details)
+    const skillsSetting = new Setting(details)
       .setName(t('settings.subagents.modal.skills'))
-      .setDesc(t('settings.subagents.modal.skillsDesc'))
-      .addText(text => {
-        skillsInput = text.inputEl;
-        text.setValue(this.existingAgent?.skills?.join(', ') || '');
-      });
+      .setDesc(t('settings.subagents.modal.skillsDesc'));
+
+    renderOptionPicker(
+      toolsSetting,
+      uniqueSorted([
+        ...BUILTIN_SUBAGENT_TOOLS,
+        ...selectedTools,
+        ...selectedDisallowedTools,
+      ]),
+      selectedTools
+    );
+    renderOptionPicker(
+      disallowedToolsSetting,
+      uniqueSorted([
+        ...BUILTIN_SUBAGENT_TOOLS,
+        ...selectedTools,
+        ...selectedDisallowedTools,
+      ]),
+      selectedDisallowedTools
+    );
+    renderOptionPicker(skillsSetting, uniqueSorted(selectedSkills), selectedSkills);
+
+    void this.plugin.storage.skills.loadAll().then((skills) => {
+      if (!skillsSetting.settingEl.isConnected) return;
+      const latestSelectedSkills = new Set(selectedSkills);
+      skillsSetting.settingEl.querySelector('.claudian-sp-option-list')?.remove();
+      renderOptionPicker(
+        skillsSetting,
+        uniqueSorted([
+          ...skills.map((skill) => skill.name),
+          ...latestSelectedSkills,
+        ]),
+        latestSelectedSkills
+      );
+      selectedSkills.clear();
+      for (const skill of latestSelectedSkills) {
+        selectedSkills.add(skill);
+      }
+    }).catch(() => {
+      // Non-critical: keep existing selections if installed skills cannot be loaded.
+    });
 
     new Setting(contentEl)
       .setName(t('settings.subagents.modal.prompt'))
@@ -144,10 +256,24 @@ class AgentModal extends Modal {
       cls: 'claudian-save-btn',
     });
     saveBtn.addEventListener('click', async () => {
-      const name = nameInput.value.trim();
+      const focusNameInput = (): void => {
+        nameInput.focus();
+        nameInput.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        nameInput.select();
+      };
+
+      const rawName = nameInput.value.trim();
+      const name = normalizeAgentNameCandidate(rawName);
+      if (name !== rawName) {
+        nameInput.value = name;
+      }
       const nameError = validateAgentName(name);
       if (nameError) {
-        new Notice(nameError);
+        const message = nameError.includes('lowercase letters, numbers, and hyphens')
+          ? `${t('settings.subagents.modal.name')}格式不正确：${t('settings.subagents.modal.nameDesc')}，例如 ${t('settings.subagents.modal.namePlaceholder')}`
+          : nameError;
+        new Notice(message);
+        focusNameInput();
         return;
       }
 
@@ -173,23 +299,17 @@ class AgentModal extends Modal {
         return;
       }
 
-      const parseList = (input: HTMLInputElement): string[] | undefined => {
-        const val = input.value.trim();
-        if (!val) return undefined;
-        return val.split(',').map(s => s.trim()).filter(Boolean);
-      };
-
       const agent: AgentDefinition = {
         id: name,
         name,
         description,
         prompt,
-        tools: parseList(toolsInput),
-        disallowedTools: parseList(disallowedToolsInput),
+        tools: mergeSelectedOptions(selectedTools),
+        disallowedTools: mergeSelectedOptions(selectedDisallowedTools),
         model: (modelValue as AgentDefinition['model']) || 'inherit',
         source: 'vault',
         filePath: this.existingAgent?.filePath,
-        skills: parseList(skillsInput),
+        skills: mergeSelectedOptions(selectedSkills),
         permissionMode: this.existingAgent?.permissionMode,
         hooks: this.existingAgent?.hooks,
         extraFrontmatter: this.existingAgent?.extraFrontmatter,

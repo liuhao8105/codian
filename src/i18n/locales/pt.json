@@ -83,6 +83,14 @@
       "name": "Prompt de sistema personalizado",
       "desc": "Instruções adicionais anexadas ao prompt de sistema padrão"
     },
+    "strongRulesFilePath": {
+      "name": "Arquivo de regras fortes",
+      "desc": "Opcional. O conteúdo abaixo do primeiro título de nível 1 desta nota é injetado no system prompt como regras rígidas."
+    },
+    "memoryFilePath": {
+      "name": "Arquivo de memória de longo prazo",
+      "desc": "Caminho opcional de nota sempre anexado como contexto. Prefira um caminho Markdown relativo ao vault, como profiles/user-memory.md."
+    },
     "autoTitle": {
       "name": "Gerar automaticamente títulos de conversa",
       "desc": "Gera automaticamente títulos de conversa após a primeira mensagem do usuário."

@@ -102,10 +102,25 @@ function createMockDeps(overrides: Partial<InputControllerDeps> = {}): InputCont
         enableBlocklist: true,
         permissionMode: 'yolo',
         enableAutoTitleGeneration: true,
+        strongRulesFilePath: '',
+        strongRulesPrompt: '',
+        memoryFilePath: '',
+      },
+      app: {
+        vault: {
+          adapter: {
+            basePath: '/vault',
+          },
+          getFileByPath: jest.fn(),
+          cachedRead: jest.fn(),
+        },
       },
       mcpManager: {
         extractMentions: jest.fn().mockReturnValue(new Set()),
         transformMentions: jest.fn().mockImplementation((text: string) => text),
+      },
+      agentManager: {
+        getAvailableAgents: jest.fn().mockReturnValue([]),
       },
       renameConversation: jest.fn(),
       updateConversation: jest.fn(),
@@ -1445,6 +1460,250 @@ describe('InputController - Message Queue', () => {
       const queryCall = ((deps as any).mockAgentService.query as jest.Mock).mock.calls[0];
       const queryOptions = queryCall[3];
       expect(queryOptions.externalContextPaths).toEqual(externalPaths);
+    });
+  });
+
+  describe('Memory file context', () => {
+    it('should append configured memory file to prompt as context', async () => {
+      deps = createSendableDeps();
+      deps.plugin.settings.memoryFilePath = 'profiles/user-memory.md';
+
+      ((deps as any).mockAgentService.query as jest.Mock).mockReturnValue(
+        createMockStream([{ type: 'done' }])
+      );
+
+      inputEl = deps.getInputEl() as ReturnType<typeof createMockInputEl>;
+      inputEl.value = 'hello';
+      controller = new InputController(deps);
+
+      await controller.sendMessage();
+
+      const queryCall = ((deps as any).mockAgentService.query as jest.Mock).mock.calls[0];
+      const promptSent = queryCall[0];
+      expect(promptSent).toContain('<context_files>');
+      expect(promptSent).toContain('profiles/user-memory.md');
+    });
+
+    it('should normalize absolute memory file paths inside the vault before appending', async () => {
+      deps = createSendableDeps();
+      deps.plugin.settings.memoryFilePath = '/vault/profiles/user-memory.md';
+
+      ((deps as any).mockAgentService.query as jest.Mock).mockReturnValue(
+        createMockStream([{ type: 'done' }])
+      );
+
+      inputEl = deps.getInputEl() as ReturnType<typeof createMockInputEl>;
+      inputEl.value = 'hello';
+      controller = new InputController(deps);
+
+      await controller.sendMessage();
+
+      const queryCall = ((deps as any).mockAgentService.query as jest.Mock).mock.calls[0];
+      const promptSent = queryCall[0];
+      expect(promptSent).toContain('profiles/user-memory.md');
+      expect(promptSent).not.toContain('/vault/profiles/user-memory.md');
+    });
+
+    it('should append memory file when creating a new conversation', async () => {
+      deps = createSendableDeps({}, null);
+      deps.plugin.settings.memoryFilePath = 'profiles/user-memory.md';
+
+      ((deps as any).mockAgentService.query as jest.Mock).mockReturnValue(
+        createMockStream([{ type: 'done' }])
+      );
+
+      inputEl = deps.getInputEl() as ReturnType<typeof createMockInputEl>;
+      inputEl.value = 'first message';
+      controller = new InputController(deps);
+
+      await controller.sendMessage();
+
+      expect(deps.plugin.createConversation).toHaveBeenCalled();
+      const queryCall = ((deps as any).mockAgentService.query as jest.Mock).mock.calls[0];
+      const promptSent = queryCall[0];
+      expect(promptSent).toContain('<context_files>');
+      expect(promptSent).toContain('profiles/user-memory.md');
+    });
+
+    it('should append memory file on every message in the same conversation', async () => {
+      deps = createSendableDeps();
+      deps.plugin.settings.memoryFilePath = 'profiles/user-memory.md';
+
+      const prompts: string[] = [];
+      ((deps as any).mockAgentService.query as jest.Mock).mockImplementation((prompt: string) => {
+        prompts.push(prompt);
+        return createMockStream([{ type: 'done' }]);
+      });
+
+      inputEl = deps.getInputEl() as ReturnType<typeof createMockInputEl>;
+      controller = new InputController(deps);
+
+      inputEl.value = 'first';
+      await controller.sendMessage();
+
+      inputEl.value = 'second';
+      await controller.sendMessage();
+
+      expect(prompts).toHaveLength(2);
+      expect(prompts[0]).toContain('profiles/user-memory.md');
+      expect(prompts[1]).toContain('profiles/user-memory.md');
+    });
+
+    it('should sync strong rules prompt from configured file before sending', async () => {
+      deps = createSendableDeps();
+      deps.plugin.settings.strongRulesFilePath = 'profiles/user-memory.md';
+      (deps.plugin.app.vault.getFileByPath as jest.Mock).mockReturnValue({ path: 'profiles/user-memory.md' });
+      (deps.plugin.app.vault.cachedRead as jest.Mock).mockResolvedValue(`# Strong Rules
+
+Always use Chinese.
+
+# Profile
+
+Other content`);
+
+      ((deps as any).mockAgentService.query as jest.Mock).mockReturnValue(
+        createMockStream([{ type: 'done' }])
+      );
+
+      inputEl = deps.getInputEl() as ReturnType<typeof createMockInputEl>;
+      inputEl.value = 'hello';
+      controller = new InputController(deps);
+
+      await controller.sendMessage();
+
+      expect(deps.plugin.settings.strongRulesPrompt).toContain('Always use Chinese.');
+      expect(deps.plugin.saveSettings).toHaveBeenCalled();
+    });
+
+    it('should add quick reply guidance for configured identity questions', async () => {
+      deps = createSendableDeps();
+      deps.plugin.settings.strongRulesFilePath = 'profiles/user-memory.md';
+      (deps.plugin.app.vault.getFileByPath as jest.Mock).mockReturnValue({ path: 'profiles/user-memory.md' });
+      (deps.plugin.app.vault.cachedRead as jest.Mock).mockResolvedValue(`# Strong Rules
+
+## 快捷回答
+
+### 你是谁
+我是丫头。平时陪你聊天，也帮你写作、整理、分析和把事情慢慢做成。`);
+
+      ((deps as any).mockAgentService.query as jest.Mock).mockReturnValue(
+        createMockStream([{ type: 'done' }])
+      );
+
+      inputEl = deps.getInputEl() as ReturnType<typeof createMockInputEl>;
+      inputEl.value = '你是谁';
+      controller = new InputController(deps);
+
+      await controller.sendMessage();
+
+      expect(((deps as any).mockAgentService.query as jest.Mock)).toHaveBeenCalled();
+      const queryCall = ((deps as any).mockAgentService.query as jest.Mock).mock.calls[0];
+      const promptSent = queryCall[0];
+      expect(promptSent).toContain('<quick_reply_reference>');
+      expect(promptSent).toContain('我是丫头');
+    });
+
+    it('should add quick reply guidance for any configured quick reply question', async () => {
+      deps = createSendableDeps();
+      deps.plugin.settings.strongRulesFilePath = 'profiles/user-memory.md';
+      (deps.plugin.app.vault.getFileByPath as jest.Mock).mockReturnValue({ path: 'profiles/user-memory.md' });
+      (deps.plugin.app.vault.cachedRead as jest.Mock).mockResolvedValue(`# Strong Rules
+
+## 快捷回答
+
+### 你多大
+我叫丫头，24岁。`);
+
+      inputEl = deps.getInputEl() as ReturnType<typeof createMockInputEl>;
+      inputEl.value = '你多大？';
+      controller = new InputController(deps);
+
+      await controller.sendMessage();
+
+      expect(((deps as any).mockAgentService.query as jest.Mock)).toHaveBeenCalled();
+      const queryCall = ((deps as any).mockAgentService.query as jest.Mock).mock.calls[0];
+      const promptSent = queryCall[0];
+      expect(promptSent).toContain('<quick_reply_reference>');
+      expect(promptSent).toContain('24岁');
+    });
+
+    it('should fall back to the normal prompt when quick replies are not configured', async () => {
+      deps = createSendableDeps();
+      deps.plugin.settings.strongRulesFilePath = 'profiles/user-memory.md';
+      (deps.plugin.app.vault.getFileByPath as jest.Mock).mockReturnValue({ path: 'profiles/user-memory.md' });
+      (deps.plugin.app.vault.cachedRead as jest.Mock).mockResolvedValue('# Strong Rules');
+
+      ((deps as any).mockAgentService.query as jest.Mock).mockReturnValue(
+        createMockStream([{ type: 'done' }])
+      );
+
+      inputEl = deps.getInputEl() as ReturnType<typeof createMockInputEl>;
+      inputEl.value = '你是谁';
+      controller = new InputController(deps);
+
+      await controller.sendMessage();
+
+      expect(((deps as any).mockAgentService.query as jest.Mock)).toHaveBeenCalled();
+      const queryCall = ((deps as any).mockAgentService.query as jest.Mock).mock.calls[0];
+      const promptSent = queryCall[0];
+      expect(promptSent).not.toContain('<quick_reply_reference>');
+    });
+
+    it('should still use the agent for regular questions', async () => {
+      deps = createSendableDeps();
+
+      ((deps as any).mockAgentService.query as jest.Mock).mockReturnValue(
+        createMockStream([{ type: 'done' }])
+      );
+
+      inputEl = deps.getInputEl() as ReturnType<typeof createMockInputEl>;
+      inputEl.value = '帮我写一个方案';
+      controller = new InputController(deps);
+
+      await controller.sendMessage();
+
+      const queryCall = ((deps as any).mockAgentService.query as jest.Mock).mock.calls[0];
+      const promptSent = queryCall[0];
+      expect(promptSent).not.toContain('<response_style>');
+    });
+
+    it('should convert valid @agent mentions into hidden subagent guidance', async () => {
+      deps = createSendableDeps();
+      (deps.plugin as any).agentManager.getAvailableAgents.mockReturnValue([
+        {
+          id: 'brainstorm-helper',
+          name: 'brainstorm-helper',
+          description: 'Brainstorm with the brainstorming skill first',
+        },
+      ]);
+      inputEl = deps.getInputEl() as ReturnType<typeof createMockInputEl>;
+      inputEl.value = '@brainstorm-helper (agent) 我要做个产品宣传方案';
+      controller = new InputController(deps);
+
+      await controller.sendMessage();
+
+      const promptSent = ((deps as any).mockAgentService.query as jest.Mock).mock.calls[0][0] as string;
+      expect(promptSent).toContain('<requested_subagents>');
+      expect(promptSent).toContain('subagent_type set to one of the IDs below');
+      expect(promptSent).toContain('brainstorm-helper');
+      expect(promptSent).toContain('我要做个产品宣传方案');
+      expect(promptSent).not.toContain('@brainstorm-helper (agent)');
+
+      const userMessage = (deps.renderer.addMessage as jest.Mock).mock.calls[0][0];
+      expect(userMessage.displayContent).toBe('@brainstorm-helper (agent) 我要做个产品宣传方案');
+    });
+
+    it('should block unknown @agent mentions before sending to model', async () => {
+      deps = createSendableDeps();
+      inputEl = deps.getInputEl() as ReturnType<typeof createMockInputEl>;
+      inputEl.value = '@missing-agent (agent) 帮我做方案';
+      controller = new InputController(deps);
+      mockNotice.mockClear();
+
+      await controller.sendMessage();
+
+      expect(mockNotice).toHaveBeenCalledWith('未找到子代理：missing-agent。请从 @Agents 列表里重新选择。');
+      expect((deps as any).mockAgentService.query).not.toHaveBeenCalled();
     });
   });
 

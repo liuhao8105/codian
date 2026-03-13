@@ -99,6 +99,8 @@ export class MessageRenderer {
       if (this.rewindCallback || this.forkCallback) {
         this.liveMessageEls.set(msg.id, msgEl);
       }
+    } else if (msg.role === 'assistant') {
+      this.renderAssistantContent(msg, contentEl);
     }
 
     this.scrollToBottom();

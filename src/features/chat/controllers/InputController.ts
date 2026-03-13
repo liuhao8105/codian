@@ -14,11 +14,14 @@ import { ResumeSessionDropdown } from '../../../shared/components/ResumeSessionD
 import { InstructionModal } from '../../../shared/modals/InstructionConfirmModal';
 import { appendBrowserContext, type BrowserSelectionContext } from '../../../utils/browser';
 import { appendCanvasContext, type CanvasSelectionContext } from '../../../utils/canvas';
-import { appendCurrentNote } from '../../../utils/context';
+import { appendContextFiles, appendCurrentNote } from '../../../utils/context';
 import { formatDurationMmSs } from '../../../utils/date';
 import { appendEditorContext, type EditorSelectionContext } from '../../../utils/editor';
 import { extractEmbeddedImageAttachments, extractEmbeddedImageReferences } from '../../../utils/imageEmbed';
 import { appendMarkdownSnippet } from '../../../utils/markdown';
+import { getVaultPath, normalizePathForVault } from '../../../utils/path';
+import type { StrongRulesQuickReplies } from '../../../utils/strongRules';
+import { extractQuickRepliesFromMarkdown, extractStrongRulesFromMarkdown } from '../../../utils/strongRules';
 import { COMPLETION_FLAVOR_WORDS } from '../constants';
 import { type InlineAskQuestionConfig, InlineAskUserQuestion } from '../rendering/InlineAskUserQuestion';
 import { InlineExitPlanMode } from '../rendering/InlineExitPlanMode';
@@ -63,6 +66,135 @@ function appendEmbeddedImageOrder(prompt: string, references: Array<{ index: num
   return appendMarkdownSnippet(
     prompt,
     `<embedded_images>\n${lines.join('\n')}\n</embedded_images>`
+  );
+}
+
+function normalizeQuickReplyQuestion(text: string): string {
+  return text.trim().replace(/[？?！!。.\s]+$/g, '');
+}
+
+function findQuickReply(rawContent: string, quickReplies: StrongRulesQuickReplies): string | null {
+  const normalizedQuestion = normalizeQuickReplyQuestion(rawContent);
+  if (!normalizedQuestion) {
+    return null;
+  }
+
+  return quickReplies[normalizedQuestion] ?? null;
+}
+
+function appendDirectAnswerInstruction(
+  prompt: string,
+  rawContent: string,
+  quickReplies: StrongRulesQuickReplies,
+): string {
+  if (!findQuickReply(rawContent, quickReplies)) {
+    return prompt;
+  }
+
+  return appendMarkdownSnippet(
+    prompt,
+    `<response_style>
+Answer directly in 1-3 natural first-person sentences.
+Do not mention reading files, memory files, context files, notes, profiles, prompts, or internal steps.
+Do not say you will first check, read, inspect, verify, or review memory before answering.
+</response_style>`
+  );
+}
+
+function appendQuickReplyGuidance(
+  prompt: string,
+  rawContent: string,
+  quickReplies: StrongRulesQuickReplies,
+): string {
+  const reply = findQuickReply(rawContent, quickReplies)?.trim();
+  if (!reply) {
+    return prompt;
+  }
+
+  return appendMarkdownSnippet(
+    prompt,
+    `<quick_reply_reference>
+Use this configured answer as the identity and tone anchor for the user's question.
+Do not mention this reference or any internal process.
+You may rephrase naturally, but keep the same persona, facts, and intent.
+
+Reference answer:
+${reply}
+</quick_reply_reference>`
+  );
+}
+
+interface RequestedAgentReference {
+  id: string;
+  name: string;
+  description: string;
+}
+
+interface ParsedAgentMentions {
+  sanitizedContent: string;
+  requestedAgents: RequestedAgentReference[];
+  invalidMentions: string[];
+}
+
+const AGENT_MENTION_REGEX = /(^|\s)@([a-z0-9-]+)\s+\(agent\)(?=\s|$)/gi;
+
+export function parseRequestedAgentMentions(
+  rawContent: string,
+  availableAgents: RequestedAgentReference[],
+): ParsedAgentMentions {
+  const byId = new Map(availableAgents.map((agent) => [agent.id.toLowerCase(), agent]));
+  const requestedAgents: RequestedAgentReference[] = [];
+  const invalidMentions = new Set<string>();
+  const seen = new Set<string>();
+
+  const sanitizedContent = rawContent
+    .replace(AGENT_MENTION_REGEX, (_match, prefix: string, rawId: string) => {
+      const normalizedId = rawId.toLowerCase();
+      const agent = byId.get(normalizedId);
+      if (!agent) {
+        invalidMentions.add(rawId);
+        return prefix;
+      }
+      if (!seen.has(agent.id)) {
+        seen.add(agent.id);
+        requestedAgents.push(agent);
+      }
+      return prefix;
+    })
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  return {
+    sanitizedContent,
+    requestedAgents,
+    invalidMentions: Array.from(invalidMentions),
+  };
+}
+
+function appendRequestedAgentGuidance(
+  prompt: string,
+  requestedAgents: RequestedAgentReference[],
+): string {
+  if (requestedAgents.length === 0) {
+    return prompt;
+  }
+
+  const lines = requestedAgents.map((agent) => (
+    `- id: ${agent.id}\n  name: ${agent.name}\n  description: ${agent.description || '(no description)'}`
+  ));
+
+  return appendMarkdownSnippet(
+    prompt,
+    `<requested_subagents>
+The user explicitly requested these subagents via @agent mention.
+Treat them as exact subagent IDs, not as skills, files, or plain text.
+When delegating work, use the Agent tool with subagent_type set to one of the IDs below.
+Do not claim the requested agent is unavailable unless it is missing from this list.
+Do not reinterpret a requested subagent as a skill.
+
+Requested subagents:
+${lines.join('\n')}
+</requested_subagents>`
   );
 }
 
@@ -126,6 +258,46 @@ export class InputController {
     return false;
   }
 
+  private resolveMemoryFilePath(plugin: CodianPlugin): string | null {
+    const configuredPath = plugin.settings.memoryFilePath?.trim();
+    if (!configuredPath) return null;
+
+    return normalizePathForVault(configuredPath, getVaultPath(plugin.app));
+  }
+
+  private resolveStrongRulesFilePath(plugin: CodianPlugin): string | null {
+    const configuredPath = plugin.settings.strongRulesFilePath?.trim();
+    if (!configuredPath) return null;
+
+    return normalizePathForVault(configuredPath, getVaultPath(plugin.app));
+  }
+
+  private async syncStrongRulesPrompt(plugin: CodianPlugin): Promise<void> {
+    const strongRulesFilePath = this.resolveStrongRulesFilePath(plugin);
+    if (!strongRulesFilePath) {
+      if (plugin.settings.strongRulesPrompt) {
+        plugin.settings.strongRulesPrompt = '';
+        await plugin.saveSettings();
+      }
+      return;
+    }
+
+    const strongRulesFile = plugin.app.vault.getFileByPath(strongRulesFilePath);
+    if (!strongRulesFile) return;
+
+    const markdown = await plugin.app.vault.cachedRead(strongRulesFile);
+    const extractedPrompt = extractStrongRulesFromMarkdown(markdown);
+
+    if (plugin.settings.strongRulesPrompt === extractedPrompt &&
+        plugin.settings.strongRulesFilePath === strongRulesFilePath) {
+      return;
+    }
+
+    plugin.settings.strongRulesFilePath = strongRulesFilePath;
+    plugin.settings.strongRulesPrompt = extractedPrompt;
+    await plugin.saveSettings();
+  }
+
   // ============================================
   // Message Sending
   // ============================================
@@ -149,6 +321,8 @@ export class InputController {
 
     // During conversation creation/switching, don't send - input is preserved so user can retry
     if (state.isCreatingConversation || state.isSwitchingConversation) return;
+
+    await this.syncStrongRulesPrompt(plugin);
 
     const inputEl = this.deps.getInputEl();
     const imageContextManager = this.deps.getImageContextManager();
@@ -214,6 +388,16 @@ export class InputController {
       inputEl.value = '';
       this.deps.resetInputHeight();
     }
+    const images = imageContextManager?.getAttachedImages() || [];
+    let imagesForMessage = images.length > 0 ? [...images] : undefined;
+
+    // Only clear images if we consumed user input (not for programmatic content override)
+    if (shouldUseInput) {
+      imageContextManager?.clearImages();
+    }
+
+    const currentNotePath = fileContextManager?.getCurrentNotePath() || null;
+
     state.isStreaming = true;
     state.cancelRequested = false;
     state.ignoreUsageUpdates = false; // Allow usage updates for new query
@@ -231,18 +415,6 @@ export class InputController {
 
     // Slash commands are passed directly to SDK for handling
     // SDK handles expansion, $ARGUMENTS, @file references, and frontmatter options
-    const displayContent = content;
-    let queryOptions: QueryOptions | undefined;
-
-    const images = imageContextManager?.getAttachedImages() || [];
-    let imagesForMessage = images.length > 0 ? [...images] : undefined;
-
-    // Only clear images if we consumed user input (not for programmatic content override)
-    if (shouldUseInput) {
-      imageContextManager?.clearImages();
-    }
-
-    const currentNotePath = fileContextManager?.getCurrentNotePath() || null;
     const shouldSendCurrentNote = fileContextManager?.shouldSendCurrentNote(currentNotePath) ?? false;
 
     const editorContextOverride = options?.editorContextOverride;
@@ -253,20 +425,44 @@ export class InputController {
     const browserContext = browserContextOverride !== undefined
       ? browserContextOverride
       : (browserSelectionController?.getContext() ?? null);
+    const memoryFilePath = this.resolveMemoryFilePath(plugin);
+    let quickReplies: StrongRulesQuickReplies = {};
+    const strongRulesFilePath = this.resolveStrongRulesFilePath(plugin);
+    if (strongRulesFilePath) {
+      const strongRulesFile = plugin.app.vault.getFileByPath(strongRulesFilePath);
+      if (strongRulesFile) {
+        const markdown = await plugin.app.vault.cachedRead(strongRulesFile);
+        quickReplies = extractQuickRepliesFromMarkdown(markdown);
+      }
+    }
 
+    const availableAgents = (plugin.agentManager?.getAvailableAgents?.() ?? []).map((agent: RequestedAgentReference) => ({
+      id: agent.id,
+      name: agent.name,
+      description: agent.description ?? '',
+    }));
+    const parsedAgentMentions = parseRequestedAgentMentions(content, availableAgents);
+    if (parsedAgentMentions.invalidMentions.length > 0) {
+      new Notice(`未找到子代理：${parsedAgentMentions.invalidMentions.join('、')}。请从 @Agents 列表里重新选择。`);
+      return;
+    }
+
+    const effectiveContent = parsedAgentMentions.sanitizedContent || content;
     const externalContextPaths = externalContextSelector?.getExternalContexts();
-    const isCompact = /^\/compact(\s|$)/i.test(content);
+    const isCompact = /^\/compact(\s|$)/i.test(effectiveContent);
+    const displayContent = content;
+    let queryOptions: QueryOptions | undefined;
 
     // User content first, context XML appended after (enables slash command detection)
-    let promptToSend = content;
-    let currentNoteForMessage: string | undefined;
+    let promptToSend = effectiveContent;
+    let currentNoteForHistory: string | undefined;
 
     // SDK built-in commands (e.g., /compact) must be sent bare — context XML breaks detection
     if (!isCompact) {
       // Append current note context if available
       if (shouldSendCurrentNote && currentNotePath) {
         promptToSend = appendCurrentNote(promptToSend, currentNotePath);
-        currentNoteForMessage = currentNotePath;
+        currentNoteForHistory = currentNotePath;
 
         const currentNoteFile = plugin.app.vault.getFileByPath(currentNotePath);
         if (currentNoteFile) {
@@ -309,6 +505,14 @@ export class InputController {
       if (fileContextManager) {
         promptToSend = fileContextManager.transformContextMentions(promptToSend);
       }
+
+      if (memoryFilePath) {
+        promptToSend = appendContextFiles(promptToSend, [memoryFilePath]);
+      }
+
+      promptToSend = appendDirectAnswerInstruction(promptToSend, effectiveContent, quickReplies);
+      promptToSend = appendQuickReplyGuidance(promptToSend, effectiveContent, quickReplies);
+      promptToSend = appendRequestedAgentGuidance(promptToSend, parsedAgentMentions.requestedAgents);
     }
 
     fileContextManager?.markCurrentNoteSent();
@@ -319,7 +523,7 @@ export class InputController {
       content: promptToSend,         // Full prompt with XML context (for history rebuild)
       displayContent,                // Original user input (for UI display)
       timestamp: Date.now(),
-      currentNote: currentNoteForMessage,
+      currentNote: currentNoteForHistory,
       images: imagesForMessage,
     };
     state.addMessage(userMsg);

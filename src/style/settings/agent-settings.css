@@ -1,2 +1,40 @@
 /* Agent Settings — all structural rules live in base.css .claudian-sp-* */
-/* This file is kept as a placeholder for future agent-specific overrides. */
+/* Multi-select option groups for agent tools and skills */
+.claudian-sp-multiselect-setting {
+  display: block;
+}
+
+.claudian-sp-multiselect-setting .setting-item-info {
+  margin-bottom: 10px;
+}
+
+.claudian-sp-option-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.claudian-sp-option-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  background: var(--background-secondary);
+  cursor: pointer;
+}
+
+.claudian-sp-option-item:hover {
+  background: var(--background-secondary-alt);
+}
+
+.claudian-sp-option-checkbox {
+  margin: 0;
+}
+
+.claudian-sp-option-label {
+  font-size: var(--font-ui-small);
+  line-height: 1.2;
+}

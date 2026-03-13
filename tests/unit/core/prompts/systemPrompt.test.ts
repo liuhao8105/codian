@@ -13,6 +13,12 @@ describe('systemPrompt', () => {
       expect(prompt).toContain('Always be concise.');
     });
 
+    it('should append strong rules section when provided', () => {
+      const prompt = buildSystemPrompt({ strongRulesPrompt: '# Strong Rules\n\nAlways use Chinese.' });
+      expect(prompt).toContain('# Strong Rules');
+      expect(prompt).toContain('Always use Chinese.');
+    });
+
     it('should not append custom prompt section when empty', () => {
       const prompt = buildSystemPrompt({ customPrompt: '   ' });
       expect(prompt).not.toContain('# Custom Instructions');
@@ -26,9 +32,17 @@ describe('systemPrompt', () => {
     it('should include base system prompt elements', () => {
       const prompt = buildSystemPrompt();
       expect(prompt).toContain('Mocked Date');
-      expect(prompt).toContain('Claudian');
+      expect(prompt).toContain('Codian');
       expect(prompt).toContain('# Path Rules');
       expect(prompt).toContain('# User Message Format');
+      expect(prompt).toContain('<context_files>');
+    });
+
+    it('should instruct the model to keep context reading internal', () => {
+      const prompt = buildSystemPrompt();
+      expect(prompt).toContain('## Response Behavior');
+      expect(prompt).toContain('Context reading is an internal step. Do not narrate it.');
+      expect(prompt).toContain('lead with a direct answer first');
     });
 
     it('should include allowed export paths instructions when configured', () => {

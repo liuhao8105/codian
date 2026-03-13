@@ -83,6 +83,14 @@
       "name": "自訂系統提示詞",
       "desc": "附加到預設系統提示詞的額外指令"
     },
+    "strongRulesFilePath": {
+      "name": "強規則檔案",
+      "desc": "可選：將該筆記中「第一個一級標題」下的內容注入 system prompt，作為硬規則使用。"
+    },
+    "memoryFilePath": {
+      "name": "長期記憶檔案",
+      "desc": "可選：始終附加為上下文的筆記路徑。建議使用儲存庫內相對路徑，例如 profiles/user-memory.md。"
+    },
     "autoTitle": {
       "name": "自動生成對話標題",
       "desc": "在使用者送出第一則訊息後自動生成對話標題。"

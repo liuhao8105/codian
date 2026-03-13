@@ -10,6 +10,7 @@ import { getTodayDate } from '../../utils/date';
 export interface SystemPromptSettings {
   mediaFolder?: string;
   customPrompt?: string;
+  strongRulesPrompt?: string;
   allowedExportPaths?: string[];
   vaultPath?: string;
   userName?: string;
@@ -72,6 +73,10 @@ path/to/note.md
 selected text content
 </editor_selection>
 
+<context_files>
+path/to/reference.md, path/to/profile.md
+</context_files>
+
 <browser_selection source="browser:https://leetcode.com/problems/two-sum" title="LeetCode" url="https://leetcode.com/problems/two-sum">
 selected content from an Obsidian browser view
 </browser_selection>
@@ -80,8 +85,16 @@ selected content from an Obsidian browser view
 - The user's query/instruction always comes first in the message.
 - \`<current_note>\`: The note the user is currently viewing/focused on. Read this to understand context.
 - \`<editor_selection>\`: Text currently selected in the editor, with file path and line numbers.
+- \`<context_files>\`: Additional files that should be treated as required context. Read them before answering.
 - \`<browser_selection>\`: Text selected in an Obsidian browser/web view (for example Surfing), including optional source/title/url metadata.
 - \`@filename.md\`: Files mentioned with @ in the query. Read these files when referenced.
+
+## Response Behavior
+
+- Context reading is an internal step. Do not narrate it.
+- If required context is already attached through system prompt, current note, or context files, answer directly instead of saying things like "I'll first check the file" or "let me read your profile note."
+- Mention files or sources only when the user explicitly asks where the answer came from, or when source attribution is necessary for correctness.
+- For simple conversational questions such as "你是谁", "你能做什么", or "你记得我什么", lead with a direct answer first. Keep it natural and brief unless the user asks for more detail.
 
 ## Obsidian Context
 
@@ -301,6 +314,10 @@ export function buildSystemPrompt(settings: SystemPromptSettings = {}): string {
   // Stable content (ordered for context cache optimization)
   prompt += getImageInstructions(settings.mediaFolder || '');
   prompt += getExportInstructions(settings.allowedExportPaths || []);
+
+  if (settings.strongRulesPrompt?.trim()) {
+    prompt += '\n\n## Strong Rules\n\n' + settings.strongRulesPrompt.trim();
+  }
 
   if (settings.customPrompt?.trim()) {
     prompt += '\n\n## Custom Instructions\n\n' + settings.customPrompt.trim();

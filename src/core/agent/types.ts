@@ -140,6 +140,7 @@ export function computeSystemPromptKey(settings: SystemPromptSettings): string {
   // Include only fields surfaced in the system prompt to avoid stale cache hits.
   const parts = [
     settings.mediaFolder || '',
+    settings.strongRulesPrompt || '',
     settings.customPrompt || '',
     (settings.allowedExportPaths || []).sort().join('|'),
     settings.vaultPath || '',

@@ -30,7 +30,7 @@ import {
 describe('types.ts', () => {
   describe('VIEW_TYPE_CLAUDIAN', () => {
     it('should be defined as the correct view type', () => {
-      expect(VIEW_TYPE_CLAUDIAN).toBe('claudian-view');
+      expect(VIEW_TYPE_CLAUDIAN).toBe('codian-view');
     });
   });
 
@@ -76,12 +76,21 @@ describe('types.ts', () => {
       expect(DEFAULT_SETTINGS.environmentVariables).toBe('');
     });
 
+    it('should have memoryFilePath as empty string by default', () => {
+      expect(DEFAULT_SETTINGS.memoryFilePath).toBe('');
+    });
+
+    it('should have strongRules fields empty by default', () => {
+      expect(DEFAULT_SETTINGS.strongRulesFilePath).toBe('');
+      expect(DEFAULT_SETTINGS.strongRulesPrompt).toBe('');
+    });
+
     it('should have envSnippets as empty array by default', () => {
       expect(DEFAULT_SETTINGS.envSnippets).toEqual([]);
     });
 
     it('should have lastClaudeModel set to haiku by default', () => {
-      expect(DEFAULT_SETTINGS.lastClaudeModel).toBe('haiku');
+      expect(DEFAULT_SETTINGS.lastClaudeModel).toBe('gpt-5');
     });
 
     it('should have lastCustomModel as empty string by default', () => {
@@ -106,6 +115,9 @@ describe('types.ts', () => {
         envSnippets: [],
         customContextLimits: {},
         systemPrompt: '',
+        strongRulesFilePath: '',
+        strongRulesPrompt: '',
+        memoryFilePath: '',
         allowedExportPaths: [],
         persistentExternalContextPaths: [],
         slashCommands: [],
@@ -145,6 +157,9 @@ describe('types.ts', () => {
         envSnippets: [],
         customContextLimits: {},
         systemPrompt: '',
+        strongRulesFilePath: '',
+        strongRulesPrompt: '',
+        memoryFilePath: '',
         allowedExportPaths: [],
         persistentExternalContextPaths: [],
         slashCommands: [],
@@ -184,6 +199,9 @@ describe('types.ts', () => {
         envSnippets: [],
         customContextLimits: {},
         systemPrompt: '',
+        strongRulesFilePath: '',
+        strongRulesPrompt: '',
+        memoryFilePath: '',
         allowedExportPaths: [],
         persistentExternalContextPaths: [],
         slashCommands: [],

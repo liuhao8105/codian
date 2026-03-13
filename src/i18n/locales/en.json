@@ -83,6 +83,14 @@
       "name": "Custom system prompt",
       "desc": "Additional instructions appended to the default system prompt"
     },
+    "strongRulesFilePath": {
+      "name": "Strong rules file",
+      "desc": "Optional vault note whose first level-1 heading section is injected into the system prompt as hard rules."
+    },
+    "memoryFilePath": {
+      "name": "Long-term memory file",
+      "desc": "Optional note path always attached as context. Prefer a vault-relative Markdown path such as profiles/user-memory.md."
+    },
     "autoTitle": {
       "name": "Auto-generate conversation titles",
       "desc": "Automatically generate conversation titles after the first user message is sent."
@@ -177,11 +185,11 @@
         "model": "Model",
         "modelDesc": "Model override for this agent",
         "tools": "Tools",
-        "toolsDesc": "Comma-separated list of allowed tools (empty = all)",
+        "toolsDesc": "Select the allowed tools below (empty = all)",
         "disallowedTools": "Disallowed tools",
-        "disallowedToolsDesc": "Comma-separated list of tools to disallow",
+        "disallowedToolsDesc": "Select the tools to disallow below",
         "skills": "Skills",
-        "skillsDesc": "Comma-separated list of skills",
+        "skillsDesc": "Select installed skills below",
         "prompt": "System prompt",
         "promptDesc": "Instructions for the agent",
         "promptPlaceholder": "You are a code reviewer. Analyze the given code for..."

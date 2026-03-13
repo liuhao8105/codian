@@ -52,6 +52,7 @@ describe('ClaudianService', () => {
         enableBlocklist: false,
         mediaFolder: 'claudian-media',
         systemPrompt: '',
+        memoryFilePath: '',
         allowedExportPaths: [],
         loadUserClaudeSettings: false,
         claudeCliPath: '/usr/local/bin/claude',

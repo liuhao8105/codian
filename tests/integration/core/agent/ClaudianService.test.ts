@@ -119,6 +119,7 @@ function createMockPlugin(settings: Record<string, unknown> = {}) {
       loadUserClaudeSettings: false,
       mediaFolder: '',
       systemPrompt: '',
+      memoryFilePath: '',
       model: 'claude-sonnet-4-5',
       thinkingBudget: 'off',
       ...settings,

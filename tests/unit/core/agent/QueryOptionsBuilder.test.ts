@@ -47,6 +47,9 @@ function createMockSettings(overrides: Partial<ClaudianSettings> = {}): Claudian
     loadUserClaudeSettings: false,
     mediaFolder: '',
     systemPrompt: '',
+    strongRulesFilePath: '',
+    strongRulesPrompt: '',
+    memoryFilePath: '',
     model: 'claude-sonnet-4-5',
     thinkingBudget: 'off',
     titleGenerationModel: '',
@@ -117,6 +120,17 @@ describe('QueryOptionsBuilder', () => {
       const currentConfig = createMockPersistentQueryConfig();
       const newConfig = { ...currentConfig, systemPromptKey: 'key2' };
       expect(QueryOptionsBuilder.needsRestart(currentConfig, newConfig)).toBe(true);
+    });
+
+    it('changes systemPromptKey when strongRulesPrompt changes', () => {
+      const currentConfig = QueryOptionsBuilder.buildPersistentQueryConfig(
+        createMockContext({ settings: createMockSettings({ strongRulesPrompt: 'rule-a' }) })
+      );
+      const newConfig = QueryOptionsBuilder.buildPersistentQueryConfig(
+        createMockContext({ settings: createMockSettings({ strongRulesPrompt: 'rule-b' }) })
+      );
+
+      expect(currentConfig.systemPromptKey).not.toBe(newConfig.systemPromptKey);
     });
 
     it('returns true when disallowedToolsKey changes', () => {

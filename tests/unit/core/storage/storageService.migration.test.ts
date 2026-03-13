@@ -280,8 +280,8 @@ describe('StorageService migration', () => {
 
     const saved = JSON.parse(files.get('.claude/claudian-settings.json') || '{}') as Record<string, unknown>;
     expect(saved.lastEnvHash).toBe('abc123');
-    // lastClaudeModel defaults to 'haiku' (truthy), so migration doesn't overwrite it
-    expect(saved.lastClaudeModel).toBe('haiku');
+    // lastClaudeModel defaults to 'gpt-5' (truthy), so migration doesn't overwrite it
+    expect(saved.lastClaudeModel).toBe('gpt-5');
     expect(saved.lastCustomModel).toBe('custom-model');
   });
 

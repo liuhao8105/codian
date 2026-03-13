@@ -144,6 +144,7 @@ export class QueryOptionsBuilder {
   ): PersistentQueryConfig {
     const systemPromptSettings: SystemPromptSettings = {
       mediaFolder: ctx.settings.mediaFolder,
+      strongRulesPrompt: ctx.settings.strongRulesPrompt,
       customPrompt: ctx.settings.systemPrompt,
       allowedExportPaths: ctx.settings.allowedExportPaths,
       vaultPath: ctx.vaultPath,
@@ -185,6 +186,7 @@ export class QueryOptionsBuilder {
     const resolved = resolveModelWithBetas(ctx.settings.model, ctx.settings.show1MModel);
     const systemPrompt = buildSystemPrompt({
       mediaFolder: ctx.settings.mediaFolder,
+      strongRulesPrompt: ctx.settings.strongRulesPrompt,
       customPrompt: ctx.settings.systemPrompt,
       allowedExportPaths: ctx.settings.allowedExportPaths,
       vaultPath: ctx.vaultPath,
@@ -253,6 +255,7 @@ export class QueryOptionsBuilder {
     const resolved = resolveModelWithBetas(selectedModel, ctx.settings.show1MModel);
     const systemPrompt = buildSystemPrompt({
       mediaFolder: ctx.settings.mediaFolder,
+      strongRulesPrompt: ctx.settings.strongRulesPrompt,
       customPrompt: ctx.settings.systemPrompt,
       allowedExportPaths: ctx.settings.allowedExportPaths,
       vaultPath: ctx.vaultPath,

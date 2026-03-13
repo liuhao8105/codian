@@ -30,6 +30,9 @@ describe('migrationConstants', () => {
       expect(CLAUDIAN_ONLY_FIELDS.has('excludedTags')).toBe(true);
       expect(CLAUDIAN_ONLY_FIELDS.has('mediaFolder')).toBe(true);
       expect(CLAUDIAN_ONLY_FIELDS.has('systemPrompt')).toBe(true);
+      expect(CLAUDIAN_ONLY_FIELDS.has('strongRulesFilePath')).toBe(true);
+      expect(CLAUDIAN_ONLY_FIELDS.has('strongRulesPrompt')).toBe(true);
+      expect(CLAUDIAN_ONLY_FIELDS.has('memoryFilePath')).toBe(true);
       expect(CLAUDIAN_ONLY_FIELDS.has('allowedExportPaths')).toBe(true);
       expect(CLAUDIAN_ONLY_FIELDS.has('persistentExternalContextPaths')).toBe(true);
     });

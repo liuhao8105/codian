@@ -83,6 +83,14 @@
       "name": "Prompt système personnalisé",
       "desc": "Instructions supplémentaires ajoutées au prompt système par défaut"
     },
+    "strongRulesFilePath": {
+      "name": "Fichier de règles fortes",
+      "desc": "Optionnel. Le contenu sous le premier titre de niveau 1 de cette note est injecté dans le system prompt comme règles strictes."
+    },
+    "memoryFilePath": {
+      "name": "Fichier de mémoire long terme",
+      "desc": "Chemin de note optionnel toujours joint comme contexte. Préférez un chemin Markdown relatif au coffre, par exemple profiles/user-memory.md."
+    },
     "autoTitle": {
       "name": "Générer automatiquement les titres de conversation",
       "desc": "Génère automatiquement les titres de conversation après le premier message de l'utilisateur."

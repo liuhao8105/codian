@@ -181,6 +181,39 @@ export class CodianSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
+      .setName(t('settings.strongRulesFilePath.name'))
+      .setDesc(t('settings.strongRulesFilePath.desc'))
+      .addText((text) => {
+        text
+          .setPlaceholder('profiles/user-memory.md')
+          .setValue(this.plugin.settings.strongRulesFilePath ?? '')
+          .onChange(async (value) => {
+            this.plugin.settings.strongRulesFilePath = value.trim();
+            if (!this.plugin.settings.strongRulesFilePath) {
+              this.plugin.settings.strongRulesPrompt = '';
+            }
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.addClass('claudian-settings-media-input');
+        text.inputEl.addEventListener('blur', () => this.restartServiceForPromptChange());
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.memoryFilePath.name'))
+      .setDesc(t('settings.memoryFilePath.desc'))
+      .addText((text) => {
+        text
+          .setPlaceholder('profiles/user-memory.md')
+          .setValue(this.plugin.settings.memoryFilePath ?? '')
+          .onChange(async (value) => {
+            this.plugin.settings.memoryFilePath = value.trim();
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.addClass('claudian-settings-media-input');
+        text.inputEl.addEventListener('blur', () => this.restartServiceForPromptChange());
+      });
+
+    new Setting(containerEl)
       .setName(t('settings.enableAutoScroll.name'))
       .setDesc(t('settings.enableAutoScroll.desc'))
       .addToggle((toggle) =>

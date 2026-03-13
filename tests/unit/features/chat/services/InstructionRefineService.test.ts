@@ -14,6 +14,7 @@ function createMockPlugin(settings = {}) {
       model: 'sonnet',
       thinkingBudget: 'off',
       systemPrompt: '',
+      memoryFilePath: '',
       ...settings,
     },
     app: {

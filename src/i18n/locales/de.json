@@ -83,6 +83,14 @@
       "name": "Benutzerdefinierter System-Prompt",
       "desc": "Zusätzliche Anweisungen, die an den Standard-System-Prompt angehängt werden"
     },
+    "strongRulesFilePath": {
+      "name": "Datei für starke Regeln",
+      "desc": "Optional. Der Abschnitt unter der ersten Überschrift Ebene 1 dieser Notiz wird als harte Regeln in den System-Prompt eingefügt."
+    },
+    "memoryFilePath": {
+      "name": "Datei für Langzeitgedächtnis",
+      "desc": "Optionaler Notizpfad, der immer als Kontext angehängt wird. Bevorzuge einen vault-relativen Markdown-Pfad wie profiles/user-memory.md."
+    },
     "autoTitle": {
       "name": "Konversationstitel automatisch generieren",
       "desc": "Generiert automatisch Konversationstitel nach der ersten Nutzernachricht."

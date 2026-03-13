@@ -83,6 +83,9 @@ interface LegacySettingsJson {
   environmentVariables?: string;
   envSnippets?: unknown[];
   systemPrompt?: string;
+  strongRulesFilePath?: string;
+  strongRulesPrompt?: string;
+  memoryFilePath?: string;
   allowedExportPaths?: string[];
   keyboardNavigation?: unknown;
   claudeCliPath?: string;
@@ -237,6 +240,9 @@ export class StorageService {
       environmentVariables, // Merged from both sources
       envSnippets: oldSettings.envSnippets as StoredCodianSettings['envSnippets'] ?? DEFAULT_SETTINGS.envSnippets,
       systemPrompt: oldSettings.systemPrompt ?? DEFAULT_SETTINGS.systemPrompt,
+      strongRulesFilePath: oldSettings.strongRulesFilePath ?? DEFAULT_SETTINGS.strongRulesFilePath,
+      strongRulesPrompt: oldSettings.strongRulesPrompt ?? DEFAULT_SETTINGS.strongRulesPrompt,
+      memoryFilePath: oldSettings.memoryFilePath ?? DEFAULT_SETTINGS.memoryFilePath,
       allowedExportPaths: oldSettings.allowedExportPaths ?? DEFAULT_SETTINGS.allowedExportPaths,
       persistentExternalContextPaths: DEFAULT_SETTINGS.persistentExternalContextPaths,
       keyboardNavigation: oldSettings.keyboardNavigation as StoredCodianSettings['keyboardNavigation'] ?? DEFAULT_SETTINGS.keyboardNavigation,

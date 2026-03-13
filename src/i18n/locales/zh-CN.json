@@ -83,6 +83,14 @@
       "name": "自定义系统提示词",
       "desc": "附加到默认系统提示词的额外指令"
     },
+    "strongRulesFilePath": {
+      "name": "强规则文件",
+      "desc": "可选：把该笔记中“第一个一级标题”下的内容注入 system prompt，作为硬规则使用。"
+    },
+    "memoryFilePath": {
+      "name": "长期记忆文件",
+      "desc": "可选：始终作为上下文附加的笔记路径。优先填写仓库内相对路径，例如 profiles/user-memory.md。"
+    },
     "autoTitle": {
       "name": "自动生成对话标题",
       "desc": "在用户发送首条消息后自动生成对话标题。"
@@ -177,11 +185,11 @@
         "model": "模型",
         "modelDesc": "该代理的模型覆盖",
         "tools": "工具",
-        "toolsDesc": "允许使用的工具列表，用逗号分隔（留空 = 全部）",
+        "toolsDesc": "从下方选择允许使用的工具（留空 = 全部）",
         "disallowedTools": "禁用工具",
-        "disallowedToolsDesc": "要禁用的工具列表，用逗号分隔",
+        "disallowedToolsDesc": "从下方选择要禁用的工具",
         "skills": "技能",
-        "skillsDesc": "技能列表，用逗号分隔",
+        "skillsDesc": "从下方选择已安装技能",
         "prompt": "系统提示词",
         "promptDesc": "给代理的指令",
         "promptPlaceholder": "你是一名代码审查员。请分析给定代码中的..."

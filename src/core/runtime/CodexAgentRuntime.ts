@@ -193,10 +193,19 @@ export class CodexAgentRuntime implements AgentRuntime {
     return 'workspace-write';
   }
 
+  private getRequestedMcpServers(queryOptions?: QueryOptions): Record<string, unknown> {
+    const mcpMentions = queryOptions?.mcpMentions || new Set<string>();
+    const uiEnabledServers = queryOptions?.enabledMcpServers || new Set<string>();
+    const combinedMentions = new Set([...mcpMentions, ...uiEnabledServers]);
+    return this.mcpManager.getActiveServers(combinedMentions);
+  }
+
   private buildTurnSandboxPolicy(queryOptions?: QueryOptions): Record<string, unknown> {
     const writableRoots = (queryOptions?.externalContextPaths || [])
       .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
       .map((value) => value.trim());
+    const activeMcpServers = this.getRequestedMcpServers(queryOptions);
+    const needsNetworkAccess = Object.keys(activeMcpServers).length > 0;
 
     return {
       type: 'workspaceWrite',
@@ -204,7 +213,7 @@ export class CodexAgentRuntime implements AgentRuntime {
       readOnlyAccess: {
         type: 'fullAccess',
       },
-      networkAccess: false,
+      networkAccess: needsNetworkAccess,
       excludeTmpdirEnvVar: false,
       excludeSlashTmp: false,
     };

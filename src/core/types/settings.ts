@@ -255,6 +255,9 @@ export interface CodianSettings {
   excludedTags: string[];
   mediaFolder: string;
   systemPrompt: string;
+  strongRulesFilePath: string;
+  strongRulesPrompt: string;
+  memoryFilePath: string;
   allowedExportPaths: string[];
   persistentExternalContextPaths: string[];  // Paths that persist across all sessions
 
@@ -323,6 +326,9 @@ export const DEFAULT_SETTINGS: CodianSettings = {
   excludedTags: [],
   mediaFolder: '',
   systemPrompt: '',
+  strongRulesFilePath: '',
+  strongRulesPrompt: '',
+  memoryFilePath: '',
   allowedExportPaths: ['~/Desktop', '~/Downloads'],
   persistentExternalContextPaths: [],
 
