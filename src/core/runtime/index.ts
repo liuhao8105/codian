@@ -10,6 +10,7 @@ import type {
   SlashCommand,
   StreamChunk,
 } from '../types';
+import type { SubagentHookState } from '../hooks';
 import type CodianPlugin from '../../main';
 import {
   type RefineProgressCallback,
@@ -58,6 +59,8 @@ export interface AgentRuntime {
   ): void;
   setExitPlanModeCallback(callback: ExitPlanModeCallback | null): void;
   setPermissionModeSyncCallback(callback: ((sdkMode: string) => void) | null): void;
+  setSubagentHookProvider(getState: () => SubagentHookState): void;
+  setAutoTurnCallback(callback: ((chunks: StreamChunk[]) => void) | null): void;
 }
 
 export interface InstructionRuntime {

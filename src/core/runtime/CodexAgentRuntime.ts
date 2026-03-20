@@ -13,6 +13,7 @@ import {
   getLastUserMessage,
 } from '../../utils/session';
 import type { ApprovalCallback, QueryOptions } from '../agent';
+import type { SubagentHookState } from '../hooks';
 import type { McpServerManager } from '../mcp';
 import type {
   ChatMessage,
@@ -568,5 +569,13 @@ export class CodexAgentRuntime implements AgentRuntime {
 
   setPermissionModeSyncCallback(callback: ((sdkMode: string) => void) | null): void {
     this.permissionModeSyncCallback = callback;
+  }
+
+  setSubagentHookProvider(_getState: () => SubagentHookState): void {
+    // Codex runtime does not use Claude SDK hooks. Kept for runtime compatibility.
+  }
+
+  setAutoTurnCallback(_callback: ((chunks: StreamChunk[]) => void) | null): void {
+    // Codex runtime currently does not emit SDK auto-turn callbacks.
   }
 }
