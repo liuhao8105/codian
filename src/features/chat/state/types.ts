@@ -37,10 +37,11 @@ export interface StoredSelection {
   notePath: string;
   selectedText: string;
   lineCount: number;
-  startLine: number;
-  from: number;
-  to: number;
-  editorView: EditorView;
+  startLine?: number;
+  from?: number;
+  to?: number;
+  editorView?: EditorView;
+  domRanges?: Range[];
 }
 
 /** Centralized chat state data. */
