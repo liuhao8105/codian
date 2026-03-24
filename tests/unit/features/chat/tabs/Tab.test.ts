@@ -16,6 +16,8 @@ import {
   wireTabInputEvents,
 } from '@/features/chat/tabs/Tab';
 
+const mockCreateAgentRuntime = jest.fn();
+
 // Mock ResizeObserver (not available in jsdom)
 const resizeObserverInstances: MockResizeObserver[] = [];
 class MockResizeObserver {
@@ -30,17 +32,13 @@ class MockResizeObserver {
 }
 global.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
 
-// Mock ClaudianService
-jest.mock('@/core/agent', () => ({
-  ClaudianService: jest.fn().mockImplementation(() => ({
-    ensureReady: jest.fn().mockResolvedValue(true),
-    closePersistentQuery: jest.fn(),
-    isReady: jest.fn().mockReturnValue(false),
-    applyForkState: jest.fn((conv: any) => conv.sessionId ?? conv.forkSource?.sessionId ?? null),
-    onReadyStateChange: jest.fn((listener: (ready: boolean) => void) => {
-      listener(false);
-      return () => {};
-    }),
+jest.mock('@/core/runtime', () => ({
+  createAgentRuntime: (...args: any[]) => mockCreateAgentRuntime(...args),
+  createInstructionRuntime: jest.fn().mockImplementation(() => ({
+    cancel: jest.fn(),
+  })),
+  createTitleRuntime: jest.fn().mockImplementation(() => ({
+    cancel: jest.fn(),
   })),
 }));
 
@@ -99,7 +97,7 @@ const createMockModelSelector = () => ({
   setReady: jest.fn(),
 });
 
-const createMockClaudianService = (overrides?: {
+const createMockAgentRuntime = (overrides?: {
   ensureReady?: jest.Mock;
   onReadyStateChange?: jest.Mock;
 }) => ({
@@ -111,6 +109,9 @@ const createMockClaudianService = (overrides?: {
     listener(false);
     return () => {};
   }),
+  setSubagentHookProvider: jest.fn(),
+  setAutoTurnCallback: jest.fn(),
+  setPermissionModeSyncCallback: jest.fn(),
 });
 
 const createMockThinkingBudgetSelector = () => ({
@@ -314,6 +315,7 @@ function createMockPlugin(overrides: Record<string, any> = {}): any {
       model: 'claude-sonnet-4-5',
       thinkingBudget: 'low',
       permissionMode: 'yolo',
+      allowExternalAccess: false,
       slashCommands: [],
       keyboardNavigation: {
         scrollUpKey: 'k',
@@ -331,6 +333,11 @@ function createMockPlugin(overrides: Record<string, any> = {}): any {
     ...overrides,
   };
 }
+
+beforeEach(() => {
+  mockCreateAgentRuntime.mockReset();
+  mockCreateAgentRuntime.mockImplementation(() => createMockAgentRuntime());
+});
 
 // Helper to create mock MCP manager
 function createMockMcpManager(): any {
@@ -457,7 +464,7 @@ describe('Tab - Service Initialization', () => {
       expect(tab.service).toEqual({});
     });
 
-    it('should create ClaudianService on first initialization', async () => {
+    it('should create runtime service on first initialization', async () => {
       const options = createMockOptions();
       const tab = createTab(options);
 
@@ -469,8 +476,7 @@ describe('Tab - Service Initialization', () => {
 
     it('should ensureReady without session ID (just spin up process)', async () => {
       const mockEnsureReady = jest.fn().mockResolvedValue(true);
-      const agentModule = jest.requireMock('@/core/agent') as { ClaudianService: jest.Mock };
-      agentModule.ClaudianService.mockImplementationOnce(() => createMockClaudianService({ ensureReady: mockEnsureReady }));
+      mockCreateAgentRuntime.mockImplementationOnce(() => createMockAgentRuntime({ ensureReady: mockEnsureReady }));
 
       const options = createMockOptions();
       const tab = createTab(options);
@@ -485,8 +491,7 @@ describe('Tab - Service Initialization', () => {
 
     it('should ensureReady with saved external contexts for existing conversation', async () => {
       const mockEnsureReady = jest.fn().mockResolvedValue(true);
-      const agentModule = jest.requireMock('@/core/agent') as { ClaudianService: jest.Mock };
-      agentModule.ClaudianService.mockImplementationOnce(() => createMockClaudianService({ ensureReady: mockEnsureReady }));
+      mockCreateAgentRuntime.mockImplementationOnce(() => createMockAgentRuntime({ ensureReady: mockEnsureReady }));
 
       const conversation = {
         id: 'conv-1',
@@ -519,8 +524,7 @@ describe('Tab - Service Initialization', () => {
         return () => {};
       });
 
-      const agentModule = jest.requireMock('@/core/agent') as { ClaudianService: jest.Mock };
-      agentModule.ClaudianService.mockImplementationOnce(() => createMockClaudianService({ onReadyStateChange: mockOnReadyStateChange }));
+      mockCreateAgentRuntime.mockImplementationOnce(() => createMockAgentRuntime({ onReadyStateChange: mockOnReadyStateChange }));
 
       const options = createMockOptions();
       const tab = createTab(options);
@@ -648,8 +652,7 @@ describe('Tab - Destruction', () => {
       const unsubscribeFn = jest.fn();
       const mockOnReadyStateChange = jest.fn(() => unsubscribeFn);
 
-      const agentModule = jest.requireMock('@/core/agent') as { ClaudianService: jest.Mock };
-      agentModule.ClaudianService.mockImplementationOnce(() => createMockClaudianService({ onReadyStateChange: mockOnReadyStateChange }));
+      mockCreateAgentRuntime.mockImplementationOnce(() => createMockAgentRuntime({ onReadyStateChange: mockOnReadyStateChange }));
 
       const options = createMockOptions();
       const tab = createTab(options);

@@ -248,6 +248,7 @@ export interface CodianSettings {
   enableAutoTitleGeneration: boolean;
   titleGenerationModel: string;  // Model for auto title generation (empty = auto)
   show1MModel: boolean;  // Legacy Anthropic option, hidden in Codian UI
+  allowExternalAccess: boolean;  // Allow tools to access files outside the vault
   enableChrome: boolean;  // Enable Chrome extension support (passes --chrome flag)
   enableBangBash: boolean;  // Enable ! bash mode for direct command execution
 
@@ -319,6 +320,7 @@ export const DEFAULT_SETTINGS: CodianSettings = {
   enableAutoTitleGeneration: true,
   titleGenerationModel: '',  // Empty = auto (OPENAI_MODEL / CODEX_MODEL / gpt-5)
   show1MModel: false,  // Hidden legacy setting
+  allowExternalAccess: false,  // Keep vault restriction enabled by default
   enableChrome: false,  // Disabled by default
   enableBangBash: false,  // Disabled by default
 

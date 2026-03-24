@@ -887,13 +887,20 @@ export class InputController {
   // ============================================
 
   cancelStreaming(): void {
-    const { state, streamController } = this.deps;
+    const { state, streamController, conversationController } = this.deps;
     if (!state.isStreaming) return;
-    state.cancelRequested = true;
+
+    // Invalidate the active stream immediately so late chunks are ignored.
+    state.bumpStreamGeneration();
     // Restore queued message to input instead of discarding
     this.restoreQueuedMessageToInput();
     this.getAgentService()?.cancel();
     streamController.hideThinkingIndicator();
+    streamController.resetStreamingState();
+    state.resetStreamingState();
+    void Promise.resolve(conversationController.save(true)).catch(() => {
+      // Best-effort persistence only; cancellation should still unblock the UI.
+    });
   }
 
   private syncScrollToBottomAfterRenderUpdates(): void {

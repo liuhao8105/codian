@@ -1185,7 +1185,6 @@ export function setupServiceCallbacks(tab: TabData, plugin: CodianPlugin): void 
   }
 }
 
-export function updatePlanModeUI(tab: TabData, plugin: CodianPlugin, mode: PermissionMode): void {
 function generateMessageId(): string {
   return `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 }

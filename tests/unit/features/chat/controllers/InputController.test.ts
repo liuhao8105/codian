@@ -138,6 +138,7 @@ function createMockDeps(overrides: Partial<InputControllerDeps> = {}): InputCont
     streamController: {
       showThinkingIndicator: jest.fn(),
       hideThinkingIndicator: jest.fn(),
+      resetStreamingState: jest.fn(),
       handleStreamChunk: jest.fn(),
       finalizeCurrentTextBlock: jest.fn(),
       finalizeCurrentThinkingBlock: jest.fn(),
@@ -396,8 +397,10 @@ describe('InputController - Message Queue', () => {
       controller.cancelStreaming();
 
       expect(deps.state.queuedMessage).toBeNull();
-      expect(deps.state.cancelRequested).toBe(true);
+      expect(deps.state.cancelRequested).toBe(false);
+      expect(deps.state.isStreaming).toBe(false);
       expect((deps as any).mockAgentService.cancel).toHaveBeenCalled();
+      expect(deps.conversationController.save).toHaveBeenCalledWith(true);
     });
 
     it('should not cancel if not streaming', () => {
@@ -1142,13 +1145,14 @@ describe('InputController - Message Queue', () => {
   });
 
   describe('Cancel streaming - restore behavior', () => {
-    it('should set cancelRequested and call agent cancel', () => {
+    it('should immediately unlock streaming state and call agent cancel', () => {
       deps.state.isStreaming = true;
       controller = new InputController(deps);
 
       controller.cancelStreaming();
 
-      expect(deps.state.cancelRequested).toBe(true);
+      expect(deps.state.cancelRequested).toBe(false);
+      expect(deps.state.isStreaming).toBe(false);
       expect((deps as any).mockAgentService.cancel).toHaveBeenCalled();
     });
 
@@ -1182,6 +1186,7 @@ describe('InputController - Message Queue', () => {
       controller.cancelStreaming();
 
       expect(deps.streamController.hideThinkingIndicator).toHaveBeenCalled();
+      expect(deps.streamController.resetStreamingState).toHaveBeenCalled();
     });
 
     it('should be a no-op when not streaming', () => {
@@ -1192,6 +1197,16 @@ describe('InputController - Message Queue', () => {
 
       expect(deps.state.cancelRequested).toBe(false);
       expect((deps as any).mockAgentService.cancel).not.toHaveBeenCalled();
+    });
+
+    it('should invalidate the current stream generation when cancelling', () => {
+      deps.state.isStreaming = true;
+      const initialGeneration = deps.state.streamGeneration;
+      controller = new InputController(deps);
+
+      controller.cancelStreaming();
+
+      expect(deps.state.streamGeneration).toBe(initialGeneration + 1);
     });
   });
 
