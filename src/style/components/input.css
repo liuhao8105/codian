@@ -114,6 +114,7 @@
   display: none;
   flex-wrap: wrap;
   gap: 6px;
+  align-items: center;
 }
 
 .claudian-file-chip {
@@ -128,6 +129,11 @@
   line-height: 1;
   max-width: 200px;
   cursor: pointer;
+}
+
+.claudian-file-chip.is-current-note {
+  border-color: color-mix(in srgb, var(--interactive-accent) 45%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
 }
 
 .claudian-file-chip-icon {

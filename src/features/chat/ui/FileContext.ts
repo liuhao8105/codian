@@ -68,9 +68,9 @@ export class FileContextManager {
       onRemoveAttachment: (filePath) => {
         if (filePath === this.currentNotePath) {
           this.currentNotePath = null;
-          this.state.detachFile(filePath);
-          this.refreshCurrentNoteChip();
         }
+        this.state.detachFile(filePath);
+        this.refreshFileChips();
       },
       onOpenFile: async (filePath) => {
         const file = this.app.vault.getAbstractFileByPath(filePath);
@@ -90,7 +90,10 @@ export class FileContextManager {
       this.dropdownContainerEl,
       this.inputEl,
       {
-        onAttachFile: (filePath) => this.state.attachFile(filePath),
+        onAttachFile: (filePath) => {
+          this.state.attachFile(filePath);
+          this.refreshFileChips();
+        },
         onMcpMentionChange: (servers) => this.onMcpMentionChange?.(servers),
         onAgentMentionSelect: (agentId) => this.callbacks.onAgentMentionSelect?.(agentId),
         getMentionedMcpServers: () => this.state.getMentionedMcpServers(),
@@ -145,14 +148,14 @@ export class FileContextManager {
   resetForNewConversation() {
     this.currentNotePath = null;
     this.state.resetForNewConversation();
-    this.refreshCurrentNoteChip();
+    this.refreshFileChips();
   }
 
   /** Resets state for loading an existing conversation. */
   resetForLoadedConversation(hasMessages: boolean) {
     this.currentNotePath = null;
     this.state.resetForLoadedConversation(hasMessages);
-    this.refreshCurrentNoteChip();
+    this.refreshFileChips();
   }
 
   /** Sets current note (for restoring persisted state). */
@@ -161,7 +164,16 @@ export class FileContextManager {
     if (notePath) {
       this.state.attachFile(notePath);
     }
-    this.refreshCurrentNoteChip();
+    this.refreshFileChips();
+  }
+
+  /** Restores attached files for an existing conversation. */
+  setAttachedFiles(files: string[]) {
+    this.state.setAttachedFiles(files);
+    if (this.currentNotePath && !this.state.getAttachedFiles().has(this.currentNotePath)) {
+      this.state.attachFile(this.currentNotePath);
+    }
+    this.refreshFileChips();
   }
 
   /** Auto-attaches the currently focused file (for new sessions). */
@@ -172,7 +184,7 @@ export class FileContextManager {
       if (normalizedPath) {
         this.currentNotePath = normalizedPath;
         this.state.attachFile(normalizedPath);
-        this.refreshCurrentNoteChip();
+        this.refreshFileChips();
       }
     }
   }
@@ -185,11 +197,11 @@ export class FileContextManager {
     const previousCurrentNotePath = this.currentNotePath;
     const shouldTrackAsCurrentNote = !this.hasExcludedTag(file);
 
-    if (!this.state.isSessionStarted()) {
-      this.state.clearAttachments();
-    } else if (previousCurrentNotePath && previousCurrentNotePath !== normalizedPath) {
-      this.state.detachFile(previousCurrentNotePath);
+    if (this.state.isSessionStarted()) {
+      return;
     }
+
+    this.state.clearAttachments();
 
     if (shouldTrackAsCurrentNote) {
       this.currentNotePath = normalizedPath;
@@ -205,7 +217,7 @@ export class FileContextManager {
       this.state.resetCurrentNoteSent();
     }
 
-    this.refreshCurrentNoteChip();
+    this.refreshFileChips();
   }
 
   markFileCacheDirty() {
@@ -256,8 +268,8 @@ export class FileContextManager {
     return normalizePathForVaultUtil(rawPath, vaultPath);
   }
 
-  private refreshCurrentNoteChip(): void {
-    this.chipsView.renderCurrentNote(this.currentNotePath);
+  private refreshFileChips(): void {
+    this.chipsView.renderFiles(this.currentNotePath, this.state.getAttachedFiles());
     this.callbacks.onChipsChanged?.();
   }
 
@@ -284,7 +296,7 @@ export class FileContextManager {
     }
 
     if (needsUpdate) {
-      this.refreshCurrentNoteChip();
+      this.refreshFileChips();
     }
   }
 
@@ -307,7 +319,7 @@ export class FileContextManager {
     }
 
     if (needsUpdate) {
-      this.refreshCurrentNoteChip();
+      this.refreshFileChips();
     }
   }
 

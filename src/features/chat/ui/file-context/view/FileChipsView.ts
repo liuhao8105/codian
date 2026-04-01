@@ -25,25 +25,36 @@ export class FileChipsView {
     this.fileIndicatorEl.remove();
   }
 
-  renderCurrentNote(filePath: string | null): void {
+  renderFiles(currentNotePath: string | null, attachedFiles: Iterable<string>): void {
     this.fileIndicatorEl.empty();
 
-    if (!filePath) {
+    const files = Array.from(new Set([
+      ...(currentNotePath ? [currentNotePath] : []),
+      ...attachedFiles,
+    ]));
+
+    if (files.length === 0) {
       this.fileIndicatorEl.style.display = 'none';
       return;
     }
 
     this.fileIndicatorEl.style.display = 'flex';
-    this.renderFileChip(filePath, () => {
-      this.callbacks.onRemoveAttachment(filePath);
-    });
+    for (const filePath of files) {
+      this.renderFileChip(
+        filePath,
+        filePath === currentNotePath,
+        () => this.callbacks.onRemoveAttachment(filePath)
+      );
+    }
   }
 
-  private renderFileChip(filePath: string, onRemove: () => void): void {
-    const chipEl = this.fileIndicatorEl.createDiv({ cls: 'claudian-file-chip' });
+  private renderFileChip(filePath: string, isCurrentNote: boolean, onRemove: () => void): void {
+    const chipEl = this.fileIndicatorEl.createDiv({
+      cls: `claudian-file-chip${isCurrentNote ? ' is-current-note' : ''}`,
+    });
 
     const iconEl = chipEl.createSpan({ cls: 'claudian-file-chip-icon' });
-    setIcon(iconEl, 'file-text');
+    setIcon(iconEl, isCurrentNote ? 'book-open' : 'file-text');
 
     const normalizedPath = filePath.replace(/\\/g, '/');
     const filename = normalizedPath.split('/').pop() || filePath;

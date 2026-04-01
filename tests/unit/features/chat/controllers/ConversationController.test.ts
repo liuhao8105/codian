@@ -23,7 +23,9 @@ function createMockDeps(overrides: Partial<ConversationControllerDeps> = {}): Co
     resetForLoadedConversation: jest.fn(),
     autoAttachActiveFile: jest.fn(),
     setCurrentNote: jest.fn(),
+    setAttachedFiles: jest.fn(),
     getCurrentNotePath: jest.fn().mockReturnValue(null),
+    getAttachedFiles: jest.fn().mockReturnValue(new Set()),
   };
 
   return {
@@ -466,6 +468,25 @@ describe('ConversationController', () => {
       expect(fileContextManager.setCurrentNote).toHaveBeenCalledWith('notes/my-note.md');
     });
 
+    it('should restore attached files when conversation has them', async () => {
+      const fileContextManager = deps.getFileContextManager()!;
+      deps.state.currentConversationId = 'conv-with-files';
+      (deps.plugin.getConversationById as jest.Mock).mockResolvedValue({
+        id: 'conv-with-files',
+        messages: [{ id: '1', role: 'user', content: 'test', timestamp: Date.now() }],
+        sessionId: null,
+        currentNote: 'notes/my-note.md',
+        attachedFiles: ['notes/my-note.md', 'docs/spec.md'],
+      });
+
+      await controller.loadActive();
+
+      expect(fileContextManager.setAttachedFiles).toHaveBeenCalledWith([
+        'notes/my-note.md',
+        'docs/spec.md',
+      ]);
+    });
+
     it('should auto-attach active file when no currentNote and no messages', async () => {
       const fileContextManager = deps.getFileContextManager()!;
       deps.state.currentConversationId = 'empty-conv';
@@ -517,6 +538,26 @@ describe('ConversationController', () => {
       await controller.switchTo('new-conv');
 
       expect(fileContextManager.setCurrentNote).toHaveBeenCalledWith('docs/readme.md');
+    });
+
+    it('should restore attached files when switched conversation has them', async () => {
+      const fileContextManager = deps.getFileContextManager()!;
+      deps.state.currentConversationId = 'old-conv';
+
+      (deps.plugin.switchConversation as jest.Mock).mockResolvedValue({
+        id: 'new-conv',
+        messages: [{ id: '1', role: 'user', content: 'test', timestamp: Date.now() }],
+        sessionId: null,
+        currentNote: 'docs/readme.md',
+        attachedFiles: ['docs/readme.md', 'docs/brief.md'],
+      });
+
+      await controller.switchTo('new-conv');
+
+      expect(fileContextManager.setAttachedFiles).toHaveBeenCalledWith([
+        'docs/readme.md',
+        'docs/brief.md',
+      ]);
     });
 
     it('should not set currentNote when switched conversation has none', async () => {

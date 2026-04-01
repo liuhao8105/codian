@@ -37,7 +37,7 @@ import {
 import type { MessageRenderer } from '../rendering/MessageRenderer';
 import type { SubagentManager } from '../services/SubagentManager';
 import type { ChatState } from '../state/ChatState';
-import type { FileContextManager } from '../ui';
+import type { FileContextManager, StatusPanel } from '../ui';
 
 export interface StreamControllerDeps {
   plugin: CodianPlugin;
@@ -46,6 +46,7 @@ export interface StreamControllerDeps {
   subagentManager: SubagentManager;
   getMessagesEl: () => HTMLElement;
   getFileContextManager: () => FileContextManager | null;
+  getStatusPanel?: () => StatusPanel | null;
   updateQueueIndicator: () => void;
   /** Get the agent service from the tab. */
   getAgentService?: () => AgentRuntime | null;
@@ -55,9 +56,50 @@ export class StreamController {
   private static readonly ASYNC_SUBAGENT_RESULT_RETRY_DELAYS_MS = [200, 600, 1500] as const;
 
   private deps: StreamControllerDeps;
+  private commandOutputs = new Map<string, string>();
 
   constructor(deps: StreamControllerDeps) {
     this.deps = deps;
+  }
+
+  private syncPlanUpdate(
+    chunk: Extract<StreamChunk, { type: 'plan_update' }>
+  ): void {
+    const todos = chunk.steps.map((step) => ({
+      content: step.step,
+      status: step.status,
+      activeForm: chunk.explanation ?? step.step,
+    }));
+    this.deps.state.currentTodos = todos;
+  }
+
+  private handleCommandStart(chunk: Extract<StreamChunk, { type: 'command_start' }>): void {
+    this.commandOutputs.set(chunk.id, '');
+    this.deps.getStatusPanel?.()?.addBashOutput({
+      id: chunk.id,
+      command: chunk.cwd ? `${chunk.command} (${chunk.cwd})` : chunk.command,
+      status: 'running',
+      output: '',
+    });
+  }
+
+  private handleCommandProgress(chunk: Extract<StreamChunk, { type: 'command_progress' }>): void {
+    const nextOutput = (this.commandOutputs.get(chunk.id) || '') + chunk.delta;
+    this.commandOutputs.set(chunk.id, nextOutput);
+    this.deps.getStatusPanel?.()?.updateBashOutput(chunk.id, {
+      output: nextOutput,
+      status: 'running',
+    });
+  }
+
+  private handleCommandComplete(chunk: Extract<StreamChunk, { type: 'command_complete' }>): void {
+    const nextOutput = chunk.output || this.commandOutputs.get(chunk.id) || '';
+    this.commandOutputs.delete(chunk.id);
+    this.deps.getStatusPanel?.()?.updateBashOutput(chunk.id, {
+      output: nextOutput,
+      status: chunk.status,
+      exitCode: chunk.exitCode,
+    });
   }
 
   // ============================================
@@ -120,6 +162,22 @@ export class StreamController {
         await this.handleToolResult(chunk, msg);
         break;
       }
+
+      case 'plan_update':
+        this.syncPlanUpdate(chunk);
+        break;
+
+      case 'command_start':
+        this.handleCommandStart(chunk);
+        break;
+
+      case 'command_progress':
+        this.handleCommandProgress(chunk);
+        break;
+
+      case 'command_complete':
+        this.handleCommandComplete(chunk);
+        break;
 
       case 'blocked':
         // Flush pending tools before rendering blocked message

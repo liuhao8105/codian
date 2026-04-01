@@ -430,6 +430,7 @@ export default class CodianPlugin extends Plugin {
         conversation.sessionId = meta.sessionId;
       }
       conversation.currentNote = meta.currentNote ?? conversation.currentNote;
+      conversation.attachedFiles = meta.attachedFiles ?? conversation.attachedFiles;
       conversation.externalContextPaths = meta.externalContextPaths ?? conversation.externalContextPaths;
       conversation.enabledMcpServers = meta.enabledMcpServers ?? conversation.enabledMcpServers;
       conversation.usage = meta.usage ?? conversation.usage;
@@ -466,6 +467,7 @@ export default class CodianPlugin extends Plugin {
           previousSdkSessionIds: meta.previousSdkSessionIds,
           messages: [], // Messages are in SDK storage, loaded on demand
           currentNote: meta.currentNote,
+          attachedFiles: meta.attachedFiles,
           externalContextPaths: meta.externalContextPaths,
           enabledMcpServers: meta.enabledMcpServers,
           usage: meta.usage,

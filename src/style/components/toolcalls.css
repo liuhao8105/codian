@@ -40,11 +40,11 @@
   font-family: var(--font-monospace);
   font-size: 13px;
   color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
   flex: 1;
   min-width: 0;
+  line-height: 1.45;
 }
 
 .claudian-tool-summary:empty {
@@ -126,9 +126,10 @@
 }
 
 .claudian-tool-line {
-  padding: 1px 0;
+  padding: 2px 0;
   color: var(--text-muted);
-  white-space: pre;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* Hover highlight for file search results */
@@ -239,8 +240,9 @@
   font-family: var(--font-monospace);
   font-size: 12px;
   color: var(--text-muted);
-  line-height: 1.4;
+  line-height: 1.55;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   overflow: hidden;
   flex: 1;
 }
@@ -253,4 +255,3 @@
 .claudian-tool-result-item:last-child {
   margin-bottom: 0;
 }
-

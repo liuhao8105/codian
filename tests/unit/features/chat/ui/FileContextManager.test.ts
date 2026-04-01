@@ -218,6 +218,27 @@ describe('FileContextManager', () => {
     manager.destroy();
   });
 
+  it('renders all attached file chips and keeps current note highlighted', () => {
+    const app = createMockApp();
+    const manager = new FileContextManager(
+      app,
+      containerEl as any,
+      inputEl,
+      createMockCallbacks()
+    );
+
+    manager.setCurrentNote('notes/chip.md');
+    manager.setAttachedFiles(['notes/chip.md', 'docs/spec.md']);
+
+    const chips = findAllByClass(containerEl, 'claudian-file-chip');
+    expect(chips).toHaveLength(2);
+    expect(chips[0]?.hasClass('is-current-note')).toBe(true);
+    const chipNames = findAllByClass(containerEl, 'claudian-file-chip-name').map((el) => el.textContent);
+    expect(chipNames).toContain('spec.md');
+
+    manager.destroy();
+  });
+
   it('auto-attaches active file unless excluded by tag', () => {
     const fileCacheByPath = new Map<string, any>([
       ['notes/private.md', { frontmatter: { tags: ['private'] } }],

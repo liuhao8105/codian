@@ -87,6 +87,7 @@ export interface Conversation {
   previousSdkSessionIds?: string[];
   messages: ChatMessage[];
   currentNote?: string;
+  attachedFiles?: string[];
   /** Session-specific external context paths (directories with full access). Resets on new session. */
   externalContextPaths?: string[];
   /** Context window usage information. */
@@ -154,6 +155,7 @@ export interface SessionMetadata {
    */
   previousSdkSessionIds?: string[];
   currentNote?: string;
+  attachedFiles?: string[];
   externalContextPaths?: string[];
   enabledMcpServers?: string[];
   usage?: UsageInfo;
@@ -177,6 +179,29 @@ export type StreamChunk =
   | { type: 'thinking'; content: string; parentToolUseId?: string | null }
   | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown>; parentToolUseId?: string | null }
   | { type: 'tool_result'; id: string; content: string; isError?: boolean; parentToolUseId?: string | null; toolUseResult?: SDKToolUseResult }
+  | {
+      type: 'plan_update';
+      explanation?: string | null;
+      steps: Array<{ step: string; status: 'pending' | 'in_progress' | 'completed' }>;
+    }
+  | {
+      type: 'command_start';
+      id: string;
+      command: string;
+      cwd?: string;
+    }
+  | {
+      type: 'command_progress';
+      id: string;
+      delta: string;
+    }
+  | {
+      type: 'command_complete';
+      id: string;
+      output: string;
+      exitCode?: number;
+      status: 'completed' | 'error';
+    }
   | { type: 'error'; content: string }
   | { type: 'blocked'; content: string }
   | { type: 'done' }

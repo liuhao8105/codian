@@ -78,6 +78,10 @@
   unicode-bidi: plaintext; /* Proper BiDi text handling for mixed RTL/LTR */
 }
 
+.claudian-message-assistant .claudian-message-content {
+  line-height: 1.72;
+}
+
 .claudian-interrupted {
   color: #d45d5d;
 }
@@ -89,6 +93,10 @@
 .claudian-text-block {
   position: relative;
   margin: 0;
+}
+
+.claudian-message-assistant .claudian-text-block {
+  max-width: 78ch;
 }
 
 .claudian-text-copy-btn {
@@ -134,7 +142,7 @@
 }
 
 .claudian-message-content p {
-  margin: 0 0 8px 0;
+  margin: 0 0 12px 0;
 }
 
 .claudian-message-content p:last-child {
@@ -143,8 +151,12 @@
 
 .claudian-message-content ul,
 .claudian-message-content ol {
-  margin: 8px 0;
+  margin: 10px 0 14px;
   padding-inline-start: 20px;
+}
+
+.claudian-message-content li + li {
+  margin-top: 4px;
 }
 
 /* Full-width tables */

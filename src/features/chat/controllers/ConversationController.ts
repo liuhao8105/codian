@@ -222,7 +222,10 @@ export class ConversationController {
 
     if (conversation.currentNote) {
       fileCtx?.setCurrentNote(conversation.currentNote);
-    } else if (!hasMessages) {
+    }
+    if (conversation.attachedFiles && conversation.attachedFiles.length > 0) {
+      fileCtx?.setAttachedFiles(conversation.attachedFiles);
+    } else if (!conversation.currentNote && !hasMessages) {
       fileCtx?.autoAttachActiveFile();
     }
 
@@ -303,7 +306,10 @@ export class ConversationController {
 
       if (conversation.currentNote) {
         fileCtx?.setCurrentNote(conversation.currentNote);
-      } else if (!hasMessages) {
+      }
+      if (conversation.attachedFiles && conversation.attachedFiles.length > 0) {
+        fileCtx?.setAttachedFiles(conversation.attachedFiles);
+      } else if (!conversation.currentNote && !hasMessages) {
         fileCtx?.autoAttachActiveFile();
       }
 
@@ -449,6 +455,7 @@ export class ConversationController {
 
     const fileCtx = this.deps.getFileContextManager();
     const currentNote = fileCtx?.getCurrentNotePath() || undefined;
+    const attachedFiles = fileCtx ? Array.from(fileCtx.getAttachedFiles()) : [];
     const externalContextSelector = this.deps.getExternalContextSelector();
     const externalContextPaths = externalContextSelector?.getExternalContexts() ?? [];
     const mcpServerSelector = this.deps.getMcpServerSelector();
@@ -498,6 +505,7 @@ export class ConversationController {
       legacyCutoffAt,
       sdkMessagesLoaded: isNative ? true : undefined,
       currentNote: currentNote,
+      attachedFiles: attachedFiles.length > 0 ? attachedFiles : undefined,
       externalContextPaths: externalContextPaths.length > 0 ? externalContextPaths : undefined,
       usage: state.usage ?? undefined,
       enabledMcpServers: enabledMcpServers.length > 0 ? enabledMcpServers : undefined,

@@ -162,6 +162,7 @@ describe('SessionStorage', () => {
       const result = await storage.loadConversation('conv-123');
 
       expect(result?.currentNote).toBe('notes/test.md');
+      expect(result?.attachedFiles).toBeUndefined();
       expect(result?.usage).toEqual(usage);
       expect(result?.titleGenerationStatus).toBe('success');
       expect(result?.lastResponseAt).toBe(1700000900);
@@ -206,6 +207,25 @@ describe('SessionStorage', () => {
       const msg2 = JSON.parse(lines[2]);
       expect(msg2.type).toBe('message');
       expect(msg2.message.role).toBe('assistant');
+    });
+
+    it('persists attached files in conversation metadata', async () => {
+      const conversation: Conversation = {
+        id: 'conv-files',
+        title: 'Files Test',
+        createdAt: 1700000000,
+        updatedAt: 1700001000,
+        sessionId: null,
+        currentNote: 'notes/current.md',
+        attachedFiles: ['notes/current.md', 'docs/spec.md'],
+        messages: [],
+      };
+
+      await storage.saveConversation(conversation);
+
+      const writtenContent = mockAdapter.write.mock.calls[0][1];
+      const meta = JSON.parse(writtenContent.split('\n')[0]);
+      expect(meta.attachedFiles).toEqual(['notes/current.md', 'docs/spec.md']);
     });
 
     it('preserves base64 image data when saving', async () => {

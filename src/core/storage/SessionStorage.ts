@@ -36,6 +36,7 @@ interface SessionMetaRecord {
   lastResponseAt?: number;
   sessionId: string | null;
   currentNote?: string;
+  attachedFiles?: string[];
   usage?: UsageInfo;
   titleGenerationStatus?: 'pending' | 'success' | 'failed';
 }
@@ -225,6 +226,7 @@ export class SessionStorage {
       sessionId: meta.sessionId,
       messages,
       currentNote: meta.currentNote,
+      attachedFiles: meta.attachedFiles,
       usage: meta.usage,
       titleGenerationStatus: meta.titleGenerationStatus,
     };
@@ -243,6 +245,7 @@ export class SessionStorage {
       lastResponseAt: conversation.lastResponseAt,
       sessionId: conversation.sessionId,
       currentNote: conversation.currentNote,
+      attachedFiles: conversation.attachedFiles,
       usage: conversation.usage,
       titleGenerationStatus: conversation.titleGenerationStatus,
     };
@@ -394,6 +397,7 @@ export class SessionStorage {
       sdkSessionId: conversation.sdkSessionId,
       previousSdkSessionIds: conversation.previousSdkSessionIds,
       currentNote: conversation.currentNote,
+      attachedFiles: conversation.attachedFiles,
       externalContextPaths: conversation.externalContextPaths,
       enabledMcpServers: conversation.enabledMcpServers,
       usage: conversation.usage,

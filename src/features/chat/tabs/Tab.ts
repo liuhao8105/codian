@@ -776,6 +776,7 @@ export function initializeTabControllers(
     subagentManager: services.subagentManager,
     getMessagesEl: () => dom.messagesEl,
     getFileContextManager: () => ui.fileContextManager,
+    getStatusPanel: () => ui.statusPanel,
     updateQueueIndicator: () => tab.controllers.inputController?.updateQueueIndicator(),
     getAgentService: () => tab.service,
   });

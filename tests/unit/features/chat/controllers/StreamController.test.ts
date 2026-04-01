@@ -65,6 +65,10 @@ function createMockDeps(): StreamControllerDeps {
     getAttachedFiles: jest.fn().mockReturnValue(new Set()),
     hasFilesChanged: jest.fn().mockReturnValue(false),
   };
+  const statusPanel = {
+    addBashOutput: jest.fn(),
+    updateBashOutput: jest.fn(),
+  };
 
   return {
     plugin: {
@@ -106,6 +110,7 @@ function createMockDeps(): StreamControllerDeps {
     } as any,
     getMessagesEl: () => messagesEl,
     getFileContextManager: () => fileContextManager as any,
+    getStatusPanel: () => statusPanel as any,
     updateQueueIndicator: jest.fn(),
     getAgentService: () => agentService as any,
   };
@@ -294,6 +299,63 @@ describe('StreamController - Text Content', () => {
       await expect(
         controller.handleStreamChunk({ type: 'done' }, msg)
       ).resolves.not.toThrow();
+    });
+  });
+
+  describe('Execution progress handling', () => {
+    it('should mirror plan updates into the todo panel state', async () => {
+      const msg = createTestMessage();
+
+      await controller.handleStreamChunk(
+        {
+          type: 'plan_update',
+          explanation: '先梳理，再执行',
+          steps: [
+            { step: '收集信息', status: 'completed' },
+            { step: '输出方案', status: 'in_progress' },
+          ],
+        },
+        msg
+      );
+
+      expect(deps.state.currentTodos).toEqual([
+        { content: '收集信息', status: 'completed', activeForm: '先梳理，再执行' },
+        { content: '输出方案', status: 'in_progress', activeForm: '先梳理，再执行' },
+      ]);
+    });
+
+    it('should send command lifecycle updates to StatusPanel', async () => {
+      const msg = createTestMessage();
+      const statusPanel = deps.getStatusPanel?.() as any;
+
+      await controller.handleStreamChunk(
+        { type: 'command_start', id: 'cmd-1', command: 'ls -la', cwd: '/tmp' },
+        msg
+      );
+      await controller.handleStreamChunk(
+        { type: 'command_progress', id: 'cmd-1', delta: 'line 1\n' },
+        msg
+      );
+      await controller.handleStreamChunk(
+        { type: 'command_complete', id: 'cmd-1', output: 'line 1\n', exitCode: 0, status: 'completed' },
+        msg
+      );
+
+      expect(statusPanel.addBashOutput).toHaveBeenCalledWith({
+        id: 'cmd-1',
+        command: 'ls -la (/tmp)',
+        status: 'running',
+        output: '',
+      });
+      expect(statusPanel.updateBashOutput).toHaveBeenNthCalledWith(1, 'cmd-1', {
+        output: 'line 1\n',
+        status: 'running',
+      });
+      expect(statusPanel.updateBashOutput).toHaveBeenNthCalledWith(2, 'cmd-1', {
+        output: 'line 1\n',
+        status: 'completed',
+        exitCode: 0,
+      });
     });
   });
 

@@ -5,6 +5,7 @@ import { createHash } from 'crypto';
 import type { RewindFilesResult } from '@anthropic-ai/claude-agent-sdk';
 
 import type CodianPlugin from '../../main';
+import { TOOL_EDIT, TOOL_MCP } from '../tools/toolNames';
 import { stripCurrentNoteContext } from '../../utils/context';
 import { getVaultPath } from '../../utils/path';
 import {
@@ -65,6 +66,31 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function asString(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
+}
+
+function asNumber(value: unknown): number | null {
+  return typeof value === 'number' ? value : null;
+}
+
+function stringifyContent(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value == null) return '';
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function mapPlanStepStatus(value: unknown): 'pending' | 'in_progress' | 'completed' {
+  switch (value) {
+    case 'completed':
+      return 'completed';
+    case 'inProgress':
+      return 'in_progress';
+    default:
+      return 'pending';
+  }
 }
 
 function getImageExtension(mediaType: ImageAttachment['mediaType']): string {
@@ -313,6 +339,7 @@ export class CodexAgentRuntime implements AgentRuntime {
     this.activeAbortController = new AbortController();
 
     const textByItemId = new Map<string, string>();
+    const commandOutputByItemId = new Map<string, string>();
     let activeAgentMessageItemId: string | null = null;
     let hasStreamedAgentText = false;
 
@@ -347,6 +374,51 @@ export class CodexAgentRuntime implements AgentRuntime {
               ensureAgentMessageSeparation(itemId);
             }
           }
+          if (item?.type === 'commandExecution') {
+            const itemId = asString(item.id);
+            const action = asRecord(item.action);
+            const command = asString(action?.command) || '';
+            if (itemId && command) {
+              commandOutputByItemId.set(itemId, '');
+              queue.push({
+                type: 'command_start',
+                id: itemId,
+                command,
+                cwd: asString(item.cwd) || undefined,
+              });
+            }
+          }
+          if (item?.type === 'mcpToolCall') {
+            const itemId = asString(item.id);
+            if (itemId) {
+              queue.push({
+                type: 'tool_use',
+                id: itemId,
+                name: TOOL_MCP,
+                input: {
+                  server: asString(item.server) || '',
+                  tool: asString(item.tool) || '',
+                  arguments: asRecord(item.arguments) || {},
+                },
+              });
+            }
+          }
+          if (item?.type === 'fileChange') {
+            const itemId = asString(item.id);
+            const changes = Array.isArray(item.changes) ? item.changes : [];
+            const firstChange = asRecord(changes[0]);
+            if (itemId) {
+              queue.push({
+                type: 'tool_use',
+                id: itemId,
+                name: TOOL_EDIT,
+                input: {
+                  file_path: asString(firstChange?.path) || '',
+                  changes: changes as Record<string, unknown>[],
+                },
+              });
+            }
+          }
           break;
         }
 
@@ -367,9 +439,58 @@ export class CodexAgentRuntime implements AgentRuntime {
           break;
         }
 
+        case 'turn/plan/updated': {
+          const plan = Array.isArray(notification.params.plan) ? notification.params.plan : [];
+          queue.push({
+            type: 'plan_update',
+            explanation: asString(notification.params.explanation),
+            steps: plan
+              .map((entry) => asRecord(entry))
+              .filter((entry): entry is Record<string, unknown> => !!entry)
+              .map((entry) => ({
+                step: asString(entry.step) || '',
+                status: mapPlanStepStatus(entry.status),
+              }))
+              .filter((entry) => entry.step.length > 0),
+          });
+          break;
+        }
+
         case 'turn/started': {
           const turn = asRecord(notification.params.turn);
           this.activeTurnId = asString(turn?.id);
+          break;
+        }
+
+        case 'item/commandExecution/outputDelta': {
+          const itemId = asString(notification.params.itemId);
+          const delta = asString(notification.params.delta);
+          if (itemId && delta) {
+            const previous = commandOutputByItemId.get(itemId) || '';
+            commandOutputByItemId.set(itemId, previous + delta);
+            queue.push({ type: 'command_progress', id: itemId, delta });
+          }
+          break;
+        }
+
+        case 'item/commandExecution/terminalInteraction': {
+          const itemId = asString(notification.params.itemId);
+          const stdin = asString(notification.params.stdin);
+          if (itemId && stdin) {
+            const line = `\n$ ${stdin}`;
+            const previous = commandOutputByItemId.get(itemId) || '';
+            commandOutputByItemId.set(itemId, previous + line);
+            queue.push({ type: 'command_progress', id: itemId, delta: line });
+          }
+          break;
+        }
+
+        case 'item/mcpToolCall/progress': {
+          const itemId = asString(notification.params.itemId);
+          const message = asString(notification.params.message);
+          if (itemId && message) {
+            queue.push({ type: 'tool_result', id: itemId, content: message });
+          }
           break;
         }
 
@@ -388,6 +509,43 @@ export class CodexAgentRuntime implements AgentRuntime {
               }
               queue.push({ type: 'text', content: finalText });
               hasStreamedAgentText = true;
+            }
+          }
+          if (item?.type === 'commandExecution') {
+            const itemId = asString(item.id);
+            if (itemId) {
+              const output = commandOutputByItemId.get(itemId) || '';
+              commandOutputByItemId.delete(itemId);
+              const exitCode = asNumber(item.exitCode) ?? undefined;
+              queue.push({
+                type: 'command_complete',
+                id: itemId,
+                output,
+                exitCode,
+                status: exitCode === 0 ? 'completed' : 'error',
+              });
+            }
+          }
+          if (item?.type === 'mcpToolCall') {
+            const itemId = asString(item.id);
+            if (itemId) {
+              queue.push({
+                type: 'tool_result',
+                id: itemId,
+                content: item.error ? stringifyContent(item.error) : stringifyContent(item.result),
+                isError: asString(item.status) === 'failed',
+              });
+            }
+          }
+          if (item?.type === 'fileChange') {
+            const itemId = asString(item.id);
+            if (itemId) {
+              queue.push({
+                type: 'tool_result',
+                id: itemId,
+                content: stringifyContent(item.changes),
+                isError: asString(item.status) === 'failed',
+              });
             }
           }
           break;
@@ -447,7 +605,7 @@ export class CodexAgentRuntime implements AgentRuntime {
             cwd: vaultPath,
             approvalPolicy: this.getApprovalPolicy(),
             sandbox: this.getThreadSandboxMode(),
-            experimentalRawEvents: false,
+            experimentalRawEvents: true,
             persistExtendedHistory: false,
           });
           const thread = asRecord(started.thread);
