@@ -36,6 +36,8 @@ jest.mock('@/features/chat/rendering', () => {
     getToolSummary: jest.fn().mockReturnValue('file.md'),
     isBlockedToolResult: jest.fn().mockReturnValue(false),
     markAsyncSubagentOrphaned: jest.fn(),
+    renderOrUpdateCommandBlock: jest.fn(),
+    renderOrUpdatePlanBlock: jest.fn(),
     renderToolCall: jest.fn(),
     updateAsyncSubagentRunning: jest.fn(),
     updateSubagentToolResult: jest.fn(),
@@ -262,6 +264,57 @@ describe('StreamController - Text Content', () => {
       );
 
       expect(deps.state.currentTextContent).toContain('Blocked');
+    });
+  });
+
+  describe('Process blocks', () => {
+    it('should persist plan updates into assistant content blocks', async () => {
+      const msg = createTestMessage();
+      deps.state.currentContentEl = createMockEl();
+
+      await controller.handleStreamChunk(
+        {
+          type: 'plan_update',
+          explanation: '先看目录结构',
+          steps: [{ step: '查看目录', status: 'in_progress' }],
+        },
+        msg
+      );
+
+      expect(msg.contentBlocks).toContainEqual({
+        type: 'plan',
+        blockId: 'live-plan',
+        explanation: '先看目录结构',
+        steps: [{ step: '查看目录', status: 'in_progress' }],
+      });
+    });
+
+    it('should persist command lifecycle into assistant content blocks', async () => {
+      const msg = createTestMessage();
+      deps.state.currentContentEl = createMockEl();
+
+      await controller.handleStreamChunk(
+        { type: 'command_start', id: 'cmd-1', command: 'ls -la', cwd: '/tmp' },
+        msg
+      );
+      await controller.handleStreamChunk(
+        { type: 'command_progress', id: 'cmd-1', delta: 'file-a\n' },
+        msg
+      );
+      await controller.handleStreamChunk(
+        { type: 'command_complete', id: 'cmd-1', output: 'file-a\n', status: 'completed', exitCode: 0 },
+        msg
+      );
+
+      expect(msg.contentBlocks).toContainEqual({
+        type: 'command',
+        blockId: 'cmd-1',
+        command: 'ls -la',
+        cwd: '/tmp',
+        output: 'file-a\n',
+        status: 'completed',
+        exitCode: 0,
+      });
     });
   });
 

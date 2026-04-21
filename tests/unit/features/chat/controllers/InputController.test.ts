@@ -1592,6 +1592,33 @@ Other content`);
       expect(promptSent).toContain('24岁');
     });
 
+    it('should match quick reply aliases for identity questions', async () => {
+      deps = createSendableDeps();
+      deps.plugin.settings.strongRulesFilePath = 'profiles/user-memory.md';
+      (deps.plugin.app.vault.getFileByPath as jest.Mock).mockReturnValue({ path: 'profiles/user-memory.md' });
+      (deps.plugin.app.vault.cachedRead as jest.Mock).mockResolvedValue(`# Strong Rules
+
+## 快捷回答
+
+### 你是谁
+我是丫头。`);
+
+      ((deps as any).mockAgentService.query as jest.Mock).mockReturnValue(
+        createMockStream([{ type: 'done' }])
+      );
+
+      inputEl = deps.getInputEl() as ReturnType<typeof createMockInputEl>;
+      inputEl.value = '介绍一下你自己';
+      controller = new InputController(deps);
+
+      await controller.sendMessage();
+
+      const queryCall = ((deps as any).mockAgentService.query as jest.Mock).mock.calls[0];
+      const promptSent = queryCall[0];
+      expect(promptSent).toContain('<quick_reply_reference>');
+      expect(promptSent).toContain('我是丫头');
+    });
+
     it('should fall back to the normal prompt when quick replies are not configured', async () => {
       deps = createSendableDeps();
       deps.plugin.settings.strongRulesFilePath = 'profiles/user-memory.md';

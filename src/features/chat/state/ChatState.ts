@@ -29,6 +29,7 @@ function createInitialState(): ChatStateData {
     queueIndicatorEl: null,
     thinkingIndicatorTimeout: null,
     toolCallElements: new Map(),
+    processBlockElements: new Map(),
     writeEditStates: new Map(),
     pendingTools: new Map(),
     usage: null,
@@ -232,6 +233,10 @@ export class ChatState {
     return this.state.toolCallElements;
   }
 
+  get processBlockElements(): Map<string, HTMLElement> {
+    return this.state.processBlockElements;
+  }
+
   get writeEditStates(): Map<string, WriteEditState> {
     return this.state.writeEditStates;
   }
@@ -379,6 +384,7 @@ export class ChatState {
 
   clearMaps(): void {
     this.state.toolCallElements.clear();
+    this.state.processBlockElements.clear();
     this.state.writeEditStates.clear();
     this.state.pendingTools.clear();
   }

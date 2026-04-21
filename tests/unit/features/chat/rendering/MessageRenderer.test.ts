@@ -3,11 +3,16 @@ import { createMockEl } from '@test/helpers/mockElement';
 import { TOOL_AGENT_OUTPUT, TOOL_TASK } from '@/core/tools/toolNames';
 import type { ChatMessage, ImageAttachment } from '@/core/types';
 import { MessageRenderer } from '@/features/chat/rendering/MessageRenderer';
+import { renderStoredCommandBlock, renderStoredPlanBlock } from '@/features/chat/rendering/ProcessBlockRenderer';
 import { renderStoredAsyncSubagent, renderStoredSubagent } from '@/features/chat/rendering/SubagentRenderer';
 import { renderStoredThinkingBlock } from '@/features/chat/rendering/ThinkingBlockRenderer';
 import { renderStoredToolCall } from '@/features/chat/rendering/ToolCallRenderer';
 import { renderStoredWriteEdit } from '@/features/chat/rendering/WriteEditRenderer';
 
+jest.mock('@/features/chat/rendering/ProcessBlockRenderer', () => ({
+  renderStoredCommandBlock: jest.fn(),
+  renderStoredPlanBlock: jest.fn(),
+}));
 jest.mock('@/features/chat/rendering/SubagentRenderer', () => ({
   renderStoredAsyncSubagent: jest.fn().mockReturnValue({ wrapperEl: {}, cleanup: jest.fn() }),
   renderStoredSubagent: jest.fn(),
@@ -115,6 +120,38 @@ describe('MessageRenderer', () => {
     const textEl = contentEl.children[0];
     expect(textEl.innerHTML).toContain('claudian-interrupted');
     expect(textEl.innerHTML).toContain('Interrupted');
+  });
+
+  it('renders stored plan and command blocks in assistant messages', () => {
+    const messagesEl = createMockEl();
+    const { renderer } = createRenderer(messagesEl);
+
+    const msg: ChatMessage = {
+      id: 'a1',
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+      contentBlocks: [
+        {
+          type: 'plan',
+          blockId: 'live-plan',
+          explanation: '正在整理结构',
+          steps: [{ step: '整理目录', status: 'in_progress' }],
+        },
+        {
+          type: 'command',
+          blockId: 'cmd-1',
+          command: 'ls -la',
+          status: 'completed',
+          output: 'file-a',
+        },
+      ],
+    };
+
+    renderer.renderStoredMessage(msg);
+
+    expect(renderStoredPlanBlock).toHaveBeenCalled();
+    expect(renderStoredCommandBlock).toHaveBeenCalled();
   });
 
   it('skips rebuilt context messages', () => {

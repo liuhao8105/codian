@@ -38,6 +38,12 @@ export {
   updateToolCallResult,
 } from './ToolCallRenderer';
 export {
+  renderOrUpdateCommandBlock,
+  renderOrUpdatePlanBlock,
+  renderStoredCommandBlock,
+  renderStoredPlanBlock,
+} from './ProcessBlockRenderer';
+export {
   createWriteEditBlock,
   finalizeWriteEditBlock,
   renderStoredWriteEdit,

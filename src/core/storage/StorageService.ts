@@ -10,6 +10,7 @@
  *
  * Handles migration from legacy formats:
  * - Old settings.json with Claudian fields → split into CC + Claudian files
+ * - Old .claudian/claudian-settings.json → .claude/claudian-settings.json
  * - Old permissions array → CC permissions object
  * - data.json state → claudian-settings.json
  */
@@ -52,6 +53,9 @@ import { VaultFileAdapter } from './VaultFileAdapter';
 
 /** Base path for all Claudian storage. */
 export const CLAUDE_PATH = '.claude';
+
+/** Legacy Claudian/Codian settings path used by older builds. */
+export const LEGACY_CLAUDIAN_SETTINGS_PATH = '.claudian/claudian-settings.json';
 
 /** Legacy settings path (now CC settings). */
 export const SETTINGS_PATH = CC_SETTINGS_PATH;
@@ -155,8 +159,12 @@ export class StorageService {
     const claudianExists = await this.codianSettings.exists();
     const dataJson = await this.loadDataJson();
 
+    if (!claudianExists) {
+      await this.migrateFromLegacyClaudianSettings();
+    }
+
     // Check if old settings.json has Claudian fields that need migration
-    if (ccExists && !claudianExists) {
+    if (ccExists && !(await this.codianSettings.exists())) {
       await this.migrateFromOldSettingsJson();
     }
 
@@ -196,6 +204,28 @@ export class StorageService {
       (data.slashCommands?.length ?? 0) > 0 ||
       (data.conversations?.length ?? 0) > 0
     );
+  }
+
+  /**
+   * Migrate settings written by older builds under .claudian/.
+   *
+   * This keeps user-configured memory/rules paths when the plugin moves to the
+   * .claude-compatible storage layout.
+   */
+  private async migrateFromLegacyClaudianSettings(): Promise<void> {
+    if (!(await this.adapter.exists(LEGACY_CLAUDIAN_SETTINGS_PATH))) {
+      return;
+    }
+
+    const content = await this.adapter.read(LEGACY_CLAUDIAN_SETTINGS_PATH);
+    const legacy = JSON.parse(content) as Partial<StoredCodianSettings>;
+    const { slashCommands: _, ...defaults } = DEFAULT_SETTINGS;
+
+    await this.codianSettings.save({
+      ...defaults,
+      ...legacy,
+      blockedCommands: normalizeBlockedCommands(legacy.blockedCommands),
+    } as StoredCodianSettings);
   }
 
   /**

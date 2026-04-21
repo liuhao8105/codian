@@ -10,6 +10,10 @@ import { processFileLinks, registerFileLinkHandler } from '../../../utils/fileLi
 import { replaceImageEmbedsWithHtml } from '../../../utils/imageEmbed';
 import { findRewindContext } from '../rewind';
 import {
+  renderStoredCommandBlock,
+  renderStoredPlanBlock,
+} from './ProcessBlockRenderer';
+import {
   renderStoredAsyncSubagent,
   renderStoredSubagent,
 } from './SubagentRenderer';
@@ -237,6 +241,10 @@ export class MessageRenderer {
             this.renderToolCall(contentEl, toolCall);
             renderedToolIds.add(toolCall.id);
           }
+        } else if (block.type === 'plan') {
+          renderStoredPlanBlock(contentEl, block);
+        } else if (block.type === 'command') {
+          renderStoredCommandBlock(contentEl, block);
         } else if (block.type === 'compact_boundary') {
           const boundaryEl = contentEl.createDiv({ cls: 'claudian-compact-boundary' });
           boundaryEl.createSpan({ cls: 'claudian-compact-boundary-label', text: 'Conversation compacted' });

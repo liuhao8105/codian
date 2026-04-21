@@ -1,25 +1,27 @@
 .claudian-tool-call {
-  margin: 8px 0;
+  margin: 10px 0 16px;
+  max-width: 78ch;
 }
 
 .claudian-tool-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
-  padding: 4px 0;
+  padding: 2px 0;
   cursor: pointer;
   overflow: hidden;
 }
 
 .claudian-tool-header:hover {
-  opacity: 0.85;
+  opacity: 0.92;
 }
 
 .claudian-tool-icon {
   display: flex;
   align-items: center;
-  color: var(--text-accent);
+  color: color-mix(in srgb, var(--text-accent) 74%, white);
   flex-shrink: 0;
+  opacity: 0.95;
 }
 
 .claudian-tool-icon svg {
@@ -30,21 +32,21 @@
 .claudian-tool-name {
   font-family: var(--font-monospace);
   font-size: 13px;
-  font-weight: 400;
-  color: var(--text-normal);
+  font-weight: 500;
+  color: color-mix(in srgb, var(--text-normal) 92%, white);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .claudian-tool-summary {
-  font-family: var(--font-monospace);
+  font-family: var(--font-interface);
   font-size: 13px;
-  color: var(--text-muted);
+  color: color-mix(in srgb, var(--text-muted) 86%, var(--text-normal));
   white-space: normal;
   overflow-wrap: anywhere;
   flex: 1;
   min-width: 0;
-  line-height: 1.45;
+  line-height: 1.52;
 }
 
 .claudian-tool-summary:empty {
@@ -86,11 +88,13 @@
 }
 
 .claudian-tool-status.status-running {
-  color: var(--text-accent);
+  color: color-mix(in srgb, var(--text-accent) 72%, white);
+  opacity: 0.8;
 }
 
 .claudian-tool-status.status-completed {
   color: var(--color-green);
+  opacity: 0.95;
 }
 
 .claudian-tool-status.status-error {
@@ -103,7 +107,7 @@
 
 /* Tool call content - border style (like thinking block) */
 .claudian-tool-content {
-  padding: 4px 0;
+  padding: 6px 0 2px;
   padding-inline-start: 16px;
   margin-inline-start: 7px;
   border-inline-start: 2px solid var(--background-modifier-border);
@@ -126,8 +130,8 @@
 }
 
 .claudian-tool-line {
-  padding: 2px 0;
-  color: var(--text-muted);
+  padding: 3px 0;
+  color: color-mix(in srgb, var(--text-muted) 88%, var(--text-normal));
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -239,7 +243,7 @@
 .claudian-tool-result-text {
   font-family: var(--font-monospace);
   font-size: 12px;
-  color: var(--text-muted);
+  color: color-mix(in srgb, var(--text-muted) 88%, var(--text-normal));
   line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -254,4 +258,100 @@
 
 .claudian-tool-result-item:last-child {
   margin-bottom: 0;
+}
+
+.claudian-process-block {
+  margin: 10px 0 16px;
+  max-width: 78ch;
+}
+
+.claudian-process-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.claudian-process-icon {
+  display: flex;
+  align-items: center;
+  color: color-mix(in srgb, var(--text-accent) 74%, white);
+  flex-shrink: 0;
+  opacity: 0.95;
+}
+
+.claudian-process-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.claudian-process-title {
+  font-family: var(--font-monospace);
+  font-size: 13px;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--text-normal) 92%, white);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.claudian-process-summary {
+  font-family: var(--font-interface);
+  font-size: 13px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--text-muted) 86%, var(--text-normal));
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.claudian-process-status {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.claudian-process-status svg {
+  width: 14px;
+  height: 14px;
+}
+
+.claudian-process-status.status-running {
+  color: color-mix(in srgb, var(--text-accent) 72%, white);
+  opacity: 0.8;
+}
+
+.claudian-process-status.status-completed {
+  color: var(--color-green);
+  opacity: 0.95;
+}
+
+.claudian-process-status.status-error {
+  color: var(--color-red);
+}
+
+.claudian-process-content {
+  padding-top: 6px;
+  padding-inline-start: 16px;
+  margin-inline-start: 7px;
+  border-inline-start: 2px solid var(--background-modifier-border);
+}
+
+.claudian-process-content-plan .claudian-todo-item {
+  padding: 4px 0;
+}
+
+.claudian-process-content-command .claudian-tool-lines {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.claudian-process-content-command .claudian-tool-line,
+.claudian-process-content-plan .claudian-todo-text {
+  line-height: 1.52;
+}
+
+.claudian-process-content-plan .claudian-todo-status-icon,
+.claudian-process-content-command .claudian-process-status {
+  opacity: 0.95;
 }

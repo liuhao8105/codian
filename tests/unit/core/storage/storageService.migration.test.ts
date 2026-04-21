@@ -126,6 +126,33 @@ describe('StorageService migration', () => {
     expect(plugin.saveData).not.toHaveBeenCalled();
   });
 
+  it('migrates settings from legacy .claudian path when new settings are missing', async () => {
+    const legacySettings = {
+      userName: '墙哥',
+      strongRulesFilePath: '墙的AI记忆/强规则-大叔墙.md',
+      strongRulesPrompt: '旧强规则',
+      memoryFilePath: '墙的AI记忆/长期记忆-大叔墙.md',
+      blockedCommands: ['rm -rf'],
+    };
+
+    const { plugin, files } = createMockPlugin({
+      dataJson: null,
+      initialFiles: {
+        '.claudian/claudian-settings.json': JSON.stringify(legacySettings),
+      },
+    });
+
+    const storage = new StorageService(plugin);
+    const initialized = await storage.initialize();
+
+    const saved = JSON.parse(files.get('.claude/claudian-settings.json') || '{}') as Record<string, unknown>;
+    expect(saved.userName).toBe('墙哥');
+    expect(saved.strongRulesFilePath).toBe('墙的AI记忆/强规则-大叔墙.md');
+    expect(saved.strongRulesPrompt).toBe('旧强规则');
+    expect(saved.memoryFilePath).toBe('墙的AI记忆/长期记忆-大叔墙.md');
+    expect(initialized.claudian.strongRulesFilePath).toBe('墙的AI记忆/强规则-大叔墙.md');
+  });
+
   it('normalizes legacy blockedCommands during settings migration', async () => {
     const legacySettings = {
       userName: 'Test User',

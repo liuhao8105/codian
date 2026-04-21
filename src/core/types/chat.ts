@@ -35,6 +35,21 @@ export type ContentBlock =
   | { type: 'text'; content: string }
   | { type: 'tool_use'; toolId: string }
   | { type: 'thinking'; content: string; durationSeconds?: number }
+  | {
+      type: 'plan';
+      blockId: string;
+      explanation?: string | null;
+      steps: Array<{ step: string; status: 'pending' | 'in_progress' | 'completed' }>;
+    }
+  | {
+      type: 'command';
+      blockId: string;
+      command: string;
+      cwd?: string;
+      output?: string;
+      exitCode?: number;
+      status: 'running' | 'completed' | 'error';
+    }
   | { type: 'subagent'; subagentId: string; mode?: SubagentMode }
   | { type: 'compact_boundary' };
 

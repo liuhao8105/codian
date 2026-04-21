@@ -97,6 +97,7 @@ export class ConversationController {
       state.currentTextContent = '';
       state.currentThinkingState = null;
       state.toolCallElements.clear();
+      state.processBlockElements.clear();
       state.writeEditStates.clear();
       state.isStreaming = false;
 

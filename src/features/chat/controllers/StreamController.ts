@@ -13,7 +13,7 @@ import {
   TOOL_TODO_WRITE,
   TOOL_WRITE,
 } from '../../../core/tools/toolNames';
-import type { ChatMessage, StreamChunk, SubagentInfo, ToolCallInfo } from '../../../core/types';
+import type { ChatMessage, StreamChunk, SubagentInfo, ToolCallInfo, ContentBlock } from '../../../core/types';
 import type { SDKToolUseResult } from '../../../core/types/diff';
 import type CodianPlugin from '../../../main';
 import { formatDurationMmSs } from '../../../utils/date';
@@ -24,6 +24,8 @@ import { FLAVOR_TEXTS } from '../constants';
 import {
   appendThinkingContent,
   createThinkingBlock,
+  renderOrUpdateCommandBlock,
+  renderOrUpdatePlanBlock,
   createWriteEditBlock,
   finalizeThinkingBlock,
   finalizeWriteEditBlock,
@@ -54,15 +56,25 @@ export interface StreamControllerDeps {
 
 export class StreamController {
   private static readonly ASYNC_SUBAGENT_RESULT_RETRY_DELAYS_MS = [200, 600, 1500] as const;
+  private static readonly PLAN_BLOCK_ID = 'live-plan';
 
   private deps: StreamControllerDeps;
   private commandOutputs = new Map<string, string>();
+
+  private getCommandBlock(msg: ChatMessage, blockId: string): Extract<ContentBlock, { type: 'command' }> | null {
+    const blocks = msg.contentBlocks ?? [];
+    const match = blocks.find(
+      block => block.type === 'command' && block.blockId === blockId
+    );
+    return match && match.type === 'command' ? match : null;
+  }
 
   constructor(deps: StreamControllerDeps) {
     this.deps = deps;
   }
 
   private syncPlanUpdate(
+    msg: ChatMessage,
     chunk: Extract<StreamChunk, { type: 'plan_update' }>
   ): void {
     const todos = chunk.steps.map((step) => ({
@@ -71,9 +83,10 @@ export class StreamController {
       activeForm: chunk.explanation ?? step.step,
     }));
     this.deps.state.currentTodos = todos;
+    this.upsertPlanBlock(msg, chunk);
   }
 
-  private handleCommandStart(chunk: Extract<StreamChunk, { type: 'command_start' }>): void {
+  private handleCommandStart(msg: ChatMessage, chunk: Extract<StreamChunk, { type: 'command_start' }>): void {
     this.commandOutputs.set(chunk.id, '');
     this.deps.getStatusPanel?.()?.addBashOutput({
       id: chunk.id,
@@ -81,24 +94,50 @@ export class StreamController {
       status: 'running',
       output: '',
     });
+    this.upsertCommandBlock(msg, {
+      type: 'command',
+      blockId: chunk.id,
+      command: chunk.command,
+      cwd: chunk.cwd,
+      output: '',
+      status: 'running',
+    });
   }
 
-  private handleCommandProgress(chunk: Extract<StreamChunk, { type: 'command_progress' }>): void {
+  private handleCommandProgress(msg: ChatMessage, chunk: Extract<StreamChunk, { type: 'command_progress' }>): void {
     const nextOutput = (this.commandOutputs.get(chunk.id) || '') + chunk.delta;
     this.commandOutputs.set(chunk.id, nextOutput);
     this.deps.getStatusPanel?.()?.updateBashOutput(chunk.id, {
       output: nextOutput,
       status: 'running',
     });
+    this.upsertCommandBlock(msg, {
+      type: 'command',
+      blockId: chunk.id,
+      command: this.getCommandBlock(msg, chunk.id)?.command || 'command',
+      cwd: this.getCommandBlock(msg, chunk.id)?.cwd,
+      output: nextOutput,
+      status: 'running',
+    });
   }
 
-  private handleCommandComplete(chunk: Extract<StreamChunk, { type: 'command_complete' }>): void {
+  private handleCommandComplete(msg: ChatMessage, chunk: Extract<StreamChunk, { type: 'command_complete' }>): void {
     const nextOutput = chunk.output || this.commandOutputs.get(chunk.id) || '';
     this.commandOutputs.delete(chunk.id);
     this.deps.getStatusPanel?.()?.updateBashOutput(chunk.id, {
       output: nextOutput,
       status: chunk.status,
       exitCode: chunk.exitCode,
+    });
+    const existingBlock = this.getCommandBlock(msg, chunk.id);
+    this.upsertCommandBlock(msg, {
+      type: 'command',
+      blockId: chunk.id,
+      command: existingBlock?.command || 'command',
+      cwd: existingBlock?.cwd,
+      output: nextOutput,
+      exitCode: chunk.exitCode,
+      status: chunk.status,
     });
   }
 
@@ -164,19 +203,19 @@ export class StreamController {
       }
 
       case 'plan_update':
-        this.syncPlanUpdate(chunk);
+        this.syncPlanUpdate(msg, chunk);
         break;
 
       case 'command_start':
-        this.handleCommandStart(chunk);
+        this.handleCommandStart(msg, chunk);
         break;
 
       case 'command_progress':
-        this.handleCommandProgress(chunk);
+        this.handleCommandProgress(msg, chunk);
         break;
 
       case 'command_complete':
-        this.handleCommandComplete(chunk);
+        this.handleCommandComplete(msg, chunk);
         break;
 
       case 'blocked':
@@ -239,6 +278,52 @@ export class StreamController {
     }
 
     this.scrollToBottom();
+  }
+
+  private upsertPlanBlock(
+    msg: ChatMessage,
+    chunk: Extract<StreamChunk, { type: 'plan_update' }>
+  ): void {
+    msg.contentBlocks = msg.contentBlocks || [];
+    const block = {
+      type: 'plan' as const,
+      blockId: StreamController.PLAN_BLOCK_ID,
+      explanation: chunk.explanation,
+      steps: chunk.steps,
+    };
+    const existingIndex = msg.contentBlocks.findIndex(
+      content => content.type === 'plan' && content.blockId === StreamController.PLAN_BLOCK_ID
+    );
+    if (existingIndex >= 0) {
+      msg.contentBlocks[existingIndex] = block;
+    } else {
+      msg.contentBlocks.push(block);
+    }
+
+    if (this.deps.state.currentContentEl) {
+      const el = renderOrUpdatePlanBlock(this.deps.state.currentContentEl, block);
+      this.deps.state.processBlockElements.set(block.blockId, el);
+    }
+  }
+
+  private upsertCommandBlock(
+    msg: ChatMessage,
+    block: Extract<ContentBlock, { type: 'command' }>
+  ): void {
+    msg.contentBlocks = msg.contentBlocks || [];
+    const existingIndex = msg.contentBlocks.findIndex(
+      content => content.type === 'command' && content.blockId === block.blockId
+    );
+    if (existingIndex >= 0) {
+      msg.contentBlocks[existingIndex] = block;
+    } else {
+      msg.contentBlocks.push(block);
+    }
+
+    if (this.deps.state.currentContentEl) {
+      const el = renderOrUpdateCommandBlock(this.deps.state.currentContentEl, block);
+      this.deps.state.processBlockElements.set(block.blockId, el);
+    }
   }
 
   // ============================================

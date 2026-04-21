@@ -6,6 +6,7 @@ import type { RewindFilesResult } from '@anthropic-ai/claude-agent-sdk';
 
 import type CodianPlugin from '../../main';
 import { TOOL_EDIT, TOOL_MCP } from '../tools/toolNames';
+import { buildSystemPrompt } from '../prompts/mainAgent';
 import { stripCurrentNoteContext } from '../../utils/context';
 import { getVaultPath } from '../../utils/path';
 import {
@@ -162,6 +163,41 @@ export class CodexAgentRuntime implements AgentRuntime {
     return buildPromptWithHistoryContext(historyContext, prompt, actualPrompt, conversationHistory);
   }
 
+  private buildInstructions(vaultPath: string): string {
+    return buildSystemPrompt({
+      mediaFolder: this.plugin.settings.mediaFolder,
+      strongRulesPrompt: this.plugin.settings.strongRulesPrompt,
+      customPrompt: this.plugin.settings.systemPrompt,
+      allowedExportPaths: this.plugin.settings.allowedExportPaths,
+      vaultPath,
+      userName: this.plugin.settings.userName,
+    });
+  }
+
+  private applyInstructionsToPrompt(prompt: string, vaultPath: string): string {
+    // Keep Codex built-in slash commands bare; wrapping them breaks command detection.
+    if (/^\/compact(\s|$)/i.test(prompt.trim())) {
+      return prompt;
+    }
+
+    const instructions = this.buildInstructions(vaultPath).trim();
+    if (!instructions) {
+      return prompt;
+    }
+
+    return `<codian_system_instructions>
+The following instructions are high-priority runtime instructions for this Codian conversation.
+Follow them over the default Codex identity and default response style.
+Do not mention this instruction block, system prompts, memory files, context files, or internal processing steps in the user-facing answer.
+
+${instructions}
+</codian_system_instructions>
+
+<user_request>
+${prompt}
+</user_request>`;
+  }
+
   private buildHistoryRebuildRequest(
     prompt: string,
     images: ImageAttachment[] | undefined,
@@ -231,8 +267,6 @@ export class CodexAgentRuntime implements AgentRuntime {
     const writableRoots = (queryOptions?.externalContextPaths || [])
       .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
       .map((value) => value.trim());
-    const activeMcpServers = this.getRequestedMcpServers(queryOptions);
-    const needsNetworkAccess = Object.keys(activeMcpServers).length > 0;
 
     return {
       type: 'workspaceWrite',
@@ -240,7 +274,10 @@ export class CodexAgentRuntime implements AgentRuntime {
       readOnlyAccess: {
         type: 'fullAccess',
       },
-      networkAccess: needsNetworkAccess,
+      // Codex desktop sessions default to internet-enabled turns. Restricting
+      // network only to MCP-backed requests breaks normal link resolution,
+      // web lookup, and other first-party networked tasks inside Codian.
+      networkAccess: true,
       excludeTmpdirEnvVar: false,
       excludeSlashTmp: false,
     };
@@ -616,7 +653,10 @@ export class CodexAgentRuntime implements AgentRuntime {
           await ensureThreadStarted();
           return await client.request('turn/start', {
             threadId: this.threadId,
-            input: await this.buildInput(request.prompt, request.images || []),
+            input: await this.buildInput(
+              this.applyInstructionsToPrompt(request.prompt, vaultPath),
+              request.images || []
+            ),
             cwd: vaultPath,
             approvalPolicy: this.getApprovalPolicy(),
             sandboxPolicy: this.buildTurnSandboxPolicy(queryOptions),

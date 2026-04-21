@@ -76,6 +76,7 @@ export interface ChatStateData {
 
   // Tool tracking maps
   toolCallElements: Map<string, HTMLElement>;
+  processBlockElements: Map<string, HTMLElement>;
   writeEditStates: Map<string, WriteEditState>;
   /** Pending tool calls buffered until input is complete (for non-streaming-style render). */
   pendingTools: Map<string, PendingToolCall>;

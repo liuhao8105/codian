@@ -99,6 +99,12 @@
   max-width: 78ch;
 }
 
+.claudian-message-assistant .claudian-thinking-block,
+.claudian-message-assistant .claudian-tool-call,
+.claudian-message-assistant .claudian-process-block {
+  max-width: 78ch;
+}
+
 .claudian-text-copy-btn {
   position: absolute;
   bottom: 0;

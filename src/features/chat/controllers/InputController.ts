@@ -70,16 +70,63 @@ function appendEmbeddedImageOrder(prompt: string, references: Array<{ index: num
 }
 
 function normalizeQuickReplyQuestion(text: string): string {
-  return text.trim().replace(/[？?！!。.\s]+$/g, '');
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/^(请问|麻烦问下|麻烦问一下|麻烦|想问下|想问一下)/, '')
+    .replace(/[？?！!。.,，、；;：:\s]+/g, '')
+    .replace(/(呀|啊|呢|嘛|吧|哈|啦|呗|哦|喔)+$/g, '');
 }
 
-function findQuickReply(rawContent: string, quickReplies: StrongRulesQuickReplies): string | null {
+const QUICK_REPLY_ALIASES: Record<string, string[]> = {
+  '你是谁': ['你是谁呀', '你到底是谁', '介绍一下你', '介绍下你', '介绍一下你自己', '介绍下你自己'],
+  '你能做什么': ['你可以做什么', '你会做什么', '你是做什么的', '你是干什么的', '你主要做什么'],
+  '你记得我什么': ['你记得我哪些事', '你记得我多少', '你对我有什么记忆', '你还记得我什么'],
+  '你多大': ['你几岁', '你年龄多大', '你多大了', '你今年多大'],
+  '你几岁': ['你多大', '你年龄多大', '你多大了', '你今年多大'],
+  '你叫什么': ['你叫什么名字', '你的名字是什么', '我该怎么叫你', '怎么称呼你'],
+  '你是男的女的': ['你是男生还是女生', '你是男的还是女的', '你是男是女', '你的性别是什么'],
+  '我是谁': ['你觉得我是谁', '你怎么看我', '你觉得我是个什么样的人', '你记得我是什么样的人'],
+};
+
+function resolveQuickReplyKey(rawContent: string, quickReplies: StrongRulesQuickReplies): string | null {
   const normalizedQuestion = normalizeQuickReplyQuestion(rawContent);
   if (!normalizedQuestion) {
     return null;
   }
 
-  return quickReplies[normalizedQuestion] ?? null;
+  const normalizedKeyMap = new Map<string, string>();
+  for (const key of Object.keys(quickReplies)) {
+    normalizedKeyMap.set(normalizeQuickReplyQuestion(key), key);
+  }
+
+  const exactMatch = normalizedKeyMap.get(normalizedQuestion);
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  for (const [canonical, aliases] of Object.entries(QUICK_REPLY_ALIASES)) {
+    const normalizedCanonical = normalizeQuickReplyQuestion(canonical);
+    const candidateKey = normalizedKeyMap.get(normalizedCanonical);
+    if (!candidateKey) continue;
+    if (normalizedCanonical === normalizedQuestion) {
+      return candidateKey;
+    }
+    if (aliases.some(alias => normalizeQuickReplyQuestion(alias) === normalizedQuestion)) {
+      return candidateKey;
+    }
+  }
+
+  return null;
+}
+
+function findQuickReply(rawContent: string, quickReplies: StrongRulesQuickReplies): string | null {
+  const resolvedKey = resolveQuickReplyKey(rawContent, quickReplies);
+  if (!resolvedKey) {
+    return null;
+  }
+
+  return quickReplies[resolvedKey] ?? null;
 }
 
 function appendDirectAnswerInstruction(
@@ -381,6 +428,17 @@ export class InputController {
       return;
     }
 
+    const availableAgents = (plugin.agentManager?.getAvailableAgents?.() ?? []).map((agent: RequestedAgentReference) => ({
+      id: agent.id,
+      name: agent.name,
+      description: agent.description ?? '',
+    }));
+    const parsedAgentMentions = parseRequestedAgentMentions(content, availableAgents);
+    if (parsedAgentMentions.invalidMentions.length > 0) {
+      new Notice(`未找到子代理：${parsedAgentMentions.invalidMentions.join('、')}。请从 @Agents 列表里重新选择。`);
+      return;
+    }
+
     if (shouldUseInput) {
       inputEl.value = '';
       this.deps.resetInputHeight();
@@ -431,17 +489,6 @@ export class InputController {
         const markdown = await plugin.app.vault.cachedRead(strongRulesFile);
         quickReplies = extractQuickRepliesFromMarkdown(markdown);
       }
-    }
-
-    const availableAgents = (plugin.agentManager?.getAvailableAgents?.() ?? []).map((agent: RequestedAgentReference) => ({
-      id: agent.id,
-      name: agent.name,
-      description: agent.description ?? '',
-    }));
-    const parsedAgentMentions = parseRequestedAgentMentions(content, availableAgents);
-    if (parsedAgentMentions.invalidMentions.length > 0) {
-      new Notice(`未找到子代理：${parsedAgentMentions.invalidMentions.join('、')}。请从 @Agents 列表里重新选择。`);
-      return;
     }
 
     const effectiveContent = parsedAgentMentions.sanitizedContent || content;
@@ -541,6 +588,7 @@ export class InputController {
     const contentEl = msgEl.querySelector('.claudian-message-content') as HTMLElement;
 
     state.toolCallElements.clear();
+    state.processBlockElements.clear();
     state.currentContentEl = contentEl;
     state.currentTextEl = null;
     state.currentTextContent = '';
