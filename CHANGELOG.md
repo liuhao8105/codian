@@ -4,6 +4,14 @@
 
 ### What changed
 
+- Added a local-memory system inspired by [`supermemoryai/supermemory`](https://github.com/supermemoryai/supermemory)'s `memory / recall / context / profile` model, implemented entirely inside the local Obsidian vault.
+- Added `.claude/local-memory/memories.jsonl` for structured local memories and `.claude/local-memory/profile.md` as a stable profile placeholder.
+- Added `/remember [要记住的内容]` to save a local memory and `/recall [搜索关键词]` to search local memories.
+- Added automatic local-memory recall during normal chat turns, injecting relevant memories as hidden background context.
+- Added settings for enabling local memory and configuring the vault-relative local-memory directory.
+- Localized built-in slash command descriptions and argument hints to Chinese.
+- Clarified that this feature is built in `liuhao8105/codian`, which is derived from [`YishenTu/claudian`](https://github.com/YishenTu/claudian), and only references Supermemory's product logic.
+- No Supermemory cloud API, MCP endpoint, API key, remote database, or third-party cloud memory service is used by this local implementation.
 - Fixed streamed reply rendering so multi-part Codex answers are separated into visible paragraphs instead of being merged into one long block.
 - Fixed image input for the `Codex App Server` adapter by sending the correct `localImage` item type.
 - Added automatic stale-thread recovery: when an old conversation thread cannot continue, `Codian` now rebuilds the request history into a fresh thread and retries once.
