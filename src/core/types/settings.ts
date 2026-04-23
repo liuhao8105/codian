@@ -259,6 +259,8 @@ export interface CodianSettings {
   strongRulesFilePath: string;
   strongRulesPrompt: string;
   memoryFilePath: string;
+  enableLocalMemory: boolean;
+  localMemoryPath: string;
   allowedExportPaths: string[];
   persistentExternalContextPaths: string[];  // Paths that persist across all sessions
 
@@ -331,6 +333,8 @@ export const DEFAULT_SETTINGS: CodianSettings = {
   strongRulesFilePath: '',
   strongRulesPrompt: '',
   memoryFilePath: '',
+  enableLocalMemory: true,
+  localMemoryPath: '.claude/local-memory',
   allowedExportPaths: ['~/Desktop', '~/Downloads'],
   persistentExternalContextPaths: [],
 

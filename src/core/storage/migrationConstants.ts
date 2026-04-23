@@ -34,6 +34,8 @@ export const CLAUDIAN_ONLY_FIELDS = new Set([
   'strongRulesFilePath',
   'strongRulesPrompt',
   'memoryFilePath',
+  'enableLocalMemory',
+  'localMemoryPath',
   'allowedExportPaths',
   'persistentExternalContextPaths',
 
@@ -75,6 +77,8 @@ export const MIGRATABLE_CLAUDIAN_FIELDS = new Set([
   'strongRulesFilePath',
   'strongRulesPrompt',
   'memoryFilePath',
+  'enableLocalMemory',
+  'localMemoryPath',
   'allowedExportPaths',
   'persistentExternalContextPaths',
   'environmentVariables',

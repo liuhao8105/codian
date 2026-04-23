@@ -85,6 +85,11 @@ describe('types.ts', () => {
       expect(DEFAULT_SETTINGS.strongRulesPrompt).toBe('');
     });
 
+    it('should enable local memory by default', () => {
+      expect(DEFAULT_SETTINGS.enableLocalMemory).toBe(true);
+      expect(DEFAULT_SETTINGS.localMemoryPath).toBe('.claude/local-memory');
+    });
+
     it('should have envSnippets as empty array by default', () => {
       expect(DEFAULT_SETTINGS.envSnippets).toEqual([]);
     });
@@ -118,6 +123,8 @@ describe('types.ts', () => {
         strongRulesFilePath: '',
         strongRulesPrompt: '',
         memoryFilePath: '',
+        enableLocalMemory: true,
+        localMemoryPath: '.claude/local-memory',
         allowedExportPaths: [],
         persistentExternalContextPaths: [],
         slashCommands: [],
@@ -161,6 +168,8 @@ describe('types.ts', () => {
         strongRulesFilePath: '',
         strongRulesPrompt: '',
         memoryFilePath: '',
+        enableLocalMemory: true,
+        localMemoryPath: '.claude/local-memory',
         allowedExportPaths: [],
         persistentExternalContextPaths: [],
         slashCommands: [],
@@ -204,6 +213,8 @@ describe('types.ts', () => {
         strongRulesFilePath: '',
         strongRulesPrompt: '',
         memoryFilePath: '',
+        enableLocalMemory: true,
+        localMemoryPath: '.claude/local-memory',
         allowedExportPaths: [],
         persistentExternalContextPaths: [],
         slashCommands: [],

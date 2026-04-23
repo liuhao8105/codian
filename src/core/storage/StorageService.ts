@@ -7,6 +7,7 @@
  * - Slash commands in .claude/commands/*.md
  * - Chat sessions in .claude/sessions/*.jsonl
  * - MCP configs in .claude/mcp.json
+ * - Local memories in .claude/local-memory/
  *
  * Handles migration from legacy formats:
  * - Old settings.json with Claudian fields → split into CC + Claudian files
@@ -41,6 +42,7 @@ import {
   type StoredClaudianSettings,
 } from './ClaudianSettingsStorage';
 import { McpStorage } from './McpStorage';
+import { LOCAL_MEMORY_PATH, LocalMemoryStorage } from './LocalMemoryStorage';
 import {
   CLAUDIAN_ONLY_FIELDS,
   convertEnvObjectToString,
@@ -90,6 +92,8 @@ interface LegacySettingsJson {
   strongRulesFilePath?: string;
   strongRulesPrompt?: string;
   memoryFilePath?: string;
+  enableLocalMemory?: boolean;
+  localMemoryPath?: string;
   allowedExportPaths?: string[];
   keyboardNavigation?: unknown;
   claudeCliPath?: string;
@@ -126,6 +130,7 @@ export class StorageService {
   readonly sessions: SessionStorage;
   readonly mcp: McpStorage;
   readonly agents: AgentVaultStorage;
+  readonly localMemory: LocalMemoryStorage;
 
   private adapter: VaultFileAdapter;
   private plugin: Plugin;
@@ -142,6 +147,7 @@ export class StorageService {
     this.sessions = new SessionStorage(this.adapter);
     this.mcp = new McpStorage(this.adapter);
     this.agents = new AgentVaultStorage(this.adapter);
+    this.localMemory = new LocalMemoryStorage(this.adapter);
   }
 
   async initialize(): Promise<CombinedSettings> {
@@ -273,6 +279,8 @@ export class StorageService {
       strongRulesFilePath: oldSettings.strongRulesFilePath ?? DEFAULT_SETTINGS.strongRulesFilePath,
       strongRulesPrompt: oldSettings.strongRulesPrompt ?? DEFAULT_SETTINGS.strongRulesPrompt,
       memoryFilePath: oldSettings.memoryFilePath ?? DEFAULT_SETTINGS.memoryFilePath,
+      enableLocalMemory: oldSettings.enableLocalMemory ?? DEFAULT_SETTINGS.enableLocalMemory,
+      localMemoryPath: oldSettings.localMemoryPath ?? DEFAULT_SETTINGS.localMemoryPath,
       allowedExportPaths: oldSettings.allowedExportPaths ?? DEFAULT_SETTINGS.allowedExportPaths,
       persistentExternalContextPaths: DEFAULT_SETTINGS.persistentExternalContextPaths,
       keyboardNavigation: oldSettings.keyboardNavigation as StoredCodianSettings['keyboardNavigation'] ?? DEFAULT_SETTINGS.keyboardNavigation,
@@ -412,6 +420,7 @@ export class StorageService {
     await this.adapter.ensureFolder(SKILLS_PATH);
     await this.adapter.ensureFolder(SESSIONS_PATH);
     await this.adapter.ensureFolder(AGENTS_PATH);
+    await this.adapter.ensureFolder(LOCAL_MEMORY_PATH);
   }
 
   async loadAllSlashCommands(): Promise<SlashCommand[]> {

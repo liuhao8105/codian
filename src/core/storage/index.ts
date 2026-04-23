@@ -8,6 +8,14 @@ export {
   type StoredClaudianSettings,
 } from './ClaudianSettingsStorage';
 export { MCP_CONFIG_PATH, McpStorage } from './McpStorage';
+export {
+  LOCAL_MEMORY_FILE,
+  LOCAL_MEMORY_PATH,
+  LOCAL_MEMORY_PROFILE_FILE,
+  LocalMemoryStorage,
+  type LocalMemoryEntry,
+  type LocalMemoryType,
+} from './LocalMemoryStorage';
 export { SESSIONS_PATH, SessionStorage } from './SessionStorage';
 export { SKILLS_PATH, SkillStorage } from './SkillStorage';
 export { COMMANDS_PATH, SlashCommandStorage } from './SlashCommandStorage';

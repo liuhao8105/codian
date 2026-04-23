@@ -214,6 +214,33 @@ export class CodianSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
+      .setName('本地记忆')
+      .setDesc('在当前 Obsidian 仓库内保存和召回记忆，不上传云端。可用 /remember 保存，/recall 搜索。')
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.enableLocalMemory !== false)
+          .onChange(async (value) => {
+            this.plugin.settings.enableLocalMemory = value;
+            this.plugin.storage.localMemory.setBasePath(this.plugin.settings.localMemoryPath || '.claude/local-memory');
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName('本地记忆目录')
+      .setDesc('保存本地记忆的仓库内目录。默认 .claude/local-memory。')
+      .addText((text) => {
+        text
+          .setPlaceholder('.claude/local-memory')
+          .setValue(this.plugin.settings.localMemoryPath || '.claude/local-memory')
+          .onChange(async (value) => {
+            this.plugin.settings.localMemoryPath = value.trim() || '.claude/local-memory';
+            this.plugin.storage.localMemory.setBasePath(this.plugin.settings.localMemoryPath);
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
       .setName(t('settings.enableAutoScroll.name'))
       .setDesc(t('settings.enableAutoScroll.desc'))
       .addToggle((toggle) =>

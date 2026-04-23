@@ -5,7 +5,7 @@
  * These are handled separately from user-defined slash commands.
  */
 
-export type BuiltInCommandAction = 'clear' | 'add-dir' | 'resume' | 'fork';
+export type BuiltInCommandAction = 'clear' | 'add-dir' | 'resume' | 'fork' | 'remember' | 'recall';
 
 export interface BuiltInCommand {
   name: string;
@@ -28,25 +28,39 @@ export const BUILT_IN_COMMANDS: BuiltInCommand[] = [
   {
     name: 'clear',
     aliases: ['new'],
-    description: 'Start a new conversation',
+    description: '新建对话',
     action: 'clear',
   },
   {
     name: 'add-dir',
-    description: 'Add external context directory',
+    description: '添加外部上下文目录',
     action: 'add-dir',
     hasArgs: true,
-    argumentHint: '[path/to/directory]',
+    argumentHint: '[目录路径]',
   },
   {
     name: 'resume',
-    description: 'Resume a previous conversation',
+    description: '继续之前的对话',
     action: 'resume',
   },
   {
     name: 'fork',
-    description: 'Fork entire conversation to new session',
+    description: '复制当前完整对话到新会话',
     action: 'fork',
+  },
+  {
+    name: 'remember',
+    description: '保存一条本地记忆',
+    action: 'remember',
+    hasArgs: true,
+    argumentHint: '[要记住的内容]',
+  },
+  {
+    name: 'recall',
+    description: '搜索本地记忆',
+    action: 'recall',
+    hasArgs: true,
+    argumentHint: '[搜索关键词]',
   },
 ];
 

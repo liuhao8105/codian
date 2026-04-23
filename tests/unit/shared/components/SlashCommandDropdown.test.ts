@@ -9,8 +9,8 @@ import {
 // Mock getBuiltInCommandsForDropdown
 jest.mock('@/core/commands', () => ({
   getBuiltInCommandsForDropdown: jest.fn(() => [
-    { id: 'builtin:clear', name: 'clear', description: 'Start a new conversation', content: '' },
-    { id: 'builtin:add-dir', name: 'add-dir', description: 'Add external context directory', content: '', argumentHint: 'path/to/directory' },
+    { id: 'builtin:clear', name: 'clear', description: '新建对话', content: '' },
+    { id: 'builtin:add-dir', name: 'add-dir', description: '添加外部上下文目录', content: '', argumentHint: '[目录路径]' },
   ]),
 }));
 
@@ -267,7 +267,7 @@ describe('SlashCommandDropdown', () => {
       // Should only have one 'clear' command
       expect(clearItems).toHaveLength(1);
       // And it should be the built-in one (verified by its description)
-      expect(clearItems[0].description).toBe('Start a new conversation');
+      expect(clearItems[0].description).toBe('新建对话');
 
       dropdownWithSdk.destroy();
     });

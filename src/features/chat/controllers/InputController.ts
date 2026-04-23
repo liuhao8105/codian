@@ -245,6 +245,15 @@ ${lines.join('\n')}
   );
 }
 
+function appendLocalMemoryContext(prompt: string, localMemoryContext: string): string {
+  const trimmed = localMemoryContext.trim();
+  if (!trimmed) {
+    return prompt;
+  }
+
+  return appendMarkdownSnippet(prompt, trimmed);
+}
+
 export interface InputControllerDeps {
   plugin: CodianPlugin;
   state: ChatState;
@@ -552,6 +561,11 @@ export class InputController {
 
       if (memoryFilePath) {
         promptToSend = appendContextFiles(promptToSend, [memoryFilePath]);
+      }
+
+      if (plugin.settings.enableLocalMemory !== false && plugin.storage?.localMemory) {
+        const localMemoryContext = await plugin.storage.localMemory.buildContext(effectiveContent);
+        promptToSend = appendLocalMemoryContext(promptToSend, localMemoryContext);
       }
 
       promptToSend = appendDirectAnswerInstruction(promptToSend, effectiveContent, quickReplies);
@@ -1260,8 +1274,25 @@ export class InputController {
   // Built-in Commands
   // ============================================
 
+  private addAssistantNoticeMessage(content: string): void {
+    const { state, renderer } = this.deps;
+    const welcomeEl = this.deps.getWelcomeEl();
+    if (welcomeEl) {
+      welcomeEl.style.display = 'none';
+    }
+
+    const msg: ChatMessage = {
+      id: this.deps.generateId(),
+      role: 'assistant',
+      content,
+      timestamp: Date.now(),
+    };
+    state.addMessage(msg);
+    renderer.addMessage(msg);
+  }
+
   private async executeBuiltInCommand(action: string, args: string): Promise<void> {
-    const { conversationController } = this.deps;
+    const { conversationController, plugin } = this.deps;
 
     switch (action) {
       case 'clear':
@@ -1290,6 +1321,33 @@ export class InputController {
           return;
         }
         await this.deps.onForkAll();
+        break;
+      }
+      case 'remember': {
+        if (!args.trim()) {
+          new Notice('请输入要记住的内容。用法：/remember 你的记忆内容');
+          return;
+        }
+        if (!plugin.storage?.localMemory) {
+          new Notice('本地记忆存储不可用。');
+          return;
+        }
+        const memory = await plugin.storage.localMemory.add(args.trim(), { source: 'manual' });
+        this.addAssistantNoticeMessage(`已保存到本地记忆：${memory.content}`);
+        break;
+      }
+      case 'recall': {
+        if (!plugin.storage?.localMemory) {
+          new Notice('本地记忆存储不可用。');
+          return;
+        }
+        const memories = await plugin.storage.localMemory.search(args.trim(), 10);
+        if (memories.length === 0) {
+          this.addAssistantNoticeMessage('没有找到匹配的本地记忆。');
+          return;
+        }
+        const lines = memories.map((memory, index) => `${index + 1}. ${memory.content}`);
+        this.addAssistantNoticeMessage(`找到 ${memories.length} 条本地记忆：\n\n${lines.join('\n')}`);
         break;
       }
       default:

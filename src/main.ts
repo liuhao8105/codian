@@ -379,6 +379,7 @@ export default class CodianPlugin extends Plugin {
       ...claudian,
       slashCommands,
     };
+    this.storage.localMemory.setBasePath(this.settings.localMemoryPath || DEFAULT_SETTINGS.localMemoryPath);
 
     const sanitizedPersistentPaths = filterValidPaths(this.settings.persistentExternalContextPaths || []);
     const didSanitizePersistentPaths =
