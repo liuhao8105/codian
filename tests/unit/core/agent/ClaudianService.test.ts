@@ -51,7 +51,7 @@ describe('ClaudianService', () => {
         thinkingBudget: 0,
         blockedCommands: [],
         enableBlocklist: false,
-        mediaFolder: 'claudian-media',
+        mediaFolder: 'codian-media',
         systemPrompt: '',
         memoryFilePath: '',
         allowedExportPaths: [],

@@ -203,11 +203,11 @@ function createImageHtml(
   const alt = escapeHtml(altText || file.basename);
   const style = buildStyleAttribute(altText);
 
-  return `<span class="claudian-embedded-image"><img src="${escapeHtml(src)}" alt="${alt}" loading="lazy"${style}></span>`;
+  return `<span class="codian-embedded-image"><img src="${escapeHtml(src)}" alt="${alt}" loading="lazy"${style}></span>`;
 }
 
 function createFallbackHtml(wikilink: string): string {
-  return `<span class="claudian-embedded-image-fallback">${escapeHtml(wikilink)}</span>`;
+  return `<span class="codian-embedded-image-fallback">${escapeHtml(wikilink)}</span>`;
 }
 
 /**

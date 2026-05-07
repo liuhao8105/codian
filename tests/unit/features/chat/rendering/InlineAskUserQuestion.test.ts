@@ -49,11 +49,11 @@ function fireKeyDown(
 }
 
 function findRoot(container: any): any {
-  return container.querySelector('.claudian-ask-question-inline');
+  return container.querySelector('.codian-ask-question-inline');
 }
 
 function findItems(container: any): any[] {
-  return container.querySelectorAll('claudian-ask-item');
+  return container.querySelectorAll('codian-ask-item');
 }
 
 describe('InlineAskUserQuestion', () => {
@@ -112,12 +112,12 @@ describe('InlineAskUserQuestion', () => {
       ]);
       const { container } = renderWidget(input);
       // Find option items (excluding custom input row)
-      const items = container.querySelectorAll('claudian-ask-item');
+      const items = container.querySelectorAll('codian-ask-item');
       // 2 unique options + 1 custom input row = 3
       const optionLabels = items
-        .filter((item: any) => !item.hasClass('claudian-ask-custom-item'))
+        .filter((item: any) => !item.hasClass('codian-ask-custom-item'))
         .map((item: any) => {
-          const labelEl = item.querySelector('claudian-ask-item-label');
+          const labelEl = item.querySelector('codian-ask-item-label');
           return labelEl?.textContent;
         });
       expect(optionLabels).toEqual(['A', 'B']);
@@ -129,7 +129,7 @@ describe('InlineAskUserQuestion', () => {
         { question: 'Second', options: ['B'] },
       ]);
       const { container } = renderWidget(input);
-      const tabLabels = container.querySelectorAll('claudian-ask-tab-label');
+      const tabLabels = container.querySelectorAll('codian-ask-tab-label');
       // Tab labels: MyHeader, Q2, Submit
       expect(tabLabels[0]?.textContent).toBe('MyHeader');
       expect(tabLabels[1]?.textContent).toBe('Q2');
@@ -144,11 +144,11 @@ describe('InlineAskUserQuestion', () => {
       const { container } = renderWidget(input);
 
       const items = findItems(container).filter(
-        (i: any) => !i.hasClass('claudian-ask-custom-item'),
+        (i: any) => !i.hasClass('codian-ask-custom-item'),
       );
       items[0]?.click();
 
-      expect(container.querySelector('claudian-ask-review-title')?.textContent).toBe('Review your answers');
+      expect(container.querySelector('codian-ask-review-title')?.textContent).toBe('Review your answers');
     });
 
     it('truncates header to 12 characters', () => {
@@ -156,7 +156,7 @@ describe('InlineAskUserQuestion', () => {
         { question: 'Q', options: ['A'], header: 'VeryLongHeaderText' },
       ]);
       const { container } = renderWidget(input);
-      const tabLabels = container.querySelectorAll('claudian-ask-tab-label');
+      const tabLabels = container.querySelectorAll('codian-ask-tab-label');
       expect(tabLabels[0]?.textContent).toBe('VeryLongHead');
     });
   });
@@ -166,7 +166,7 @@ describe('InlineAskUserQuestion', () => {
       const input = makeInput([{ question: 'Q', options: ['Yes', 'No'] }]);
       const { container } = renderWidget(input);
       const labels = container
-        .querySelectorAll('claudian-ask-item-label')
+        .querySelectorAll('codian-ask-item-label')
         .map((el: any) => el.textContent);
       expect(labels).toContain('Yes');
       expect(labels).toContain('No');
@@ -186,7 +186,7 @@ describe('InlineAskUserQuestion', () => {
       ]);
       const { container } = renderWidget(input);
       const labels = container
-        .querySelectorAll('claudian-ask-item-label')
+        .querySelectorAll('codian-ask-item-label')
         .map((el: any) => el.textContent);
       expect(labels).toContain('Option A');
       expect(labels).toContain('Option B');
@@ -199,7 +199,7 @@ describe('InlineAskUserQuestion', () => {
         { question: 'Q', options: [{ label: 'A', description: 'Some desc' }] },
       ]);
       const { container } = renderWidget(input);
-      const descEl = container.querySelector('claudian-ask-item-desc');
+      const descEl = container.querySelector('codian-ask-item-desc');
       expect(descEl?.textContent).toBe('Some desc');
     });
 
@@ -207,7 +207,7 @@ describe('InlineAskUserQuestion', () => {
       const input = makeInput([{ question: 'Q', options: [42] }]);
       const { container } = renderWidget(input);
       const labels = container
-        .querySelectorAll('claudian-ask-item-label')
+        .querySelectorAll('codian-ask-item-label')
         .map((el: any) => el.textContent);
       expect(labels).toContain('42');
     });
@@ -223,15 +223,15 @@ describe('InlineAskUserQuestion', () => {
 
       // Click first option
       const items = findItems(container).filter(
-        (i: any) => !i.hasClass('claudian-ask-custom-item'),
+        (i: any) => !i.hasClass('codian-ask-custom-item'),
       );
       items[0]?.click();
       jest.advanceTimersByTime(200);
 
       // Auto-advanced to submit tab — now submit
-      const submitItems = container.querySelectorAll('claudian-ask-item');
+      const submitItems = container.querySelectorAll('codian-ask-item');
       const submitRow = submitItems.find(
-        (i: any) => !i.hasClass('claudian-ask-custom-item'),
+        (i: any) => !i.hasClass('codian-ask-custom-item'),
       );
       submitRow?.click();
 
@@ -246,20 +246,20 @@ describe('InlineAskUserQuestion', () => {
       const { container } = renderWidget(input);
 
       const items = findItems(container).filter(
-        (i: any) => !i.hasClass('claudian-ask-custom-item'),
+        (i: any) => !i.hasClass('codian-ask-custom-item'),
       );
       // Select X and Y
       items[0]?.click();
       items[1]?.click();
 
       // Check marks for multi-select
-      const checks = container.querySelectorAll('claudian-ask-check');
+      const checks = container.querySelectorAll('codian-ask-check');
       const checkedCount = checks.filter((c: any) => c.hasClass('is-checked')).length;
       expect(checkedCount).toBe(2);
 
       // Deselect X
       items[0]?.click();
-      const checksAfter = container.querySelectorAll('claudian-ask-check');
+      const checksAfter = container.querySelectorAll('codian-ask-check');
       const checkedAfter = checksAfter.filter((c: any) => c.hasClass('is-checked')).length;
       expect(checkedAfter).toBe(1);
     });
@@ -297,22 +297,22 @@ describe('InlineAskUserQuestion', () => {
 
       // Select "Red" for Q1
       const items = findItems(container).filter(
-        (i: any) => !i.hasClass('claudian-ask-custom-item'),
+        (i: any) => !i.hasClass('codian-ask-custom-item'),
       );
       items[0]?.click();
       jest.advanceTimersByTime(200);
 
       // Now on Q2 — select "M" (index 1)
       const q2Items = findItems(container).filter(
-        (i: any) => !i.hasClass('claudian-ask-custom-item'),
+        (i: any) => !i.hasClass('codian-ask-custom-item'),
       );
       q2Items[1]?.click();
       jest.advanceTimersByTime(200);
 
       // Now on submit tab — click submit
-      const submitItems = container.querySelectorAll('claudian-ask-item');
+      const submitItems = container.querySelectorAll('codian-ask-item');
       const submitRow = submitItems.find(
-        (i: any) => !i.hasClass('claudian-ask-custom-item'),
+        (i: any) => !i.hasClass('codian-ask-custom-item'),
       );
       submitRow?.click();
 
@@ -466,7 +466,7 @@ describe('InlineAskUserQuestion', () => {
       fireKeyDown(root, 'Tab');
 
       // Should now be on Q2 — check tab bar
-      const tabs = container.querySelectorAll('claudian-ask-tab');
+      const tabs = container.querySelectorAll('codian-ask-tab');
       expect(tabs[1]?.hasClass('is-active')).toBe(true);
     });
 
@@ -482,7 +482,7 @@ describe('InlineAskUserQuestion', () => {
       fireKeyDown(root, 'Tab');
       fireKeyDown(root, 'Tab', { shiftKey: true });
 
-      const tabs = container.querySelectorAll('claudian-ask-tab');
+      const tabs = container.querySelectorAll('codian-ask-tab');
       expect(tabs[0]?.hasClass('is-active')).toBe(true);
     });
 
@@ -496,7 +496,7 @@ describe('InlineAskUserQuestion', () => {
 
       fireKeyDown(root, 'ArrowRight');
 
-      const tabs = container.querySelectorAll('claudian-ask-tab');
+      const tabs = container.querySelectorAll('codian-ask-tab');
       expect(tabs[1]?.hasClass('is-active')).toBe(true);
     });
 
@@ -508,7 +508,7 @@ describe('InlineAskUserQuestion', () => {
 
       // Select option A
       const items = findItems(container).filter(
-        (i: any) => !i.hasClass('claudian-ask-custom-item'),
+        (i: any) => !i.hasClass('codian-ask-custom-item'),
       );
       items[0]?.click();
       jest.advanceTimersByTime(200);
@@ -528,7 +528,7 @@ describe('InlineAskUserQuestion', () => {
 
       // Select A and auto-advance to submit
       const items = findItems(container).filter(
-        (i: any) => !i.hasClass('claudian-ask-custom-item'),
+        (i: any) => !i.hasClass('codian-ask-custom-item'),
       );
       items[0]?.click();
       jest.advanceTimersByTime(200);
@@ -552,7 +552,7 @@ describe('InlineAskUserQuestion', () => {
       jest.advanceTimersByTime(200);
 
       // After auto-advance we should be on submit tab
-      const tabs = container.querySelectorAll('claudian-ask-tab');
+      const tabs = container.querySelectorAll('codian-ask-tab');
       const submitTab = tabs[tabs.length - 1];
       expect(submitTab?.hasClass('is-active')).toBe(true);
 
@@ -588,14 +588,14 @@ describe('InlineAskUserQuestion - immediateSelect mode', () => {
       const { container, resolve } = renderImmediateWidget(input);
 
       // Should render tab bar (immediateSelect disabled due to multi-question)
-      const tabBar = container.querySelector('claudian-ask-tab-bar');
+      const tabBar = container.querySelector('codian-ask-tab-bar');
       expect(tabBar).not.toBeNull();
-      const tabs = container.querySelectorAll('claudian-ask-tab');
+      const tabs = container.querySelectorAll('codian-ask-tab');
       expect(tabs.length).toBeGreaterThan(0);
 
       // Should NOT resolve immediately on click (normal multi-tab flow)
       const items = findItems(container).filter(
-        (i: any) => !i.hasClass('claudian-ask-custom-item'),
+        (i: any) => !i.hasClass('codian-ask-custom-item'),
       );
       items[0]?.click();
       expect(resolve).not.toHaveBeenCalled();
@@ -606,33 +606,33 @@ describe('InlineAskUserQuestion - immediateSelect mode', () => {
     it('does not render tab bar', () => {
       const input = makeInput([{ question: 'Pick', options: ['A', 'B'] }]);
       const { container } = renderImmediateWidget(input);
-      const tabBar = container.querySelector('claudian-ask-tab-bar');
+      const tabBar = container.querySelector('codian-ask-tab-bar');
       expect(tabBar).toBeNull();
-      const tabs = container.querySelectorAll('claudian-ask-tab');
+      const tabs = container.querySelectorAll('codian-ask-tab');
       expect(tabs).toHaveLength(0);
     });
 
     it('does not render custom input row', () => {
       const input = makeInput([{ question: 'Pick', options: ['A', 'B'] }]);
       const { container } = renderImmediateWidget(input);
-      const customItems = container.querySelectorAll('claudian-ask-custom-item');
+      const customItems = container.querySelectorAll('codian-ask-custom-item');
       expect(customItems).toHaveLength(0);
     });
 
     it('uses custom title when provided', () => {
       const input = makeInput([{ question: 'Pick', options: ['A'] }]);
       const { container } = renderImmediateWidget(input, { title: 'Permission required' });
-      const title = container.querySelector('claudian-ask-inline-title');
+      const title = container.querySelector('codian-ask-inline-title');
       expect(title?.textContent).toBe('Permission required');
     });
 
     it('renders headerEl between title and content', () => {
       const headerEl = createMockEl('div');
-      headerEl.addClass('claudian-ask-approval-info');
+      headerEl.addClass('codian-ask-approval-info');
       const input = makeInput([{ question: 'Pick', options: ['A'] }]);
       const { container } = renderImmediateWidget(input, { headerEl: headerEl as any });
       const root = findRoot(container);
-      expect(root.children.some((c: any) => c.hasClass('claudian-ask-approval-info'))).toBe(true);
+      expect(root.children.some((c: any) => c.hasClass('codian-ask-approval-info'))).toBe(true);
     });
   });
 
@@ -642,7 +642,7 @@ describe('InlineAskUserQuestion - immediateSelect mode', () => {
       const { container, resolve } = renderImmediateWidget(input);
 
       const items = findItems(container).filter(
-        (i: any) => !i.hasClass('claudian-ask-custom-item'),
+        (i: any) => !i.hasClass('codian-ask-custom-item'),
       );
       items[0]?.click();
 
@@ -654,7 +654,7 @@ describe('InlineAskUserQuestion - immediateSelect mode', () => {
       const { container, resolve } = renderImmediateWidget(input);
 
       const items = findItems(container).filter(
-        (i: any) => !i.hasClass('claudian-ask-custom-item'),
+        (i: any) => !i.hasClass('codian-ask-custom-item'),
       );
       items[1]?.click();
 

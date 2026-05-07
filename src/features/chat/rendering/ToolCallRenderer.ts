@@ -190,21 +190,21 @@ function renderWebSearchExpanded(container: HTMLElement, result: string): void {
     return;
   }
 
-  const linksEl = container.createDiv({ cls: 'claudian-tool-lines' });
+  const linksEl = container.createDiv({ cls: 'codian-tool-lines' });
   for (const link of parsed.links) {
-    const linkEl = linksEl.createEl('a', { cls: 'claudian-tool-link' });
+    const linkEl = linksEl.createEl('a', { cls: 'codian-tool-link' });
     linkEl.setAttribute('href', link.url);
     linkEl.setAttribute('target', '_blank');
     linkEl.setAttribute('rel', 'noopener noreferrer');
 
-    const iconEl = linkEl.createSpan({ cls: 'claudian-tool-link-icon' });
+    const iconEl = linkEl.createSpan({ cls: 'codian-tool-link-icon' });
     setIcon(iconEl, 'external-link');
 
-    linkEl.createSpan({ cls: 'claudian-tool-link-title', text: link.title });
+    linkEl.createSpan({ cls: 'codian-tool-link-title', text: link.title });
   }
 
   if (parsed.summary) {
-    const summaryEl = container.createDiv({ cls: 'claudian-tool-web-summary' });
+    const summaryEl = container.createDiv({ cls: 'codian-tool-web-summary' });
     summaryEl.setText(parsed.summary.length > 800 ? parsed.summary.slice(0, 800) + '...' : parsed.summary);
   }
 }
@@ -212,7 +212,7 @@ function renderWebSearchExpanded(container: HTMLElement, result: string): void {
 function renderFileSearchExpanded(container: HTMLElement, result: string): void {
   const lines = result.split(/\r?\n/).filter(line => line.trim());
   if (lines.length === 0) {
-    container.createDiv({ cls: 'claudian-tool-empty', text: 'No matches found' });
+    container.createDiv({ cls: 'codian-tool-empty', text: 'No matches found' });
     return;
   }
   renderLinesExpanded(container, result, 15, true);
@@ -228,17 +228,17 @@ function renderLinesExpanded(
   const truncated = lines.length > maxLines;
   const displayLines = truncated ? lines.slice(0, maxLines) : lines;
 
-  const linesEl = container.createDiv({ cls: 'claudian-tool-lines' });
+  const linesEl = container.createDiv({ cls: 'codian-tool-lines' });
   for (const line of displayLines) {
     const stripped = line.replace(/^\s*\d+→/, '');
-    const lineEl = linesEl.createDiv({ cls: 'claudian-tool-line' });
+    const lineEl = linesEl.createDiv({ cls: 'codian-tool-line' });
     if (hoverable) lineEl.addClass('hoverable');
     lineEl.setText(stripped || ' ');
   }
 
   if (truncated) {
     linesEl.createDiv({
-      cls: 'claudian-tool-truncated',
+      cls: 'codian-tool-truncated',
       text: `... ${lines.length - maxLines} more lines`,
     });
   }
@@ -263,8 +263,8 @@ function renderToolSearchExpanded(container: HTMLElement, result: string): void 
   }
 
   for (const name of toolNames) {
-    const lineEl = container.createDiv({ cls: 'claudian-tool-search-item' });
-    const iconEl = lineEl.createSpan({ cls: 'claudian-tool-search-icon' });
+    const lineEl = container.createDiv({ cls: 'codian-tool-search-item' });
+    const iconEl = lineEl.createSpan({ cls: 'codian-tool-search-icon' });
     setToolIcon(iconEl, name);
     lineEl.createSpan({ text: name });
   }
@@ -272,15 +272,15 @@ function renderToolSearchExpanded(container: HTMLElement, result: string): void 
 
 function renderWebFetchExpanded(container: HTMLElement, result: string): void {
   const maxChars = 500;
-  const linesEl = container.createDiv({ cls: 'claudian-tool-lines' });
-  const lineEl = linesEl.createDiv({ cls: 'claudian-tool-line' });
+  const linesEl = container.createDiv({ cls: 'codian-tool-lines' });
+  const lineEl = linesEl.createDiv({ cls: 'codian-tool-line' });
   lineEl.style.whiteSpace = 'pre-wrap';
   lineEl.style.wordBreak = 'break-word';
 
   if (result.length > maxChars) {
     lineEl.setText(result.slice(0, maxChars));
     linesEl.createDiv({
-      cls: 'claudian-tool-truncated',
+      cls: 'codian-tool-truncated',
       text: `... ${result.length - maxChars} more characters`,
     });
   } else {
@@ -290,7 +290,7 @@ function renderWebFetchExpanded(container: HTMLElement, result: string): void {
 
 export function renderExpandedContent(container: HTMLElement, toolName: string, result: string | undefined): void {
   if (!result) {
-    container.createDiv({ cls: 'claudian-tool-empty', text: 'No result' });
+    container.createDiv({ cls: 'codian-tool-empty', text: 'No result' });
     return;
   }
 
@@ -340,7 +340,7 @@ function areAllTodosCompleted(input: Record<string, unknown>): boolean {
 }
 
 function resetStatusElement(statusEl: HTMLElement, statusClass: string, ariaLabel: string): void {
-  statusEl.className = 'claudian-tool-status';
+  statusEl.className = 'codian-tool-status';
   statusEl.empty();
   statusEl.addClass(statusClass);
   statusEl.setAttribute('aria-label', ariaLabel);
@@ -371,12 +371,12 @@ export function renderTodoWriteResult(
   input: Record<string, unknown>
 ): void {
   container.empty();
-  container.addClass('claudian-todo-panel-content');
-  container.addClass('claudian-todo-list-container');
+  container.addClass('codian-todo-panel-content');
+  container.addClass('codian-todo-list-container');
 
   const todos = input.todos as TodoItem[] | undefined;
   if (!todos || !Array.isArray(todos)) {
-    const item = container.createSpan({ cls: 'claudian-tool-result-item' });
+    const item = container.createSpan({ cls: 'codian-tool-result-item' });
     item.setText('Tasks updated');
     return;
   }
@@ -410,29 +410,29 @@ function createToolElementStructure(
   parentEl: HTMLElement,
   toolCall: ToolCallInfo
 ): ToolElementStructure {
-  const toolEl = parentEl.createDiv({ cls: 'claudian-tool-call' });
+  const toolEl = parentEl.createDiv({ cls: 'codian-tool-call' });
 
-  const header = toolEl.createDiv({ cls: 'claudian-tool-header' });
+  const header = toolEl.createDiv({ cls: 'codian-tool-header' });
   header.setAttribute('tabindex', '0');
   header.setAttribute('role', 'button');
 
-  const iconEl = header.createSpan({ cls: 'claudian-tool-icon' });
+  const iconEl = header.createSpan({ cls: 'codian-tool-icon' });
   iconEl.setAttribute('aria-hidden', 'true');
   setToolIcon(iconEl, toolCall.name);
 
-  const nameEl = header.createSpan({ cls: 'claudian-tool-name' });
+  const nameEl = header.createSpan({ cls: 'codian-tool-name' });
   nameEl.setText(getToolName(toolCall.name, toolCall.input));
 
-  const summaryEl = header.createSpan({ cls: 'claudian-tool-summary' });
+  const summaryEl = header.createSpan({ cls: 'codian-tool-summary' });
   summaryEl.setText(getToolSummary(toolCall.name, toolCall.input));
 
   const currentTaskEl = toolCall.name === TOOL_TODO_WRITE
     ? createCurrentTaskPreview(header, toolCall.input)
     : null;
 
-  const statusEl = header.createSpan({ cls: 'claudian-tool-status' });
+  const statusEl = header.createSpan({ cls: 'codian-tool-status' });
 
-  const content = toolEl.createDiv({ cls: 'claudian-tool-content' });
+  const content = toolEl.createDiv({ cls: 'codian-tool-content' });
 
   return { toolEl, header, iconEl, nameEl, summaryEl, statusEl, content, currentTaskEl };
 }
@@ -461,17 +461,17 @@ function renderAskUserQuestionResult(container: HTMLElement, toolCall: ToolCallI
   const answers = resolveAskUserAnswers(toolCall);
   if (!questions || !Array.isArray(questions) || !answers) return false;
 
-  const reviewEl = container.createDiv({ cls: 'claudian-ask-review' });
+  const reviewEl = container.createDiv({ cls: 'codian-ask-review' });
   for (let i = 0; i < questions.length; i++) {
     const q = questions[i];
     const answer = formatAnswer(answers[q.question]);
-    const pairEl = reviewEl.createDiv({ cls: 'claudian-ask-review-pair' });
-    pairEl.createDiv({ text: `${i + 1}.`, cls: 'claudian-ask-review-num' });
-    const bodyEl = pairEl.createDiv({ cls: 'claudian-ask-review-body' });
-    bodyEl.createDiv({ text: q.question, cls: 'claudian-ask-review-q-text' });
+    const pairEl = reviewEl.createDiv({ cls: 'codian-ask-review-pair' });
+    pairEl.createDiv({ text: `${i + 1}.`, cls: 'codian-ask-review-num' });
+    const bodyEl = pairEl.createDiv({ cls: 'codian-ask-review-body' });
+    bodyEl.createDiv({ text: q.question, cls: 'codian-ask-review-q-text' });
     bodyEl.createDiv({
       text: answer || 'Not answered',
-      cls: answer ? 'claudian-ask-review-a-text' : 'claudian-ask-review-empty',
+      cls: answer ? 'codian-ask-review-a-text' : 'codian-ask-review-empty',
     });
   }
 
@@ -483,8 +483,8 @@ function renderAskUserQuestionFallback(container: HTMLElement, toolCall: ToolCal
 }
 
 function contentFallback(container: HTMLElement, text: string): void {
-  const resultRow = container.createDiv({ cls: 'claudian-tool-result-row' });
-  const resultText = resultRow.createSpan({ cls: 'claudian-tool-result-text' });
+  const resultRow = container.createDiv({ cls: 'codian-tool-result-row' });
+  const resultText = resultRow.createSpan({ cls: 'codian-tool-result-text' });
   resultText.setText(text);
 }
 
@@ -492,7 +492,7 @@ function createCurrentTaskPreview(
   header: HTMLElement,
   input: Record<string, unknown>
 ): HTMLElement {
-  const currentTaskEl = header.createSpan({ cls: 'claudian-tool-current' });
+  const currentTaskEl = header.createSpan({ cls: 'codian-tool-current' });
   const currentTask = getCurrentTask(input);
   if (currentTask) {
     currentTaskEl.setText(currentTask.activeForm);
@@ -522,10 +522,10 @@ function renderToolContent(
   initialText?: string
 ): void {
   if (toolCall.name === TOOL_TODO_WRITE) {
-    content.addClass('claudian-tool-content-todo');
+    content.addClass('codian-tool-content-todo');
     renderTodoWriteResult(content, toolCall.input);
   } else if (toolCall.name === TOOL_ASK_USER_QUESTION) {
-    content.addClass('claudian-tool-content-ask');
+    content.addClass('codian-tool-content-ask');
     if (initialText) {
       renderAskUserQuestionFallback(content, toolCall, 'Waiting for answer...');
     } else if (!renderAskUserQuestionResult(content, toolCall)) {
@@ -577,19 +577,19 @@ export function updateToolCallResult(
   if (!toolEl) return;
 
   if (toolCall.name === TOOL_TODO_WRITE) {
-    const statusEl = toolEl.querySelector('.claudian-tool-status') as HTMLElement;
+    const statusEl = toolEl.querySelector('.codian-tool-status') as HTMLElement;
     if (statusEl) {
       setTodoWriteStatus(statusEl, toolCall.input);
     }
-    const content = toolEl.querySelector('.claudian-tool-content') as HTMLElement;
+    const content = toolEl.querySelector('.codian-tool-content') as HTMLElement;
     if (content) {
       renderTodoWriteResult(content, toolCall.input);
     }
-    const nameEl = toolEl.querySelector('.claudian-tool-name') as HTMLElement;
+    const nameEl = toolEl.querySelector('.codian-tool-name') as HTMLElement;
     if (nameEl) {
       nameEl.setText(getToolName(toolCall.name, toolCall.input));
     }
-    const currentTaskEl = toolEl.querySelector('.claudian-tool-current') as HTMLElement;
+    const currentTaskEl = toolEl.querySelector('.codian-tool-current') as HTMLElement;
     if (currentTaskEl) {
       const currentTask = getCurrentTask(toolCall.input);
       currentTaskEl.setText(currentTask ? currentTask.activeForm : '');
@@ -597,15 +597,15 @@ export function updateToolCallResult(
     return;
   }
 
-  const statusEl = toolEl.querySelector('.claudian-tool-status') as HTMLElement;
+  const statusEl = toolEl.querySelector('.codian-tool-status') as HTMLElement;
   if (statusEl) {
     setToolStatus(statusEl, toolCall.status);
   }
 
   if (toolCall.name === TOOL_ASK_USER_QUESTION) {
-    const content = toolEl.querySelector('.claudian-tool-content') as HTMLElement;
+    const content = toolEl.querySelector('.codian-tool-content') as HTMLElement;
     if (content) {
-      content.addClass('claudian-tool-content-ask');
+      content.addClass('codian-tool-content-ask');
       if (!renderAskUserQuestionResult(content, toolCall)) {
         renderAskUserQuestionFallback(content, toolCall);
       }
@@ -613,7 +613,7 @@ export function updateToolCallResult(
     return;
   }
 
-  const content = toolEl.querySelector('.claudian-tool-content') as HTMLElement;
+  const content = toolEl.querySelector('.codian-tool-content') as HTMLElement;
   if (content) {
     content.empty();
     renderExpandedContent(content, toolCall.name, toolCall.result);

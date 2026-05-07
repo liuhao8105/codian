@@ -1,12 +1,12 @@
 /* Input area */
-.claudian-input-container {
+.codian-input-container {
   position: relative;
   padding: 12px 0 0 0;
 }
 
 /* Input wrapper (border container) - flex column so textarea expands when no chips */
 /* Height calculation: context row (36px) + textarea min (60px) + toolbar (38px) + border (2px) = 136px */
-.claudian-input-wrapper {
+.codian-input-wrapper {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -18,7 +18,7 @@
 
 /* Context row (file chip start, selection indicator end) - inside input wrapper at top */
 /* Collapsed by default; expanded via .has-content class; textarea fills remaining space */
-.claudian-context-row {
+.codian-context-row {
   display: none;
   align-items: flex-start;
   justify-content: flex-start;
@@ -28,12 +28,12 @@
 }
 
 /* Show context row when it has visible content */
-.claudian-context-row.has-content {
+.codian-context-row.has-content {
   display: flex;
 }
 
 /* Nav row (tab badges start, header icons end) - above input wrapper */
-.claudian-input-nav-row {
+.codian-input-nav-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -42,16 +42,16 @@
 }
 
 /* Header mode: hide nav row above input (content moved to header) */
-.claudian-container--header-mode .claudian-input-nav-row {
+.codian-container--header-mode .codian-input-nav-row {
   display: none;
 }
 
 /* Selection indicator (shown when text is selected in editor) */
 /* Match file chip height (24px): chip has 16px remove button + 6px padding + 2px border */
 /* Indicator: 12px text + 10px padding (5+5) + 2px border = 24px */
-.claudian-selection-indicator,
-.claudian-browser-selection-indicator,
-.claudian-canvas-indicator {
+.codian-selection-indicator,
+.codian-browser-selection-indicator,
+.codian-canvas-indicator {
   color: #7abaff;
   font-size: 12px;
   line-height: 1;
@@ -69,7 +69,7 @@
   text-overflow: ellipsis;
 }
 
-.claudian-input {
+.codian-input {
   width: 100%;
   flex: 1 1 0;
   min-height: 60px;
@@ -88,20 +88,20 @@
   unicode-bidi: plaintext; /* Proper BiDi text handling for mixed RTL/LTR */
 }
 
-.claudian-input:hover,
-.claudian-input:focus {
+.codian-input:hover,
+.codian-input:focus {
   outline: none !important;
   border: none !important;
   background: transparent !important;
   box-shadow: none !important;
 }
 
-.claudian-input::placeholder {
+.codian-input::placeholder {
   color: var(--text-muted);
 }
 
 /* Input toolbar */
-.claudian-input-toolbar {
+.codian-input-toolbar {
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -112,13 +112,13 @@
   overflow: visible;
 }
 
-.claudian-input-toolbar-row {
+.codian-input-toolbar-row {
   display: flex;
   align-items: center;
   min-width: 0;
 }
 
-.claudian-input-toolbar-row-primary {
+.codian-input-toolbar-row-primary {
   gap: 10px;
   justify-content: flex-start;
   padding: 3px 4px;
@@ -127,7 +127,7 @@
   background: color-mix(in srgb, var(--background-secondary) 18%, transparent);
 }
 
-.claudian-input-toolbar-row-secondary {
+.codian-input-toolbar-row-secondary {
   gap: 12px;
   justify-content: space-between;
   flex-wrap: nowrap;
@@ -136,19 +136,19 @@
   border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 24%, transparent);
 }
 
-.claudian-input-toolbar-secondary-left,
-.claudian-input-toolbar-secondary-right {
+.codian-input-toolbar-secondary-left,
+.codian-input-toolbar-secondary-right {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
 }
 
-.claudian-input-toolbar-secondary-right {
+.codian-input-toolbar-secondary-right {
   margin-left: auto;
 }
 
-.claudian-toolbar-group {
+.codian-toolbar-group {
   display: flex;
   align-items: center;
   min-height: 26px;
@@ -158,28 +158,28 @@
   background: transparent;
 }
 
-.claudian-toolbar-group-tools {
+.codian-toolbar-group-tools {
   gap: 2px;
   padding: 0;
 }
 
-.claudian-toolbar-group-usage {
+.codian-toolbar-group-usage {
   padding: 0;
 }
 
-.claudian-toolbar-group-permission {
+.codian-toolbar-group-permission {
   padding: 0;
 }
 
 /* File indicator (attached files) */
-.claudian-file-indicator {
+.codian-file-indicator {
   display: none;
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
 }
 
-.claudian-file-chip {
+.codian-file-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -193,31 +193,31 @@
   cursor: pointer;
 }
 
-.claudian-file-chip.is-current-note {
+.codian-file-chip.is-current-note {
   border-color: color-mix(in srgb, var(--interactive-accent) 45%, var(--background-modifier-border));
   background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
 }
 
-.claudian-file-chip-icon {
+.codian-file-chip-icon {
   display: flex;
   align-items: center;
   color: var(--text-muted);
   flex-shrink: 0;
 }
 
-.claudian-file-chip-icon svg {
+.codian-file-chip-icon svg {
   width: 12px;
   height: 12px;
 }
 
-.claudian-file-chip-name {
+.codian-file-chip-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-normal);
 }
 
-.claudian-file-chip-remove {
+.codian-file-chip-remove {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -231,17 +231,17 @@
   transition: background 0.15s ease, color 0.15s ease;
 }
 
-.claudian-file-chip-remove:hover {
+.codian-file-chip-remove:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.claudian-file-chip:hover {
+.codian-file-chip:hover {
   background: var(--background-modifier-hover);
 }
 
 /* Message Queue Indicator (shown below flavor text in thinking indicator) */
-.claudian-queue-indicator {
+.codian-queue-indicator {
   display: none;
   font-size: 12px;
   color: var(--text-muted);
@@ -253,18 +253,18 @@
 }
 
 /* Light blue border when instruction mode is active */
-.claudian-input-instruction-mode {
+.codian-input-instruction-mode {
   border-color: #60a5fa !important;
   box-shadow: 0 0 0 1px #60a5fa;
 }
 
 /* Pink border when bash mode is active */
-.claudian-input-bang-bash-mode {
+.codian-input-bang-bash-mode {
   border-color: #f472b6 !important;
   box-shadow: 0 0 0 1px #f472b6;
 }
 
 /* Monospace input while in bash mode */
-.claudian-input-wrapper.claudian-input-bang-bash-mode .claudian-input {
+.codian-input-wrapper.codian-input-bang-bash-mode .codian-input {
   font-family: var(--font-monospace);
 }

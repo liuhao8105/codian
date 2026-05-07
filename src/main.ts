@@ -6,7 +6,7 @@
  */
 
 import type { Editor, MarkdownView } from 'obsidian';
-import { addIcon, Notice, Plugin } from 'obsidian';
+import { Notice, Plugin } from 'obsidian';
 
 import { AgentManager } from './core/agents';
 import { McpServerManager } from './core/mcp';
@@ -35,7 +35,7 @@ import { CodianView } from './features/chat/CodianView';
 import { type InlineEditContext, InlineEditModal } from './features/inline-edit/ui/InlineEditModal';
 import { CodianSettingTab } from './features/settings/CodianSettings';
 import { setLocale } from './i18n';
-import { CODIAN_ICON_SVG } from './shared';
+// CODIAN_ICON_SVG kept in shared/icons.ts for reference
 import { normalizeCodexModelForRuntime } from './core/runtime/codexExec';
 import { ClaudeCliResolver } from './utils/claudeCli';
 import { buildCursorContext } from './utils/editor';
@@ -203,7 +203,6 @@ export default class CodianPlugin extends Plugin {
   private runtimeEnvironmentVariables = '';
 
   async onload() {
-    addIcon('codian-mark', CODIAN_ICON_SVG);
     await this.loadSettings();
 
     this.cliResolver = new ClaudeCliResolver();
@@ -226,7 +225,7 @@ export default class CodianPlugin extends Plugin {
       (leaf) => new CodianView(leaf, this)
     );
 
-    this.addRibbonIcon('codian-mark', 'Open Codian', () => {
+    this.addRibbonIcon('terminal', 'Open Codian', () => {
       this.activateView();
     });
 

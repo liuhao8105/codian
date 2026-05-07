@@ -698,7 +698,7 @@ export function getPathAccessType(
   const claudeDir = normalizePathForComparison(resolveRealPath(path.join(os.homedir(), '.claude')));
   if (resolvedCandidate === claudeDir || resolvedCandidate.startsWith(claudeDir + '/')) {
     const safeSubdirs = ['sessions', 'projects', 'commands', 'agents', 'skills', 'plans'];
-    const safeFiles = ['mcp.json', 'settings.json', 'settings.local.json', 'claudian-settings.json', 'codian-settings.json'];
+    const safeFiles = ['mcp.json', 'settings.json', 'settings.local.json', 'codian-settings.json', 'claudian-settings.json'];
     const relativeToClaude = resolvedCandidate.slice(claudeDir.length + 1);
 
     if (!relativeToClaude) {

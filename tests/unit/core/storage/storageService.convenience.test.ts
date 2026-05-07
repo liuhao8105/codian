@@ -175,7 +175,7 @@ describe('StorageService convenience methods', () => {
     it('updates partial claudian settings', async () => {
       const { plugin, files } = createMockPlugin({
         initialFiles: {
-          '.claude/claudian-settings.json': claudianSettingsJson,
+          '.claude/codian-settings.json': claudianSettingsJson,
         },
       });
       const storage = new StorageService(plugin);
@@ -183,7 +183,7 @@ describe('StorageService convenience methods', () => {
 
       await storage.updateClaudianSettings({ userName: 'NewUser' });
 
-      const saved = JSON.parse(files.get('.claude/claudian-settings.json')!) as Record<string, unknown>;
+      const saved = JSON.parse(files.get('.claude/codian-settings.json')!) as Record<string, unknown>;
       expect(saved.userName).toBe('NewUser');
     });
   });
@@ -192,7 +192,7 @@ describe('StorageService convenience methods', () => {
     it('saves full claudian settings', async () => {
       const { plugin, files } = createMockPlugin({
         initialFiles: {
-          '.claude/claudian-settings.json': claudianSettingsJson,
+          '.claude/codian-settings.json': claudianSettingsJson,
         },
       });
       const storage = new StorageService(plugin);
@@ -202,7 +202,7 @@ describe('StorageService convenience methods', () => {
       existing.userName = 'FullSave';
       await storage.saveClaudianSettings(existing);
 
-      const saved = JSON.parse(files.get('.claude/claudian-settings.json')!) as Record<string, unknown>;
+      const saved = JSON.parse(files.get('.claude/codian-settings.json')!) as Record<string, unknown>;
       expect(saved.userName).toBe('FullSave');
     });
   });
@@ -211,7 +211,7 @@ describe('StorageService convenience methods', () => {
     it('loads claudian settings', async () => {
       const { plugin } = createMockPlugin({
         initialFiles: {
-          '.claude/claudian-settings.json': claudianSettingsJson,
+          '.claude/codian-settings.json': claudianSettingsJson,
         },
       });
       const storage = new StorageService(plugin);
@@ -279,7 +279,7 @@ describe('StorageService convenience methods', () => {
       });
       const { plugin } = createMockPlugin({
         initialFiles: {
-          '.claude/claudian-settings.json': settings,
+          '.claude/codian-settings.json': settings,
         },
       });
       const storage = new StorageService(plugin);
@@ -293,7 +293,7 @@ describe('StorageService convenience methods', () => {
       const { plugin } = createMockPlugin({
         dataJson: { activeConversationId: 'conv-from-data' },
         initialFiles: {
-          '.claude/claudian-settings.json': JSON.stringify({ userName: 'Test' }),
+          '.claude/codian-settings.json': JSON.stringify({ userName: 'Test' }),
         },
       });
       const storage = new StorageService(plugin);
@@ -307,7 +307,7 @@ describe('StorageService convenience methods', () => {
       const { plugin } = createMockPlugin({
         dataJson: {},
         initialFiles: {
-          '.claude/claudian-settings.json': JSON.stringify({ userName: 'Test' }),
+          '.claude/codian-settings.json': JSON.stringify({ userName: 'Test' }),
         },
       });
       const storage = new StorageService(plugin);
@@ -323,7 +323,7 @@ describe('StorageService convenience methods', () => {
       const { plugin } = createMockPlugin({
         dataJson: { activeConversationId: 'conv-1', otherField: 'keep' },
         initialFiles: {
-          '.claude/claudian-settings.json': JSON.stringify({ userName: 'Test' }),
+          '.claude/codian-settings.json': JSON.stringify({ userName: 'Test' }),
         },
       });
       const storage = new StorageService(plugin);
@@ -347,7 +347,7 @@ describe('StorageService convenience methods', () => {
       const { plugin } = createMockPlugin({
         dataJson: { otherField: 'keep' },
         initialFiles: {
-          '.claude/claudian-settings.json': JSON.stringify({ userName: 'Test' }),
+          '.claude/codian-settings.json': JSON.stringify({ userName: 'Test' }),
         },
       });
       const storage = new StorageService(plugin);

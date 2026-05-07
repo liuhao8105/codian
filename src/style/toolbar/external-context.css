@@ -1,5 +1,5 @@
 /* External Context Selector */
-.claudian-external-context-selector {
+.codian-external-context-selector {
   position: relative;
   display: flex;
   align-items: center;
@@ -8,7 +8,7 @@
   min-height: 26px;
 }
 
-.claudian-external-context-icon-wrapper {
+.codian-external-context-icon-wrapper {
   position: relative;
   display: flex;
   align-items: center;
@@ -16,7 +16,7 @@
   cursor: pointer;
 }
 
-.claudian-external-context-icon {
+.codian-external-context-icon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -28,40 +28,40 @@
   transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
 }
 
-.claudian-external-context-icon-wrapper:hover .claudian-external-context-icon {
+.codian-external-context-icon-wrapper:hover .codian-external-context-icon {
   color: var(--text-normal);
   background: var(--background-modifier-hover);
   border-color: color-mix(in srgb, var(--background-modifier-border) 85%, transparent);
 }
 
-.claudian-external-context-icon.active {
-  color: var(--claudian-brand);
-  background: rgba(var(--claudian-brand-rgb), 0.12);
-  border-color: rgba(var(--claudian-brand-rgb), 0.14);
+.codian-external-context-icon.active {
+  color: var(--codian-brand);
+  background: rgba(var(--codian-brand-rgb), 0.12);
+  border-color: rgba(var(--codian-brand-rgb), 0.14);
 }
 
-.claudian-external-context-icon svg {
+.codian-external-context-icon svg {
   width: 16px;
   height: 16px;
 }
 
-.claudian-external-context-badge {
+.codian-external-context-badge {
   position: absolute;
   top: 0;
   right: 0;
   font-size: 9px;
   font-weight: 600;
-  color: var(--claudian-brand);
+  color: var(--codian-brand);
   opacity: 0;
   transition: opacity 0.15s ease;
   pointer-events: none;
 }
 
-.claudian-external-context-badge.visible {
+.codian-external-context-badge.visible {
   opacity: 1;
 }
 
-.claudian-external-context-dropdown {
+.codian-external-context-dropdown {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
@@ -79,12 +79,12 @@
   z-index: 100;
 }
 
-.claudian-external-context-selector:hover .claudian-external-context-dropdown {
+.codian-external-context-selector:hover .codian-external-context-dropdown {
   opacity: 1;
   visibility: visible;
 }
 
-.claudian-external-context-header {
+.codian-external-context-header {
   padding: 10px 12px;
   font-size: 12px;
   font-weight: 600;
@@ -92,12 +92,12 @@
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.claudian-external-context-list {
+.codian-external-context-list {
   max-height: 200px;
   overflow-y: auto;
 }
 
-.claudian-external-context-empty {
+.codian-external-context-empty {
   padding: 16px 12px;
   text-align: center;
   color: var(--text-muted);
@@ -105,7 +105,7 @@
   font-style: italic;
 }
 
-.claudian-external-context-item {
+.codian-external-context-item {
   display: flex;
   align-items: center;
   padding: 8px 12px;
@@ -113,11 +113,11 @@
   border-bottom: 1px solid var(--background-modifier-border-focus);
 }
 
-.claudian-external-context-item:last-child {
+.codian-external-context-item:last-child {
   border-bottom: none;
 }
 
-.claudian-external-context-text {
+.codian-external-context-text {
   flex: 1;
   font-size: 12px;
   font-family: var(--font-monospace);
@@ -127,7 +127,7 @@
   white-space: nowrap;
 }
 
-.claudian-external-context-lock {
+.codian-external-context-lock {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -140,26 +140,26 @@
   transition: all 0.15s ease;
 }
 
-.claudian-external-context-lock:hover {
+.codian-external-context-lock:hover {
   background: var(--background-modifier-hover);
   opacity: 0.8;
 }
 
-.claudian-external-context-lock.locked {
-  color: var(--claudian-brand);
+.codian-external-context-lock.locked {
+  color: var(--codian-brand);
   opacity: 0.9;
 }
 
-.claudian-external-context-lock.locked:hover {
+.codian-external-context-lock.locked:hover {
   opacity: 1;
 }
 
-.claudian-external-context-lock svg {
+.codian-external-context-lock svg {
   width: 12px;
   height: 12px;
 }
 
-.claudian-external-context-remove {
+.codian-external-context-remove {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -172,13 +172,13 @@
   transition: all 0.15s ease;
 }
 
-.claudian-external-context-remove:hover {
-  background: rgba(var(--claudian-error-rgb), 0.15);
-  color: var(--claudian-error);
+.codian-external-context-remove:hover {
+  background: rgba(var(--codian-error-rgb), 0.15);
+  color: var(--codian-error);
   opacity: 1;
 }
 
-.claudian-external-context-remove svg {
+.codian-external-context-remove svg {
   width: 14px;
   height: 14px;
 }

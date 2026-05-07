@@ -385,7 +385,7 @@ describe('getPathAccessType', () => {
     expect(getPathAccessType(path.join(os.homedir(), '.claude', 'skills', 'skill'), [], [], vaultPath)).toBe('vault');
     expect(getPathAccessType(path.join(os.homedir(), '.claude', 'plans', 'plan.md'), [], [], vaultPath)).toBe('vault');
     expect(getPathAccessType(path.join(os.homedir(), '.claude', 'mcp.json'), [], [], vaultPath)).toBe('vault');
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'claudian-settings.json'), [], [], vaultPath)).toBe('vault');
+    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'codian-settings.json'), [], [], vaultPath)).toBe('vault');
   });
 
   it('returns context (read-only) for unknown ~/.claude paths', () => {

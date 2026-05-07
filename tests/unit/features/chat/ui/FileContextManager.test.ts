@@ -203,11 +203,11 @@ describe('FileContextManager', () => {
 
     manager.setCurrentNote('notes/chip.md');
 
-    const indicator = findByClass(containerEl, 'claudian-file-indicator');
+    const indicator = findByClass(containerEl, 'codian-file-indicator');
     expect(indicator).toBeDefined();
     expect(indicator?.style.display).toBe('flex');
 
-    const removeEl = findByClass(containerEl, 'claudian-file-chip-remove');
+    const removeEl = findByClass(containerEl, 'codian-file-chip-remove');
     expect(removeEl).toBeDefined();
 
     removeEl!.click();
@@ -230,10 +230,10 @@ describe('FileContextManager', () => {
     manager.setCurrentNote('notes/chip.md');
     manager.setAttachedFiles(['notes/chip.md', 'docs/spec.md']);
 
-    const chips = findAllByClass(containerEl, 'claudian-file-chip');
+    const chips = findAllByClass(containerEl, 'codian-file-chip');
     expect(chips).toHaveLength(2);
     expect(chips[0]?.hasClass('is-current-note')).toBe(true);
-    const chipNames = findAllByClass(containerEl, 'claudian-file-chip-name').map((el) => el.textContent);
+    const chipNames = findAllByClass(containerEl, 'codian-file-chip-name').map((el) => el.textContent);
     expect(chipNames).toContain('spec.md');
 
     manager.destroy();
@@ -283,7 +283,7 @@ describe('FileContextManager', () => {
     manager.handleInputChange();
     jest.advanceTimersByTime(200);
 
-    const pathEl = findByClass(containerEl, 'claudian-mention-path');
+    const pathEl = findByClass(containerEl, 'codian-mention-path');
     expect(pathEl?.textContent).toBe('clipping/file.md');
 
     manager.handleMentionKeydown({ key: 'Enter', preventDefault: jest.fn() } as any);
@@ -316,7 +316,7 @@ describe('FileContextManager', () => {
     jest.advanceTimersByTime(200);
 
     expect(getFoldersSpy).toHaveBeenCalled();
-    const folderLabel = findByClass(containerEl, 'claudian-mention-name-folder');
+    const folderLabel = findByClass(containerEl, 'codian-mention-name-folder');
     expect(folderLabel?.textContent).toBe('@src/');
 
     manager.destroy();
@@ -349,7 +349,7 @@ describe('FileContextManager', () => {
     manager.handleInputChange();
     jest.advanceTimersByTime(200);
 
-    const nameEls = findAllByClass(containerEl, 'claudian-mention-name-context');
+    const nameEls = findAllByClass(containerEl, 'codian-mention-name-context');
     expect(nameEls[0]?.textContent).toBe('src/app.md');
 
     manager.handleMentionKeydown({ key: 'Enter', preventDefault: jest.fn() } as any);

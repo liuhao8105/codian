@@ -39,43 +39,43 @@ export class InlineExitPlanMode {
   }
 
   render(): void {
-    this.rootEl = this.containerEl.createDiv({ cls: 'claudian-plan-approval-inline' });
+    this.rootEl = this.containerEl.createDiv({ cls: 'codian-plan-approval-inline' });
 
-    const titleEl = this.rootEl.createDiv({ cls: 'claudian-plan-inline-title' });
+    const titleEl = this.rootEl.createDiv({ cls: 'codian-plan-inline-title' });
     titleEl.setText('Plan complete');
 
     this.planContent = this.readPlanContent();
     if (this.planContent) {
-      const contentEl = this.rootEl.createDiv({ cls: 'claudian-plan-content-preview' });
+      const contentEl = this.rootEl.createDiv({ cls: 'codian-plan-content-preview' });
       if (this.renderContent) {
         void this.renderContent(contentEl, this.planContent);
       } else {
-        contentEl.createDiv({ cls: 'claudian-plan-content-text', text: this.planContent });
+        contentEl.createDiv({ cls: 'codian-plan-content-text', text: this.planContent });
       }
     } else if (this.planReadError) {
       this.rootEl.createDiv({
-        cls: 'claudian-plan-content-preview claudian-plan-read-error',
+        cls: 'codian-plan-content-preview codian-plan-read-error',
         text: `Could not read plan file: ${this.planReadError}. "Approve (new session)" will not include plan details.`,
       });
     }
 
     const allowedPrompts = this.input.allowedPrompts as Array<{ tool: string; prompt: string }> | undefined;
     if (allowedPrompts && Array.isArray(allowedPrompts) && allowedPrompts.length > 0) {
-      const permEl = this.rootEl.createDiv({ cls: 'claudian-plan-permissions' });
-      permEl.createDiv({ text: 'Requested permissions:', cls: 'claudian-plan-permissions-label' });
-      const listEl = permEl.createEl('ul', { cls: 'claudian-plan-permissions-list' });
+      const permEl = this.rootEl.createDiv({ cls: 'codian-plan-permissions' });
+      permEl.createDiv({ text: 'Requested permissions:', cls: 'codian-plan-permissions-label' });
+      const listEl = permEl.createEl('ul', { cls: 'codian-plan-permissions-list' });
       for (const perm of allowedPrompts) {
         listEl.createEl('li', { text: perm.prompt });
       }
     }
 
-    const actionsEl = this.rootEl.createDiv({ cls: 'claudian-ask-list' });
+    const actionsEl = this.rootEl.createDiv({ cls: 'codian-ask-list' });
 
-    const newSessionRow = actionsEl.createDiv({ cls: 'claudian-ask-item' });
+    const newSessionRow = actionsEl.createDiv({ cls: 'codian-ask-item' });
     newSessionRow.addClass('is-focused');
-    newSessionRow.createSpan({ text: '\u203A', cls: 'claudian-ask-cursor' });
-    newSessionRow.createSpan({ text: '1. ', cls: 'claudian-ask-item-num' });
-    newSessionRow.createSpan({ text: 'Approve (new session)', cls: 'claudian-ask-item-label' });
+    newSessionRow.createSpan({ text: '\u203A', cls: 'codian-ask-cursor' });
+    newSessionRow.createSpan({ text: '1. ', cls: 'codian-ask-item-num' });
+    newSessionRow.createSpan({ text: 'Approve (new session)', cls: 'codian-ask-item-label' });
     newSessionRow.addEventListener('click', () => {
       this.focusedIndex = 0;
       this.updateFocus();
@@ -86,10 +86,10 @@ export class InlineExitPlanMode {
     });
     this.items.push(newSessionRow);
 
-    const approveRow = actionsEl.createDiv({ cls: 'claudian-ask-item' });
-    approveRow.createSpan({ text: '\u00A0', cls: 'claudian-ask-cursor' });
-    approveRow.createSpan({ text: '2. ', cls: 'claudian-ask-item-num' });
-    approveRow.createSpan({ text: 'Approve (current session)', cls: 'claudian-ask-item-label' });
+    const approveRow = actionsEl.createDiv({ cls: 'codian-ask-item' });
+    approveRow.createSpan({ text: '\u00A0', cls: 'codian-ask-cursor' });
+    approveRow.createSpan({ text: '2. ', cls: 'codian-ask-item-num' });
+    approveRow.createSpan({ text: 'Approve (current session)', cls: 'codian-ask-item-label' });
     approveRow.addEventListener('click', () => {
       this.focusedIndex = 1;
       this.updateFocus();
@@ -97,12 +97,12 @@ export class InlineExitPlanMode {
     });
     this.items.push(approveRow);
 
-    const feedbackRow = actionsEl.createDiv({ cls: 'claudian-ask-item claudian-ask-custom-item' });
-    feedbackRow.createSpan({ text: '\u00A0', cls: 'claudian-ask-cursor' });
-    feedbackRow.createSpan({ text: '3. ', cls: 'claudian-ask-item-num' });
+    const feedbackRow = actionsEl.createDiv({ cls: 'codian-ask-item codian-ask-custom-item' });
+    feedbackRow.createSpan({ text: '\u00A0', cls: 'codian-ask-cursor' });
+    feedbackRow.createSpan({ text: '3. ', cls: 'codian-ask-item-num' });
     this.feedbackInput = feedbackRow.createEl('input', {
       type: 'text',
-      cls: 'claudian-ask-custom-text',
+      cls: 'codian-ask-custom-text',
       placeholder: 'Enter feedback to continue planning...',
     });
     this.feedbackInput.addEventListener('focus', () => { this.isInputFocused = true; });
@@ -113,7 +113,7 @@ export class InlineExitPlanMode {
     });
     this.items.push(feedbackRow);
 
-    this.rootEl.createDiv({ text: HINTS_TEXT, cls: 'claudian-ask-hints' });
+    this.rootEl.createDiv({ text: HINTS_TEXT, cls: 'codian-ask-hints' });
 
     this.rootEl.setAttribute('tabindex', '0');
     this.rootEl.addEventListener('keydown', this.boundKeyDown);
@@ -218,14 +218,14 @@ export class InlineExitPlanMode {
   private updateFocus(): void {
     for (let i = 0; i < this.items.length; i++) {
       const item = this.items[i];
-      const cursor = item.querySelector('.claudian-ask-cursor');
+      const cursor = item.querySelector('.codian-ask-cursor');
       if (i === this.focusedIndex) {
         item.addClass('is-focused');
         if (cursor) cursor.textContent = '\u203A';
         item.scrollIntoView({ block: 'nearest' });
 
-        if (item.hasClass('claudian-ask-custom-item')) {
-          const input = item.querySelector('.claudian-ask-custom-text') as HTMLInputElement;
+        if (item.hasClass('codian-ask-custom-item')) {
+          const input = item.querySelector('.codian-ask-custom-text') as HTMLInputElement;
           if (input) {
             input.focus();
             this.isInputFocused = true;
@@ -235,8 +235,8 @@ export class InlineExitPlanMode {
         item.removeClass('is-focused');
         if (cursor) cursor.textContent = '\u00A0';
 
-        if (item.hasClass('claudian-ask-custom-item')) {
-          const input = item.querySelector('.claudian-ask-custom-text') as HTMLInputElement;
+        if (item.hasClass('codian-ask-custom-item')) {
+          const input = item.querySelector('.codian-ask-custom-text') as HTMLInputElement;
           if (input && document.activeElement === input) {
             input.blur();
             this.isInputFocused = false;

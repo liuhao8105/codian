@@ -1,13 +1,13 @@
 /* Model selector */
-.claudian-model-selector,
-.claudian-provider-selector {
+.codian-model-selector,
+.codian-provider-selector {
   position: relative;
   min-width: 0;
   flex: 0 0 auto;
 }
 
-.claudian-model-btn,
-.claudian-provider-btn {
+.codian-model-btn,
+.codian-provider-btn {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -24,7 +24,7 @@
   background: transparent;
 }
 
-.claudian-provider-btn {
+.codian-provider-btn {
   user-select: none;
   max-width: 140px;
   background: color-mix(in srgb, var(--background-primary-alt) 20%, transparent);
@@ -32,25 +32,25 @@
   color: var(--text-normal);
 }
 
-.claudian-model-btn {
+.codian-model-btn {
   max-width: 280px;
   color: var(--text-normal);
 }
 
-.claudian-model-btn.ready {
-  color: var(--claudian-brand);
-  background: color-mix(in srgb, rgba(var(--claudian-brand-rgb), 0.05) 34%, transparent);
-  border-color: rgba(var(--claudian-brand-rgb), 0.08);
+.codian-model-btn.ready {
+  color: var(--codian-brand);
+  background: color-mix(in srgb, rgba(var(--codian-brand-rgb), 0.05) 34%, transparent);
+  border-color: rgba(var(--codian-brand-rgb), 0.08);
 }
 
-.claudian-model-btn:hover,
-.claudian-provider-btn:hover {
+.codian-model-btn:hover,
+.codian-provider-btn:hover {
   background: var(--background-modifier-hover);
   border-color: var(--background-modifier-border-hover);
 }
 
-.claudian-model-label,
-.claudian-provider-label {
+.codian-model-label,
+.codian-provider-label {
   font-weight: 600;
   display: block;
   min-width: 0;
@@ -60,19 +60,19 @@
   letter-spacing: 0.005em;
 }
 
-.claudian-model-chevron {
+.codian-model-chevron {
   display: flex;
   align-items: center;
   opacity: 0.7;
 }
 
-.claudian-model-chevron svg {
+.codian-model-chevron svg {
   width: 12px;
   height: 12px;
 }
 
-.claudian-model-dropdown,
-.claudian-provider-dropdown {
+.codian-model-dropdown,
+.codian-provider-dropdown {
   position: absolute;
   bottom: 100%;
   left: 0;
@@ -92,14 +92,14 @@
   transition: opacity 0.15s ease, visibility 0.15s ease;
 }
 
-.claudian-model-selector:hover .claudian-model-dropdown,
-.claudian-provider-selector.is-open .claudian-provider-dropdown {
+.codian-model-selector:hover .codian-model-dropdown,
+.codian-provider-selector.is-open .codian-provider-dropdown {
   opacity: 1;
   visibility: visible;
 }
 
-.claudian-model-option,
-.claudian-provider-option {
+.codian-model-option,
+.codian-provider-option {
   padding: 6px 10px;
   cursor: pointer;
   font-size: 12px;
@@ -111,25 +111,25 @@
   text-overflow: ellipsis;
 }
 
-.claudian-model-option:hover,
-.claudian-provider-option:hover {
+.codian-model-option:hover,
+.codian-provider-option:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.claudian-model-option.selected,
-.claudian-provider-option.selected {
-  background: rgba(var(--claudian-brand-rgb), 0.15);
-  color: var(--claudian-brand);
+.codian-model-option.selected,
+.codian-provider-option.selected {
+  background: rgba(var(--codian-brand-rgb), 0.15);
+  color: var(--codian-brand);
   font-weight: 500;
 }
 
-.claudian-provider-chevron {
+.codian-provider-chevron {
   font-size: 10px;
   color: var(--text-faint);
   line-height: 1;
 }
 
-.claudian-provider-selector.is-open .claudian-provider-btn {
+.codian-provider-selector.is-open .codian-provider-btn {
   color: var(--text-normal);
 }

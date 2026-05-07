@@ -1,5 +1,5 @@
 /* Permission Mode Toggle */
-.claudian-permission-toggle {
+.codian-permission-toggle {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -10,7 +10,7 @@
   min-height: 26px;
 }
 
-.claudian-permission-label {
+.codian-permission-label {
   font-size: 11px;
   color: var(--text-muted);
   min-width: 30px;
@@ -18,12 +18,12 @@
   letter-spacing: 0.01em;
 }
 
-.claudian-permission-label.plan-active {
+.codian-permission-label.plan-active {
   color: rgb(92, 148, 140);
   font-weight: 600;
 }
 
-.claudian-toggle-switch {
+.codian-toggle-switch {
   width: 28px;
   height: 16px;
   border-radius: 8px;
@@ -35,7 +35,7 @@
   flex-shrink: 0;
 }
 
-.claudian-toggle-switch::after {
+.codian-toggle-switch::after {
   content: '';
   position: absolute;
   width: 12px;
@@ -47,15 +47,15 @@
   transition: transform 0.2s ease, background 0.2s ease;
 }
 
-.claudian-toggle-switch:hover {
+.codian-toggle-switch:hover {
   background: var(--background-modifier-hover);
 }
 
-.claudian-toggle-switch.active {
-  background: rgba(var(--claudian-brand-rgb), 0.3);
+.codian-toggle-switch.active {
+  background: rgba(var(--codian-brand-rgb), 0.3);
 }
 
-.claudian-toggle-switch.active::after {
+.codian-toggle-switch.active::after {
   transform: translateX(12px);
-  background: var(--claudian-brand);
+  background: var(--codian-brand);
 }

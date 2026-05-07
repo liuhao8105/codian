@@ -78,7 +78,7 @@ describe('MessageRenderer', () => {
 
     expect(emptySpy).toHaveBeenCalled();
     expect(renderStoredSpy).toHaveBeenCalledTimes(1);
-    expect(welcomeEl.hasClass('claudian-welcome')).toBe(true);
+    expect(welcomeEl.hasClass('codian-welcome')).toBe(true);
     expect(welcomeEl.children[0].textContent).toBe('Hello');
   });
 
@@ -89,7 +89,7 @@ describe('MessageRenderer', () => {
     const welcomeEl = renderer.renderMessages([], () => 'Welcome!');
 
     expect(renderStoredSpy).not.toHaveBeenCalled();
-    expect(welcomeEl.hasClass('claudian-welcome')).toBe(true);
+    expect(welcomeEl.hasClass('codian-welcome')).toBe(true);
   });
 
   // ============================================
@@ -114,11 +114,11 @@ describe('MessageRenderer', () => {
     // Should create assistant-style message with interrupt content
     expect(messagesEl.children.length).toBe(1);
     const msgEl = messagesEl.children[0];
-    expect(msgEl.hasClass('claudian-message-assistant')).toBe(true);
+    expect(msgEl.hasClass('codian-message-assistant')).toBe(true);
     // Check the content contains interrupt styling
     const contentEl = msgEl.children[0];
     const textEl = contentEl.children[0];
-    expect(textEl.innerHTML).toContain('claudian-interrupted');
+    expect(textEl.innerHTML).toContain('codian-interrupted');
     expect(textEl.innerHTML).toContain('Interrupted');
   });
 
@@ -187,7 +187,7 @@ describe('MessageRenderer', () => {
 
     expect(messagesEl.children.length).toBe(1);
     const msgEl = messagesEl.children[0];
-    expect(msgEl.hasClass('claudian-message-user')).toBe(true);
+    expect(msgEl.hasClass('codian-message-user')).toBe(true);
   });
 
   it('renders user message with displayContent instead of content', () => {
@@ -227,7 +227,7 @@ describe('MessageRenderer', () => {
     expect(renderer.renderMessageImages).toHaveBeenCalled();
     // Only the images container, no message bubble
     const bubbles = messagesEl.children.filter(
-      (c: any) => c.hasClass('claudian-message')
+      (c: any) => c.hasClass('codian-message')
     );
     expect(bubbles.length).toBe(0);
   });
@@ -269,7 +269,7 @@ describe('MessageRenderer', () => {
 
     renderer.renderStoredMessage(allMessages[1], allMessages, 1);
 
-    expect(messagesEl.querySelector('.claudian-message-rewind-btn')).not.toBeNull();
+    expect(messagesEl.querySelector('.codian-message-rewind-btn')).not.toBeNull();
   });
 
   it('does not add a rewind button when stored render is called without context', () => {
@@ -288,7 +288,7 @@ describe('MessageRenderer', () => {
 
     renderer.renderStoredMessage(msg);
 
-    expect(messagesEl.querySelector('.claudian-message-rewind-btn')).toBeNull();
+    expect(messagesEl.querySelector('.codian-message-rewind-btn')).toBeNull();
   });
 
   it('adds a rewind button for eligible streamed user messages via refreshActionButtons', () => {
@@ -314,7 +314,7 @@ describe('MessageRenderer', () => {
 
     renderer.refreshActionButtons(userMsg, allMessages, 1);
 
-    const btn = messagesEl.querySelector('.claudian-message-rewind-btn');
+    const btn = messagesEl.querySelector('.codian-message-rewind-btn');
     expect(btn).not.toBeNull();
 
     btn!.click();
@@ -422,8 +422,8 @@ describe('MessageRenderer', () => {
 
     // Find the footer element
     const msgEl = messagesEl.children[0];
-    const contentEl = msgEl.children[0]; // claudian-message-content
-    const footerEl = contentEl.children.find((c: any) => c.hasClass('claudian-response-footer'));
+    const contentEl = msgEl.children[0]; // codian-message-content
+    const footerEl = contentEl.children.find((c: any) => c.hasClass('codian-response-footer'));
     expect(footerEl).toBeDefined();
     const durationSpan = footerEl!.children[0];
     expect(durationSpan.textContent).toContain('Baked');
@@ -450,7 +450,7 @@ describe('MessageRenderer', () => {
 
     const msgEl = messagesEl.children[0];
     const contentEl = msgEl.children[0];
-    const footerEl = contentEl.children.find((c: any) => c.hasClass('claudian-response-footer'));
+    const footerEl = contentEl.children.find((c: any) => c.hasClass('codian-response-footer'));
     expect(footerEl).toBeUndefined();
   });
 
@@ -474,7 +474,7 @@ describe('MessageRenderer', () => {
 
     const msgEl = messagesEl.children[0];
     const contentEl = msgEl.children[0];
-    const footerEl = contentEl.children.find((c: any) => c.hasClass('claudian-response-footer'));
+    const footerEl = contentEl.children.find((c: any) => c.hasClass('codian-response-footer'));
     expect(footerEl).toBeDefined();
     expect(footerEl!.children[0].textContent).toContain('Baked');
   });
@@ -748,7 +748,7 @@ describe('MessageRenderer', () => {
 
     const msgEl = renderer.addMessage(msg);
 
-    expect(msgEl.hasClass('claudian-message-user')).toBe(true);
+    expect(msgEl.hasClass('codian-message-user')).toBe(true);
   });
 
   it('addMessage renders images for user messages', () => {
@@ -808,7 +808,7 @@ describe('MessageRenderer', () => {
 
     const msgEl = renderer.addMessage(msg);
 
-    expect(msgEl.hasClass('claudian-message-assistant')).toBe(true);
+    expect(msgEl.hasClass('codian-message-assistant')).toBe(true);
   });
 
   // ============================================
@@ -847,7 +847,7 @@ describe('MessageRenderer', () => {
     // Should create images container with 2 image wrappers
     expect(containerEl.children.length).toBe(1);
     const imagesContainer = containerEl.children[0];
-    expect(imagesContainer.hasClass('claudian-message-images')).toBe(true);
+    expect(imagesContainer.hasClass('codian-message-images')).toBe(true);
     expect(imagesContainer.children.length).toBe(2);
   });
 
@@ -888,7 +888,7 @@ describe('MessageRenderer', () => {
 
     try {
       renderer.showFullImage(image);
-      expect(mockBody.createDiv).toHaveBeenCalledWith({ cls: 'claudian-image-modal-overlay' });
+      expect(mockBody.createDiv).toHaveBeenCalledWith({ cls: 'codian-image-modal-overlay' });
     } finally {
       (globalThis as any).document = origDocument;
     }
@@ -906,7 +906,7 @@ describe('MessageRenderer', () => {
 
     expect(textEl.children.length).toBe(1);
     const copyBtn = textEl.children[0];
-    expect(copyBtn.hasClass('claudian-text-copy-btn')).toBe(true);
+    expect(copyBtn.hasClass('codian-text-copy-btn')).toBe(true);
   });
 
   // ============================================
@@ -1016,7 +1016,7 @@ describe('MessageRenderer', () => {
       renderer.addTextCopyButton(textEl, 'markdown content');
 
       const copyBtn = textEl.children[0];
-      expect(copyBtn.hasClass('claudian-text-copy-btn')).toBe(true);
+      expect(copyBtn.hasClass('codian-text-copy-btn')).toBe(true);
 
       // Simulate click
       const clickHandlers = copyBtn._eventListeners.get('click');
@@ -1071,7 +1071,7 @@ describe('MessageRenderer', () => {
     const welcomeEl = renderer.renderMessages(messages, () => 'Good morning!');
 
     expect(welcomeEl).toBeDefined();
-    expect(welcomeEl!.hasClass('claudian-welcome')).toBe(true);
+    expect(welcomeEl!.hasClass('codian-welcome')).toBe(true);
   });
 
   it('renderMessages should hide welcome when messages exist', () => {
@@ -1097,7 +1097,7 @@ describe('MessageRenderer', () => {
     const welcomeEl = renderer.renderMessages([], () => 'Welcome');
 
     expect(welcomeEl).toBeDefined();
-    expect(welcomeEl!.hasClass('claudian-welcome')).toBe(true);
+    expect(welcomeEl!.hasClass('codian-welcome')).toBe(true);
   });
 
   // ============================================
@@ -1263,10 +1263,10 @@ describe('MessageRenderer', () => {
         renderer.showFullImage(image);
 
         // The overlay has a modal child, which has a close button child
-        const modalEl = overlayEl.children[0]; // claudian-image-modal
+        const modalEl = overlayEl.children[0]; // codian-image-modal
         // Children: img (index 0), closeBtn (index 1)
         const closeBtn = modalEl.children[1];
-        expect(closeBtn.hasClass('claudian-image-modal-close')).toBe(true);
+        expect(closeBtn.hasClass('codian-image-modal-close')).toBe(true);
 
         const removeSpy = jest.spyOn(overlayEl, 'remove');
         closeBtn.click();
@@ -1338,7 +1338,7 @@ describe('MessageRenderer', () => {
       await renderer.renderContent(el, '**broken markdown**');
 
       const errorDiv = el.children.find(
-        (c: any) => c.hasClass('claudian-render-error')
+        (c: any) => c.hasClass('codian-render-error')
       );
       expect(errorDiv).toBeDefined();
       expect(errorDiv!.textContent).toBe('Failed to render message content.');
@@ -1440,7 +1440,7 @@ describe('MessageRenderer', () => {
 
       await renderer.renderContent(el, '```js\nconsole.log("hello")\n```');
 
-      // The pre should be wrapped in a claudian-code-wrapper
+      // The pre should be wrapped in a codian-code-wrapper
       // Due to mock limitations, check that querySelectorAll was called on el
       // The actual wrapping logic runs on real DOM, but the mock captures calls
       expect(MarkdownRenderer.renderMarkdown).toHaveBeenCalled();
@@ -1454,7 +1454,7 @@ describe('MessageRenderer', () => {
       // Mock renderMarkdown to create an already-wrapped pre element
       (MarkdownRenderer.renderMarkdown as jest.Mock).mockImplementationOnce(
         async (_md: string, container: any) => {
-          const wrapper = container.createDiv({ cls: 'claudian-code-wrapper' });
+          const wrapper = container.createDiv({ cls: 'codian-code-wrapper' });
           wrapper.createEl('pre');
         }
       );

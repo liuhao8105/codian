@@ -70,7 +70,7 @@ export function createTab(options: TabCreateOptions): TabData {
   const id = tabId ?? generateTabId();
 
   // Create per-tab content container (hidden by default)
-  const contentEl = containerEl.createDiv({ cls: 'claudian-tab-content' });
+  const contentEl = containerEl.createDiv({ cls: 'codian-tab-content' });
   contentEl.style.display = 'none';
 
   // Create ChatState with callbacks
@@ -153,7 +153,7 @@ function autoResizeTextarea(textarea: HTMLTextAreaElement): void {
   textarea.style.minHeight = '';
 
   // Calculate max height: 55% of view height, minimum 150px
-  const viewHeight = textarea.closest('.claudian-container')?.clientHeight ?? window.innerHeight;
+  const viewHeight = textarea.closest('.codian-container')?.clientHeight ?? window.innerHeight;
   const maxHeight = Math.max(TEXTAREA_MIN_MAX_HEIGHT, viewHeight * TEXTAREA_MAX_HEIGHT_PERCENT);
 
   // Get flex-allocated height (what flexbox gives the textarea)
@@ -177,31 +177,31 @@ function autoResizeTextarea(textarea: HTMLTextAreaElement): void {
  */
 function buildTabDOM(contentEl: HTMLElement): TabDOMElements {
   // Messages wrapper (for scroll-to-bottom button positioning)
-  const messagesWrapperEl = contentEl.createDiv({ cls: 'claudian-messages-wrapper' });
+  const messagesWrapperEl = contentEl.createDiv({ cls: 'codian-messages-wrapper' });
 
   // Messages area (inside wrapper)
-  const messagesEl = messagesWrapperEl.createDiv({ cls: 'claudian-messages' });
+  const messagesEl = messagesWrapperEl.createDiv({ cls: 'codian-messages' });
 
   // Welcome message placeholder
-  const welcomeEl = messagesEl.createDiv({ cls: 'claudian-welcome' });
+  const welcomeEl = messagesEl.createDiv({ cls: 'codian-welcome' });
 
   // Status panel container (fixed between messages and input)
-  const statusPanelContainerEl = contentEl.createDiv({ cls: 'claudian-status-panel-container' });
+  const statusPanelContainerEl = contentEl.createDiv({ cls: 'codian-status-panel-container' });
 
   // Input container
-  const inputContainerEl = contentEl.createDiv({ cls: 'claudian-input-container' });
+  const inputContainerEl = contentEl.createDiv({ cls: 'codian-input-container' });
 
   // Nav row (for tab badges and header icons, populated by CodianView)
-  const navRowEl = inputContainerEl.createDiv({ cls: 'claudian-input-nav-row' });
+  const navRowEl = inputContainerEl.createDiv({ cls: 'codian-input-nav-row' });
 
-  const inputWrapper = inputContainerEl.createDiv({ cls: 'claudian-input-wrapper' });
+  const inputWrapper = inputContainerEl.createDiv({ cls: 'codian-input-wrapper' });
 
   // Context row inside input wrapper (file chips + selection indicator)
-  const contextRowEl = inputWrapper.createDiv({ cls: 'claudian-context-row' });
+  const contextRowEl = inputWrapper.createDiv({ cls: 'codian-context-row' });
 
   // Input textarea
   const inputEl = inputWrapper.createEl('textarea', {
-    cls: 'claudian-input',
+    cls: 'codian-input',
     attr: {
       placeholder: 'How can I help you today?',
       rows: '3',
@@ -428,7 +428,7 @@ function initializeInstructionAndTodo(tab: TabData, plugin: CodianPlugin): void 
 function initializeInputToolbar(tab: TabData, plugin: CodianPlugin): void {
   const { dom } = tab;
 
-  const inputToolbar = dom.inputWrapper.createDiv({ cls: 'claudian-input-toolbar' });
+  const inputToolbar = dom.inputWrapper.createDiv({ cls: 'codian-input-toolbar' });
   const toolbarComponents = createInputToolbar(inputToolbar, {
     getSettings: () => ({
       provider: plugin.settings.currentProvider,
@@ -491,7 +491,7 @@ function initializeInputToolbar(tab: TabData, plugin: CodianPlugin): void {
     onPermissionModeChange: async (mode) => {
       plugin.settings.permissionMode = mode;
       await plugin.saveSettings();
-      dom.inputWrapper.toggleClass('claudian-input-plan-mode', mode === 'plan');
+      dom.inputWrapper.toggleClass('codian-input-plan-mode', mode === 'plan');
     },
   });
 
@@ -526,7 +526,7 @@ function initializeInputToolbar(tab: TabData, plugin: CodianPlugin): void {
     await plugin.saveSettings();
   });
 
-  dom.inputWrapper.toggleClass('claudian-input-plan-mode', plugin.settings.permissionMode === 'plan');
+  dom.inputWrapper.toggleClass('codian-input-plan-mode', plugin.settings.permissionMode === 'plan');
 }
 
 export interface InitializeTabUIOptions {
@@ -548,15 +548,15 @@ export function initializeTabUI(
   initializeContextManagers(tab, plugin);
 
   // Selection indicator - add to contextRowEl
-  dom.selectionIndicatorEl = dom.contextRowEl.createDiv({ cls: 'claudian-selection-indicator' });
+  dom.selectionIndicatorEl = dom.contextRowEl.createDiv({ cls: 'codian-selection-indicator' });
   dom.selectionIndicatorEl.style.display = 'none';
 
   // Browser selection indicator
-  dom.browserIndicatorEl = dom.contextRowEl.createDiv({ cls: 'claudian-browser-selection-indicator' });
+  dom.browserIndicatorEl = dom.contextRowEl.createDiv({ cls: 'codian-browser-selection-indicator' });
   dom.browserIndicatorEl.style.display = 'none';
 
   // Canvas selection indicator
-  dom.canvasIndicatorEl = dom.contextRowEl.createDiv({ cls: 'claudian-canvas-indicator' });
+  dom.canvasIndicatorEl = dom.contextRowEl.createDiv({ cls: 'codian-canvas-indicator' });
   dom.canvasIndicatorEl.style.display = 'none';
 
   // Initialize slash commands with shared SDK commands callback and hidden commands
@@ -1258,5 +1258,5 @@ export function updatePlanModeUI(tab: TabData, plugin: CodianPlugin, mode: Permi
   plugin.settings.permissionMode = mode;
   void plugin.saveSettings();
   tab.ui.permissionToggle?.updateDisplay();
-  tab.dom.inputWrapper.toggleClass('claudian-input-plan-mode', mode === 'plan');
+  tab.dom.inputWrapper.toggleClass('codian-input-plan-mode', mode === 'plan');
 }

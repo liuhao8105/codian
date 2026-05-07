@@ -1,21 +1,21 @@
-/* Agent Settings — all structural rules live in base.css .claudian-sp-* */
+/* Agent Settings — all structural rules live in base.css .codian-sp-* */
 /* Multi-select option groups for agent tools and skills */
-.claudian-sp-multiselect-setting {
+.codian-sp-multiselect-setting {
   display: block;
 }
 
-.claudian-sp-multiselect-setting .setting-item-info {
+.codian-sp-multiselect-setting .setting-item-info {
   margin-bottom: 10px;
 }
 
-.claudian-sp-option-list {
+.codian-sp-option-list {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 4px;
 }
 
-.claudian-sp-option-item {
+.codian-sp-option-item {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -26,15 +26,15 @@
   cursor: pointer;
 }
 
-.claudian-sp-option-item:hover {
+.codian-sp-option-item:hover {
   background: var(--background-secondary-alt);
 }
 
-.claudian-sp-option-checkbox {
+.codian-sp-option-checkbox {
   margin: 0;
 }
 
-.claudian-sp-option-label {
+.codian-sp-option-label {
   font-size: var(--font-ui-small);
   line-height: 1.2;
 }

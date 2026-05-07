@@ -69,10 +69,10 @@ function createMockEventTarget() {
 
 function createMockContextRow() {
   const elements: Record<string, any> = {
-    '.claudian-selection-indicator': { style: { display: 'none' } },
-    '.claudian-canvas-indicator': { style: { display: 'none' } },
-    '.claudian-file-indicator': null,
-    '.claudian-image-preview': null,
+    '.codian-selection-indicator': { style: { display: 'none' } },
+    '.codian-canvas-indicator': { style: { display: 'none' } },
+    '.codian-file-indicator': null,
+    '.codian-image-preview': null,
   };
 
   return {
@@ -329,7 +329,7 @@ describe('SelectionController', () => {
 
       expect(showSelectionHighlight).not.toHaveBeenCalled();
       expect(mockHighlights.set).toHaveBeenCalledWith(
-        'claudian-selection',
+        'codian-selection',
         expect.any(Object),
       );
     });
@@ -420,7 +420,7 @@ describe('SelectionController', () => {
       );
       jest.advanceTimersByTime(250);
 
-      expect(mockHighlights.delete).toHaveBeenCalledWith('claudian-selection');
+      expect(mockHighlights.delete).toHaveBeenCalledWith('codian-selection');
     });
 
     it('skips CSS highlight for disconnected DOM ranges', () => {
@@ -475,7 +475,7 @@ describe('SelectionController', () => {
       controller.showHighlight();
 
       expect(mockHighlights.set).toHaveBeenCalledWith(
-        'claudian-selection',
+        'codian-selection',
         { ranges: [secondRange] },
       );
     });
@@ -547,7 +547,7 @@ describe('SelectionController', () => {
   it('keeps context row visible when canvas selection indicator is visible', () => {
     const canvasIndicator = { style: { display: 'block' } };
     contextRowEl.querySelector.mockImplementation((selector: string) => {
-      if (selector === '.claudian-canvas-indicator') return canvasIndicator;
+      if (selector === '.codian-canvas-indicator') return canvasIndicator;
       return null;
     });
 

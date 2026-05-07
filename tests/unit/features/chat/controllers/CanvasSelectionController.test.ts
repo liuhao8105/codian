@@ -9,10 +9,10 @@ function createMockIndicator() {
 
 function createMockContextRow() {
   const elements: Record<string, any> = {
-    '.claudian-selection-indicator': { style: { display: 'none' } },
-    '.claudian-canvas-indicator': { style: { display: 'none' } },
-    '.claudian-file-indicator': null,
-    '.claudian-image-preview': null,
+    '.codian-selection-indicator': { style: { display: 'none' } },
+    '.codian-canvas-indicator': { style: { display: 'none' } },
+    '.codian-file-indicator': null,
+    '.codian-image-preview': null,
   };
 
   return {
@@ -148,7 +148,7 @@ describe('CanvasSelectionController', () => {
   it('keeps context row visible when editor selection indicator is visible', () => {
     const editorIndicator = { style: { display: 'block' } };
     contextRowEl.querySelector.mockImplementation((selector: string) => {
-      if (selector === '.claudian-selection-indicator') return editorIndicator;
+      if (selector === '.codian-selection-indicator') return editorIndicator;
       return null;
     });
 

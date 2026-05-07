@@ -1873,9 +1873,9 @@ Other content`);
         'Run shell command',
       );
 
-      const items = parentEl.querySelectorAll('claudian-ask-item');
+      const items = parentEl.querySelectorAll('codian-ask-item');
       const target = items.find((item: any) => {
-        const label = item.querySelector('claudian-ask-item-label');
+        const label = item.querySelector('codian-ask-item-label');
         return label?.textContent === optionLabel;
       });
       expect(target).toBeDefined();
@@ -1904,13 +1904,13 @@ Other content`);
         },
       );
 
-      const reasonEl = parentEl.querySelector('claudian-ask-approval-reason');
+      const reasonEl = parentEl.querySelector('codian-ask-approval-reason');
       expect(reasonEl?.textContent).toBe('Command is destructive');
 
-      const pathEl = parentEl.querySelector('claudian-ask-approval-blocked-path');
+      const pathEl = parentEl.querySelector('codian-ask-approval-blocked-path');
       expect(pathEl?.textContent).toBe('/usr/bin/rm');
 
-      const agentEl = parentEl.querySelector('claudian-ask-approval-agent');
+      const agentEl = parentEl.querySelector('codian-ask-approval-agent');
       expect(agentEl?.textContent).toBe('Agent: agent-42');
 
       controller.dismissPendingApproval();
@@ -1965,9 +1965,9 @@ Other content`);
 
       expect(inputContainerEl.style.display).toBe('none');
 
-      const items = parentEl.querySelectorAll('claudian-ask-item');
+      const items = parentEl.querySelectorAll('codian-ask-item');
       const allowOnceItem = items.find((item: any) => {
-        const label = item.querySelector('claudian-ask-item-label');
+        const label = item.querySelector('codian-ask-item-label');
         return label?.textContent === 'Allow once';
       });
       expect(allowOnceItem).toBeDefined();

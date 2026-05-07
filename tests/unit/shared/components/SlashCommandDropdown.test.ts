@@ -35,18 +35,18 @@ function createMockCallbacks(overrides: Partial<SlashCommandDropdownCallbacks> =
 
 /**
  * Query the rendered dropdown DOM to extract displayed command items.
- * Each rendered item has a `.claudian-slash-name` span (text: `/{name}`)
- * and an optional `.claudian-slash-desc` div.
+ * Each rendered item has a `.codian-slash-name` span (text: `/{name}`)
+ * and an optional `.codian-slash-desc` div.
  */
 function getRenderedItems(containerEl: any): { name: string; description: string }[] {
   const dropdownEl = containerEl.children.find(
-    (c: any) => c.hasClass('claudian-slash-dropdown')
+    (c: any) => c.hasClass('codian-slash-dropdown')
   );
   if (!dropdownEl) return [];
-  const items = dropdownEl.querySelectorAll('.claudian-slash-item');
+  const items = dropdownEl.querySelectorAll('.codian-slash-item');
   return items.map((item: any) => {
-    const nameSpan = item.children.find((c: any) => c.hasClass('claudian-slash-name'));
-    const descDiv = item.children.find((c: any) => c.hasClass('claudian-slash-desc'));
+    const nameSpan = item.children.find((c: any) => c.hasClass('codian-slash-name'));
+    const descDiv = item.children.find((c: any) => c.hasClass('codian-slash-desc'));
     return {
       name: nameSpan?.textContent?.replace(/^\//, '') ?? '',
       description: descDiv?.textContent ?? '',

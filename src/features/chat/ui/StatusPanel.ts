@@ -116,15 +116,15 @@ export class StatusPanel {
 
     // Create panel element (no border/background - seamless)
     this.panelEl = document.createElement('div');
-    this.panelEl.className = 'claudian-status-panel';
+    this.panelEl.className = 'codian-status-panel';
 
     // Bash output container - hidden by default
     this.bashOutputContainerEl = document.createElement('div');
-    this.bashOutputContainerEl.className = 'claudian-status-panel-bash';
+    this.bashOutputContainerEl.className = 'codian-status-panel-bash';
     this.bashOutputContainerEl.style.display = 'none';
 
     this.bashHeaderEl = document.createElement('div');
-    this.bashHeaderEl.className = 'claudian-tool-header claudian-status-panel-bash-header';
+    this.bashHeaderEl.className = 'codian-tool-header codian-status-panel-bash-header';
     this.bashHeaderEl.setAttribute('tabindex', '0');
     this.bashHeaderEl.setAttribute('role', 'button');
 
@@ -139,7 +139,7 @@ export class StatusPanel {
     this.bashHeaderEl.addEventListener('keydown', this.bashKeydownHandler);
 
     this.bashContentEl = document.createElement('div');
-    this.bashContentEl.className = 'claudian-status-panel-bash-content';
+    this.bashContentEl.className = 'codian-status-panel-bash-content';
 
     this.bashOutputContainerEl.appendChild(this.bashHeaderEl);
     this.bashOutputContainerEl.appendChild(this.bashContentEl);
@@ -147,13 +147,13 @@ export class StatusPanel {
 
     // Todo container
     this.todoContainerEl = document.createElement('div');
-    this.todoContainerEl.className = 'claudian-status-panel-todos';
+    this.todoContainerEl.className = 'codian-status-panel-todos';
     this.todoContainerEl.style.display = 'none';
     this.panelEl.appendChild(this.todoContainerEl);
 
     // Todo header (collapsed view)
     this.todoHeaderEl = document.createElement('div');
-    this.todoHeaderEl.className = 'claudian-status-panel-header';
+    this.todoHeaderEl.className = 'codian-status-panel-header';
     this.todoHeaderEl.setAttribute('tabindex', '0');
     this.todoHeaderEl.setAttribute('role', 'button');
 
@@ -171,7 +171,7 @@ export class StatusPanel {
 
     // Todo content (expanded list)
     this.todoContentEl = document.createElement('div');
-    this.todoContentEl.className = 'claudian-status-panel-content claudian-todo-list-container';
+    this.todoContentEl.className = 'codian-status-panel-content codian-todo-list-container';
     this.todoContentEl.style.display = 'none';
     this.todoContainerEl.appendChild(this.todoContentEl);
 
@@ -228,13 +228,13 @@ export class StatusPanel {
 
     // List icon
     const icon = document.createElement('span');
-    icon.className = 'claudian-status-panel-icon';
+    icon.className = 'codian-status-panel-icon';
     setIcon(icon, getToolIcon(TOOL_TODO_WRITE));
     this.todoHeaderEl.appendChild(icon);
 
     // Label
     const label = document.createElement('span');
-    label.className = 'claudian-status-panel-label';
+    label.className = 'codian-status-panel-label';
     label.textContent = `Tasks (${completedCount}/${totalCount})`;
     this.todoHeaderEl.appendChild(label);
 
@@ -243,7 +243,7 @@ export class StatusPanel {
       // Status indicator (tick only when all todos complete)
       if (completedCount === totalCount && totalCount > 0) {
         const status = document.createElement('span');
-        status.className = 'claudian-status-panel-status status-completed';
+        status.className = 'codian-status-panel-status status-completed';
         setIcon(status, 'check');
         this.todoHeaderEl.appendChild(status);
       }
@@ -251,7 +251,7 @@ export class StatusPanel {
       // Current task preview
       if (currentTask) {
         const current = document.createElement('span');
-        current.className = 'claudian-status-panel-current';
+        current.className = 'codian-status-panel-current';
         current.textContent = currentTask.activeForm;
         this.todoHeaderEl.appendChild(current);
       }
@@ -365,7 +365,7 @@ export class StatusPanel {
     this.bashContentEl.empty();
 
     const headerIconEl = document.createElement('span');
-    headerIconEl.className = 'claudian-tool-icon';
+    headerIconEl.className = 'codian-tool-icon';
     headerIconEl.setAttribute('aria-hidden', 'true');
     setIcon(headerIconEl, 'terminal');
     this.bashHeaderEl.appendChild(headerIconEl);
@@ -373,7 +373,7 @@ export class StatusPanel {
     const latest = Array.from(this.currentBashOutputs.values()).at(-1);
 
     const headerLabelEl = document.createElement('span');
-    headerLabelEl.className = 'claudian-tool-label';
+    headerLabelEl.className = 'codian-tool-label';
     if (this.isBashExpanded) {
       headerLabelEl.textContent = t('chat.bangBash.commandPanel');
     } else {
@@ -382,12 +382,12 @@ export class StatusPanel {
     this.bashHeaderEl.appendChild(headerLabelEl);
 
     const previewEl = document.createElement('span');
-    previewEl.className = 'claudian-tool-current';
+    previewEl.className = 'codian-tool-current';
     previewEl.style.display = this.isBashExpanded ? '' : 'none';
     this.bashHeaderEl.appendChild(previewEl);
 
     const summaryStatusEl = document.createElement('span');
-    summaryStatusEl.className = 'claudian-tool-status';
+    summaryStatusEl.className = 'codian-tool-status';
     if (!this.isBashExpanded && latest) {
       summaryStatusEl.classList.add(`status-${latest.status}`);
       summaryStatusEl.setAttribute('aria-label', t('chat.bangBash.statusLabel', { status: latest.status }));
@@ -401,7 +401,7 @@ export class StatusPanel {
     this.bashHeaderEl.setAttribute('aria-expanded', String(this.isBashExpanded));
 
     const actionsEl = document.createElement('span');
-    actionsEl.className = 'claudian-status-panel-bash-actions';
+    actionsEl.className = 'codian-status-panel-bash-actions';
     this.appendActionButton(actionsEl, 'copy', t('chat.bangBash.copyAriaLabel'), 'copy', () => {
       void this.copyLatestBashOutput();
     });
@@ -428,26 +428,26 @@ export class StatusPanel {
 
   private renderBashEntry(info: PanelBashOutput): HTMLElement {
     const entryEl = document.createElement('div');
-    entryEl.className = 'claudian-tool-call claudian-status-panel-bash-entry';
+    entryEl.className = 'codian-tool-call codian-status-panel-bash-entry';
 
     const entryHeaderEl = document.createElement('div');
-    entryHeaderEl.className = 'claudian-tool-header';
+    entryHeaderEl.className = 'codian-tool-header';
     entryHeaderEl.setAttribute('tabindex', '0');
     entryHeaderEl.setAttribute('role', 'button');
 
     const entryIconEl = document.createElement('span');
-    entryIconEl.className = 'claudian-tool-icon';
+    entryIconEl.className = 'codian-tool-icon';
     entryIconEl.setAttribute('aria-hidden', 'true');
     setIcon(entryIconEl, 'dollar-sign');
     entryHeaderEl.appendChild(entryIconEl);
 
     const entryLabelEl = document.createElement('span');
-    entryLabelEl.className = 'claudian-tool-label';
+    entryLabelEl.className = 'codian-tool-label';
     entryLabelEl.textContent = t('chat.bangBash.commandLabel', { command: this.truncateDescription(info.command, 60) });
     entryHeaderEl.appendChild(entryLabelEl);
 
     const entryStatusEl = document.createElement('span');
-    entryStatusEl.className = 'claudian-tool-status';
+    entryStatusEl.className = 'codian-tool-status';
     entryStatusEl.classList.add(`status-${info.status}`);
     entryStatusEl.setAttribute('aria-label', t('chat.bangBash.statusLabel', { status: info.status }));
     if (info.status === 'completed') setIcon(entryStatusEl, 'check');
@@ -457,7 +457,7 @@ export class StatusPanel {
     entryEl.appendChild(entryHeaderEl);
 
     const contentEl = document.createElement('div');
-    contentEl.className = 'claudian-tool-content';
+    contentEl.className = 'codian-tool-content';
     const isEntryExpanded = this.bashEntryExpanded.get(info.id) ?? true;
     contentEl.style.display = isEntryExpanded ? 'block' : 'none';
     entryHeaderEl.setAttribute('aria-expanded', String(isEntryExpanded));
@@ -475,10 +475,10 @@ export class StatusPanel {
     });
 
     const rowEl = document.createElement('div');
-    rowEl.className = 'claudian-tool-result-row';
+    rowEl.className = 'codian-tool-result-row';
 
     const textEl = document.createElement('span');
-    textEl.className = 'claudian-tool-result-text';
+    textEl.className = 'codian-tool-result-text';
     if (info.status === 'running' && !info.output) {
       textEl.textContent = t('chat.bangBash.running');
     } else if (info.output) {
@@ -513,7 +513,7 @@ export class StatusPanel {
     action: () => void
   ): void {
     const el = document.createElement('span');
-    el.className = `claudian-status-panel-bash-action claudian-status-panel-bash-action-${name}`;
+    el.className = `codian-status-panel-bash-action codian-status-panel-bash-action-${name}`;
     el.setAttribute('role', 'button');
     el.setAttribute('tabindex', '0');
     el.setAttribute('aria-label', ariaLabel);

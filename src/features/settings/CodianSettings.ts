@@ -69,10 +69,10 @@ function addHotkeySettingRow(
   translationPrefix: string
 ): void {
   const hotkey = getHotkeyForCommand(app, commandId);
-  const item = containerEl.createDiv({ cls: 'claudian-hotkey-item' });
-  item.createSpan({ cls: 'claudian-hotkey-name', text: t(`${translationPrefix}.name` as TranslationKey) });
+  const item = containerEl.createDiv({ cls: 'codian-hotkey-item' });
+  item.createSpan({ cls: 'codian-hotkey-name', text: t(`${translationPrefix}.name` as TranslationKey) });
   if (hotkey) {
-    item.createSpan({ cls: 'claudian-hotkey-badge', text: hotkey });
+    item.createSpan({ cls: 'codian-hotkey-badge', text: hotkey });
   }
   item.addEventListener('click', () => openHotkeySettings(app));
 }
@@ -89,7 +89,7 @@ export class CodianSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.addClass('claudian-settings');
+    containerEl.addClass('codian-settings');
 
     setLocale(this.plugin.settings.locale);
 
@@ -161,7 +161,7 @@ export class CodianSettingTab extends PluginSettingTab {
             this.plugin.settings.mediaFolder = value.trim();
             await this.plugin.saveSettings();
           });
-        text.inputEl.addClass('claudian-settings-media-input');
+        text.inputEl.addClass('codian-settings-media-input');
         text.inputEl.addEventListener('blur', () => this.restartServiceForPromptChange());
       });
 
@@ -195,7 +195,7 @@ export class CodianSettingTab extends PluginSettingTab {
             }
             await this.plugin.saveSettings();
           });
-        text.inputEl.addClass('claudian-settings-media-input');
+        text.inputEl.addClass('codian-settings-media-input');
         text.inputEl.addEventListener('blur', () => this.restartServiceForPromptChange());
       });
 
@@ -210,7 +210,7 @@ export class CodianSettingTab extends PluginSettingTab {
             this.plugin.settings.memoryFilePath = value.trim();
             await this.plugin.saveSettings();
           });
-        text.inputEl.addClass('claudian-settings-media-input');
+        text.inputEl.addClass('codian-settings-media-input');
         text.inputEl.addEventListener('blur', () => this.restartServiceForPromptChange());
       });
 
@@ -383,7 +383,7 @@ export class CodianSettingTab extends PluginSettingTab {
 
     new Setting(containerEl).setName(t('settings.hotkeys')).setHeading();
 
-    const hotkeyGrid = containerEl.createDiv({ cls: 'claudian-hotkey-grid' });
+    const hotkeyGrid = containerEl.createDiv({ cls: 'codian-hotkey-grid' });
     addHotkeySettingRow(hotkeyGrid, this.app, 'codian:inline-edit', 'settings.inlineEditHotkey');
     addHotkeySettingRow(hotkeyGrid, this.app, 'codian:open-view', 'settings.openChatHotkey');
     addHotkeySettingRow(hotkeyGrid, this.app, 'codian:new-session', 'settings.newSessionHotkey');
@@ -392,7 +392,7 @@ export class CodianSettingTab extends PluginSettingTab {
 
     new Setting(containerEl).setName(t('settings.slashCommands.name')).setHeading();
 
-    const slashCommandsDesc = containerEl.createDiv({ cls: 'claudian-sp-settings-desc' });
+    const slashCommandsDesc = containerEl.createDiv({ cls: 'codian-sp-settings-desc' });
     const descP = slashCommandsDesc.createEl('p', { cls: 'setting-item-description' });
     descP.appendText(t('settings.slashCommands.desc') + ' ');
     descP.createEl('a', {
@@ -400,7 +400,7 @@ export class CodianSettingTab extends PluginSettingTab {
       href: 'https://help.openai.com/en/articles/11096431-openai-codex-ci-getting-started',
     });
 
-    const slashCommandsContainer = containerEl.createDiv({ cls: 'claudian-slash-commands-container' });
+    const slashCommandsContainer = containerEl.createDiv({ cls: 'codian-slash-commands-container' });
     new SlashCommandSettings(slashCommandsContainer, this.plugin);
 
     new Setting(containerEl)
@@ -610,17 +610,17 @@ export class CodianSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.environmentVariables);
         text.inputEl.rows = 6;
         text.inputEl.cols = 50;
-        text.inputEl.addClass('claudian-settings-env-textarea');
+        text.inputEl.addClass('codian-settings-env-textarea');
         text.inputEl.addEventListener('blur', async () => {
           await this.plugin.applyEnvironmentVariables(text.inputEl.value);
           this.renderContextLimitsSection();
         });
       });
 
-    this.contextLimitsContainer = containerEl.createDiv({ cls: 'claudian-context-limits-container' });
+    this.contextLimitsContainer = containerEl.createDiv({ cls: 'codian-context-limits-container' });
     this.renderContextLimitsSection();
 
-    const envSnippetsContainer = containerEl.createDiv({ cls: 'claudian-env-snippets-container' });
+    const envSnippetsContainer = containerEl.createDiv({ cls: 'codian-env-snippets-container' });
     new EnvSnippetManager(envSnippetsContainer, this.plugin, () => {
       this.renderContextLimitsSection();
     });
@@ -650,7 +650,7 @@ export class CodianSettingTab extends PluginSettingTab {
           })
       );
 
-    const bangBashValidationEl = containerEl.createDiv({ cls: 'claudian-bang-bash-validation' });
+    const bangBashValidationEl = containerEl.createDiv({ cls: 'codian-bang-bash-validation' });
     bangBashValidationEl.style.color = 'var(--text-error)';
     bangBashValidationEl.style.fontSize = '0.85em';
     bangBashValidationEl.style.marginTop = '-0.5em';
@@ -661,7 +661,7 @@ export class CodianSettingTab extends PluginSettingTab {
       .setName(t('settings.maxTabs.name'))
       .setDesc(t('settings.maxTabs.desc'));
 
-    const maxTabsWarningEl = containerEl.createDiv({ cls: 'claudian-max-tabs-warning' });
+    const maxTabsWarningEl = containerEl.createDiv({ cls: 'codian-max-tabs-warning' });
     maxTabsWarningEl.style.color = 'var(--text-warning)';
     maxTabsWarningEl.style.fontSize = '0.85em';
     maxTabsWarningEl.style.marginTop = '-0.5em';
@@ -697,7 +697,7 @@ export class CodianSettingTab extends PluginSettingTab {
       .setName(`${t('settings.cliPath.name')} (${hostnameKey})`)
       .setDesc(cliPathDescription);
 
-    const validationEl = containerEl.createDiv({ cls: 'claudian-cli-path-validation' });
+    const validationEl = containerEl.createDiv({ cls: 'codian-cli-path-validation' });
     validationEl.style.color = 'var(--text-error)';
     validationEl.style.fontSize = '0.85em';
     validationEl.style.marginTop = '-0.5em';
@@ -753,7 +753,7 @@ export class CodianSettingTab extends PluginSettingTab {
             (service) => Promise.resolve(service.cleanup())
           );
         });
-      text.inputEl.addClass('claudian-settings-cli-path-input');
+      text.inputEl.addClass('codian-settings-cli-path-input');
       text.inputEl.style.width = '100%';
 
       const initialError = validatePath(currentValue);
@@ -769,7 +769,7 @@ export class CodianSettingTab extends PluginSettingTab {
 
   private renderCompatibilitySection(containerEl: HTMLElement): void {
     const details = containerEl.createEl('details', {
-      cls: 'claudian-settings-compatibility',
+      cls: 'codian-settings-compatibility',
     });
 
     if (this.plugin.settings.loadUserClaudeSettings || this.plugin.settings.enableChrome) {
@@ -778,11 +778,11 @@ export class CodianSettingTab extends PluginSettingTab {
 
     const summary = details.createEl('summary', {
       text: t('settings.plugins.name'),
-      cls: 'claudian-settings-compatibility-summary',
+      cls: 'codian-settings-compatibility-summary',
     });
     summary.setAttr('aria-label', t('settings.plugins.name'));
 
-    const desc = details.createDiv({ cls: 'claudian-sp-settings-desc' });
+    const desc = details.createDiv({ cls: 'codian-sp-settings-desc' });
     desc.createEl('p', {
       text: t('settings.plugins.desc'),
       cls: 'setting-item-description',
@@ -801,13 +801,13 @@ export class CodianSettingTab extends PluginSettingTab {
           })
       );
 
-    const pluginsHeading = details.createDiv({ cls: 'claudian-plugin-settings-desc' });
+    const pluginsHeading = details.createDiv({ cls: 'codian-plugin-settings-desc' });
     pluginsHeading.createEl('p', {
       text: t('settings.plugins.desc'),
       cls: 'setting-item-description',
     });
 
-    const pluginsContainer = details.createDiv({ cls: 'claudian-plugins-container' });
+    const pluginsContainer = details.createDiv({ cls: 'codian-plugins-container' });
     new PluginSettingsManager(pluginsContainer, this.plugin);
 
     const chromeSettingsContainer = details.createDiv();
@@ -826,43 +826,43 @@ export class CodianSettingTab extends PluginSettingTab {
 
   private renderSubagentsSection(containerEl: HTMLElement): void {
     const details = containerEl.createEl('details', {
-      cls: 'claudian-settings-subagents',
+      cls: 'codian-settings-subagents',
     });
 
     const summary = details.createEl('summary', {
       text: t('settings.subagents.name'),
-      cls: 'claudian-settings-compatibility-summary',
+      cls: 'codian-settings-compatibility-summary',
     });
     summary.setAttr('aria-label', t('settings.subagents.name'));
 
-    const agentsDesc = details.createDiv({ cls: 'claudian-sp-settings-desc' });
+    const agentsDesc = details.createDiv({ cls: 'codian-sp-settings-desc' });
     agentsDesc.createEl('p', {
       text: t('settings.subagents.desc'),
       cls: 'setting-item-description',
     });
 
-    const agentsContainer = details.createDiv({ cls: 'claudian-agents-container' });
+    const agentsContainer = details.createDiv({ cls: 'codian-agents-container' });
     new AgentSettings(agentsContainer, this.plugin);
   }
 
   private renderMcpSection(containerEl: HTMLElement): void {
     const details = containerEl.createEl('details', {
-      cls: 'claudian-settings-mcp',
+      cls: 'codian-settings-mcp',
     });
 
     const summary = details.createEl('summary', {
       text: t('settings.mcpServers.name'),
-      cls: 'claudian-settings-compatibility-summary',
+      cls: 'codian-settings-compatibility-summary',
     });
     summary.setAttr('aria-label', t('settings.mcpServers.name'));
 
-    const mcpDesc = details.createDiv({ cls: 'claudian-mcp-settings-desc' });
+    const mcpDesc = details.createDiv({ cls: 'codian-mcp-settings-desc' });
     mcpDesc.createEl('p', {
       text: t('settings.mcpServers.desc'),
       cls: 'setting-item-description',
     });
 
-    const mcpContainer = details.createDiv({ cls: 'claudian-mcp-container' });
+    const mcpContainer = details.createDiv({ cls: 'codian-mcp-container' });
     new McpSettingsManager(mcpContainer, this.plugin);
   }
 
@@ -879,33 +879,33 @@ export class CodianSettingTab extends PluginSettingTab {
       return;
     }
 
-    const headerEl = container.createDiv({ cls: 'claudian-context-limits-header' });
-    headerEl.createSpan({ text: t('settings.customContextLimits.name'), cls: 'claudian-context-limits-label' });
+    const headerEl = container.createDiv({ cls: 'codian-context-limits-header' });
+    headerEl.createSpan({ text: t('settings.customContextLimits.name'), cls: 'codian-context-limits-label' });
 
-    const descEl = container.createDiv({ cls: 'claudian-context-limits-desc' });
+    const descEl = container.createDiv({ cls: 'codian-context-limits-desc' });
     descEl.setText(t('settings.customContextLimits.desc'));
 
-    const listEl = container.createDiv({ cls: 'claudian-context-limits-list' });
+    const listEl = container.createDiv({ cls: 'codian-context-limits-list' });
 
     for (const modelId of uniqueModelIds) {
       const currentValue = this.plugin.settings.customContextLimits?.[modelId];
 
-      const itemEl = listEl.createDiv({ cls: 'claudian-context-limits-item' });
+      const itemEl = listEl.createDiv({ cls: 'codian-context-limits-item' });
 
-      const nameEl = itemEl.createDiv({ cls: 'claudian-context-limits-model' });
+      const nameEl = itemEl.createDiv({ cls: 'codian-context-limits-model' });
       nameEl.setText(modelId);
 
-      const inputWrapper = itemEl.createDiv({ cls: 'claudian-context-limits-input-wrapper' });
+      const inputWrapper = itemEl.createDiv({ cls: 'codian-context-limits-input-wrapper' });
 
       const inputEl = inputWrapper.createEl('input', {
         type: 'text',
         placeholder: '200k',
-        cls: 'claudian-context-limits-input',
+        cls: 'codian-context-limits-input',
         value: currentValue ? formatContextLimit(currentValue) : '',
       });
 
       // Validation element
-      const validationEl = inputWrapper.createDiv({ cls: 'claudian-context-limit-validation' });
+      const validationEl = inputWrapper.createDiv({ cls: 'codian-context-limit-validation' });
 
       inputEl.addEventListener('input', async () => {
         const trimmed = inputEl.value.trim();
@@ -918,19 +918,19 @@ export class CodianSettingTab extends PluginSettingTab {
           // Empty = use default (remove from custom limits)
           delete this.plugin.settings.customContextLimits[modelId];
           validationEl.style.display = 'none';
-          inputEl.classList.remove('claudian-input-error');
+          inputEl.classList.remove('codian-input-error');
         } else {
           const parsed = parseContextLimit(trimmed);
           if (parsed === null) {
             validationEl.setText(t('settings.customContextLimits.invalid'));
             validationEl.style.display = 'block';
-            inputEl.classList.add('claudian-input-error');
+            inputEl.classList.add('codian-input-error');
             return; // Don't save invalid value
           }
 
           this.plugin.settings.customContextLimits[modelId] = parsed;
           validationEl.style.display = 'none';
-          inputEl.classList.remove('claudian-input-error');
+          inputEl.classList.remove('codian-input-error');
         }
 
         await this.plugin.saveSettings();
