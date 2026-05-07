@@ -24,6 +24,8 @@ export interface CodexExecResult {
   };
 }
 
+const CHATGPT_SAFE_CODEX_MODEL = 'gpt-5.5';
+
 function isExistingFile(filePath: string): boolean {
   try {
     return fs.statSync(filePath).isFile();
@@ -49,10 +51,72 @@ function isLikelyCodexModel(model: string | undefined): boolean {
   return /^(gpt-|o[1-9]|o[1-9]-|codex)/i.test(model.trim());
 }
 
+function readCodexAuthMode(): string | null {
+  try {
+    const authPath = path.join(os.homedir(), '.codex', 'auth.json');
+    const raw = fs.readFileSync(authPath, 'utf8');
+    const parsed = JSON.parse(raw) as { auth_mode?: unknown };
+    return typeof parsed.auth_mode === 'string' ? parsed.auth_mode : null;
+  } catch {
+    return null;
+  }
+}
+
+export function extractReadableCodexErrorMessage(rawMessage: string): string {
+  const trimmed = rawMessage.trim();
+  if (!trimmed) return rawMessage;
+
+  try {
+    const parsed = JSON.parse(trimmed) as {
+      error?: { message?: unknown };
+      message?: unknown;
+    };
+    const nested = typeof parsed.error?.message === 'string'
+      ? parsed.error.message
+      : (typeof parsed.message === 'string' ? parsed.message : null);
+    return nested || rawMessage;
+  } catch {
+    return rawMessage;
+  }
+}
+
+export function normalizeCodexModelForRuntime(model: string | undefined): string | null {
+  const trimmed = model?.trim();
+  const authMode = readCodexAuthMode();
+
+  if (authMode === 'chatgpt') {
+    if (!trimmed || trimmed === 'gpt-5' || /^deepseek-/i.test(trimmed)) {
+      return CHATGPT_SAFE_CODEX_MODEL;
+    }
+  }
+
+  return trimmed || null;
+}
+
+export function buildCodexConfigOverrideArgs(model: string | null): string[] {
+  if (!model) return [];
+  return ['-c', `model=\"${model}\"`];
+}
+
 export function resolveCodexCliPath(plugin: CodianPlugin): string | null {
   const configuredPath = plugin.getResolvedClaudeCliPath();
   if (configuredPath && isExistingFile(configuredPath) && isLikelyCodexExecutable(configuredPath)) {
     return configuredPath;
+  }
+
+  const home = os.homedir();
+  const preferredCandidates = process.platform === 'win32'
+    ? [
+        path.join(home, 'AppData', 'Local', 'Programs', 'Codex', 'codex.exe'),
+      ]
+    : [
+        '/Applications/Codex.app/Contents/Resources/codex',
+      ];
+
+  for (const candidate of preferredCandidates) {
+    if (isExistingFile(candidate)) {
+      return candidate;
+    }
   }
 
   const envVars = parseEnvironmentVariables(plugin.getActiveEnvironmentVariables());
@@ -67,15 +131,11 @@ export function resolveCodexCliPath(plugin: CodianPlugin): string | null {
       return candidate;
     }
   }
-
-  const home = os.homedir();
   const fallbackCandidates = process.platform === 'win32'
     ? [
-        path.join(home, 'AppData', 'Local', 'Programs', 'Codex', 'codex.exe'),
         path.join(home, '.local', 'bin', 'codex.exe'),
       ]
     : [
-        '/Applications/Codex.app/Contents/Resources/codex',
         '/opt/homebrew/bin/codex',
         '/usr/local/bin/codex',
         path.join(home, '.local', 'bin', 'codex'),
@@ -100,8 +160,8 @@ function buildRuntimeEnv(plugin: CodianPlugin, codexPath: string): NodeJS.Proces
   };
 }
 
-function buildExecArgs(params: CodexExecParams): string[] {
-  const args = ['exec', '--json', '--skip-git-repo-check', '-C', params.cwd];
+function buildExecArgs(params: CodexExecParams, startupModel: string | null): string[] {
+  const args = [...buildCodexConfigOverrideArgs(startupModel), 'exec', '--json', '--skip-git-repo-check', '-C', params.cwd];
 
   if (params.permissionMode === 'yolo') {
     args.push('--full-auto');
@@ -127,7 +187,8 @@ export async function execCodexPrompt(
   }
 
   const env = buildRuntimeEnv(plugin, codexPath);
-  const args = buildExecArgs(params);
+  const startupModel = normalizeCodexModelForRuntime(params.model ?? plugin.settings.model);
+  const args = buildExecArgs(params, startupModel);
 
   return await new Promise<CodexExecResult>((resolve, reject) => {
     let child: ChildProcess | null = null;
@@ -208,9 +269,9 @@ export async function execCodexPrompt(
 
         if (type === 'turn.failed' || type === 'error') {
           const message = typeof event.message === 'string'
-            ? event.message
+            ? extractReadableCodexErrorMessage(event.message)
             : (typeof (event.item as Record<string, unknown> | undefined)?.message === 'string'
-                ? (event.item as Record<string, unknown>).message as string
+                ? extractReadableCodexErrorMessage((event.item as Record<string, unknown>).message as string)
                 : 'Codex 执行失败。');
           stderrBuffer = stderrBuffer ? `${stderrBuffer}\n${message}` : message;
         }

@@ -103,10 +103,72 @@
 /* Input toolbar */
 .claudian-input-toolbar {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   justify-content: flex-start;
   flex-shrink: 0;
-  padding: 4px 6px 6px 6px;
+  gap: 8px;
+  padding: 6px 8px 8px 8px;
+  overflow: visible;
+}
+
+.claudian-input-toolbar-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.claudian-input-toolbar-row-primary {
+  gap: 10px;
+  justify-content: flex-start;
+  padding: 3px 4px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 34%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--background-secondary) 18%, transparent);
+}
+
+.claudian-input-toolbar-row-secondary {
+  gap: 12px;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  padding: 4px 2px 0 2px;
+  min-height: 26px;
+  border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 24%, transparent);
+}
+
+.claudian-input-toolbar-secondary-left,
+.claudian-input-toolbar-secondary-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.claudian-input-toolbar-secondary-right {
+  margin-left: auto;
+}
+
+.claudian-toolbar-group {
+  display: flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.claudian-toolbar-group-tools {
+  gap: 2px;
+  padding: 0;
+}
+
+.claudian-toolbar-group-usage {
+  padding: 0;
+}
+
+.claudian-toolbar-group-permission {
+  padding: 0;
 }
 
 /* File indicator (attached files) */

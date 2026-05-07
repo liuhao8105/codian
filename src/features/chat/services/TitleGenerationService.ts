@@ -40,7 +40,7 @@ export class TitleGenerationService {
       this.plugin.settings.titleGenerationModel ||
       envVars.OPENAI_MODEL ||
       envVars.CODEX_MODEL ||
-      'gpt-5';
+      'gpt-5.5';
 
     const existingController = this.activeGenerations.get(conversationId);
     if (existingController) {

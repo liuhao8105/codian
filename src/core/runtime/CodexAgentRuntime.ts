@@ -14,6 +14,7 @@ import {
   buildPromptWithHistoryContext,
   getLastUserMessage,
 } from '../../utils/session';
+import { isProviderConfigured } from '../../utils/env';
 import type { ApprovalCallback, QueryOptions } from '../agent';
 import type { SubagentHookState } from '../hooks';
 import type { McpServerManager } from '../mcp';
@@ -27,9 +28,18 @@ import type {
 } from '../types';
 import type { AgentRuntime } from './index';
 import { CodexAppServerClient, type AppServerNotification } from './CodexAppServerClient';
-import { resolveCodexCliPath } from './codexExec';
+import { normalizeCodexModelForRuntime, resolveCodexCliPath } from './codexExec';
 
 type Waiter = () => void;
+const CODIAN_RUNTIME_DIAGNOSTIC_LOG = path.join(os.tmpdir(), 'codian-runtime.log');
+
+async function appendRuntimeDiagnosticLog(message: string): Promise<void> {
+  try {
+    await fs.appendFile(CODIAN_RUNTIME_DIAGNOSTIC_LOG, `[${new Date().toISOString()}] ${message}\n`, 'utf8');
+  } catch {
+    // Ignore logging failures.
+  }
+}
 
 function createChunkQueue() {
   const chunks: StreamChunk[] = [];
@@ -81,6 +91,29 @@ function stringifyContent(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+function extractReadableErrorMessage(rawMessage: string): string {
+  const trimmed = rawMessage.trim();
+  if (!trimmed) return rawMessage;
+
+  try {
+    const parsed = JSON.parse(trimmed) as {
+      error?: { message?: unknown };
+      message?: unknown;
+    };
+    const nested = typeof parsed.error?.message === 'string'
+      ? parsed.error.message
+      : (typeof parsed.message === 'string' ? parsed.message : null);
+    return nested || rawMessage;
+  } catch {
+    return rawMessage;
+  }
+}
+
+function isInputTooLongError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return /Input exceeds the maximum length of \d+ characters/i.test(message);
 }
 
 function mapPlanStepStatus(value: unknown): 'pending' | 'in_progress' | 'completed' {
@@ -369,9 +402,22 @@ ${prompt}
 
     const queue = createChunkQueue();
     const selectedModel = queryOptions?.model?.trim() || undefined;
+    const requestedModel = this.plugin.settings.currentProvider === 'codex'
+      ? (normalizeCodexModelForRuntime(selectedModel ?? this.plugin.settings.model) || undefined)
+      : (selectedModel ?? this.plugin.settings.model)?.trim() || undefined;
+    void appendRuntimeDiagnosticLog(
+      `query provider=${this.plugin.settings.currentProvider} selectedModel=${selectedModel ?? 'null'} requestedModel=${requestedModel ?? 'null'}`
+    );
     let request = this.threadId
       ? { prompt, images }
       : this.buildHistoryRebuildRequest(prompt, images, conversationHistory);
+
+    const providerValidation = isProviderConfigured(this.plugin.settings, this.plugin.settings.currentProvider);
+    if (!providerValidation.ok) {
+      void appendRuntimeDiagnosticLog(`provider-validation-failed ${providerValidation.error}`);
+      yield { type: 'error', content: providerValidation.error };
+      return;
+    }
 
     this.activeAbortController = new AbortController();
 
@@ -469,7 +515,7 @@ ${prompt}
         }
 
         case 'thread/tokenUsage/updated': {
-          const usageChunk = this.mapUsage(asRecord(notification.params.tokenUsage) || undefined, selectedModel);
+          const usageChunk = this.mapUsage(asRecord(notification.params.tokenUsage) || undefined, requestedModel);
           if (usageChunk) {
             queue.push(usageChunk);
           }
@@ -589,7 +635,8 @@ ${prompt}
         }
 
         case 'error': {
-          const message = asString(notification.params.message) || 'Codex App Server 执行失败。';
+          const rawMessage = asString(notification.params.message) || 'Codex App Server 执行失败。';
+          const message = extractReadableErrorMessage(rawMessage);
           queue.push({ type: 'error', content: message });
           queue.finish();
           break;
@@ -613,21 +660,25 @@ ${prompt}
           handleNotification,
           this.activeAbortController?.signal
         );
+        void appendRuntimeDiagnosticLog('client-created');
         this.activeClient = client;
 
         await client.initialize();
+        void appendRuntimeDiagnosticLog('client-initialized');
 
         if (this.threadId) {
           try {
             await client.request('thread/resume', {
               threadId: this.threadId,
               cwd: vaultPath,
-              model: selectedModel ?? null,
+              model: requestedModel ?? null,
               approvalPolicy: this.getApprovalPolicy(),
               sandbox: this.getThreadSandboxMode(),
               persistExtendedHistory: false,
             });
+            void appendRuntimeDiagnosticLog(`thread-resumed ${this.threadId ?? 'null'}`);
           } catch {
+            void appendRuntimeDiagnosticLog(`thread-resume-failed ${this.threadId ?? 'null'}`);
             this.threadId = null;
             request = this.buildHistoryRebuildRequest(prompt, images, conversationHistory);
           }
@@ -638,7 +689,7 @@ ${prompt}
             return;
           }
           const started = await client.request('thread/start', {
-            model: selectedModel ?? null,
+            model: requestedModel ?? null,
             cwd: vaultPath,
             approvalPolicy: this.getApprovalPolicy(),
             sandbox: this.getThreadSandboxMode(),
@@ -647,6 +698,7 @@ ${prompt}
           });
           const thread = asRecord(started.thread);
           this.threadId = asString(thread?.id);
+          void appendRuntimeDiagnosticLog(`thread-started ${this.threadId ?? 'null'}`);
         };
 
         const startTurn = async () => {
@@ -660,7 +712,7 @@ ${prompt}
             cwd: vaultPath,
             approvalPolicy: this.getApprovalPolicy(),
             sandboxPolicy: this.buildTurnSandboxPolicy(queryOptions),
-            model: selectedModel ?? null,
+            model: requestedModel ?? null,
           });
         };
 
@@ -668,19 +720,37 @@ ${prompt}
         try {
           startedTurn = await startTurn();
         } catch (error) {
-          if (!this.threadId) {
-            throw error;
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          void appendRuntimeDiagnosticLog(`turn-start-failed threadId=${this.threadId ?? 'null'} error=${errorMsg}`);
+          if (isInputTooLongError(error)) {
+            void appendRuntimeDiagnosticLog('turn-start-input-too-long resetting-thread-and-sending-current-request-only');
+            this.threadId = null;
+            request = {
+              prompt,
+              images: images && images.length > 0 ? images : undefined,
+            };
+            startedTurn = await startTurn();
+          } else {
+            // For any other error, try once more with a fresh thread and
+            // current request only (skip history rebuild to isolate the issue).
+            this.threadId = null;
+            request = {
+              prompt,
+              images: images && images.length > 0 ? images : undefined,
+            };
+            startedTurn = await startTurn();
           }
-          this.threadId = null;
-          request = this.buildHistoryRebuildRequest(prompt, images, conversationHistory);
-          startedTurn = await startTurn();
         }
 
         const turn = asRecord(startedTurn.turn);
         this.activeTurnId = asString(turn?.id);
+        void appendRuntimeDiagnosticLog(`turn-started ${this.activeTurnId ?? 'null'}`);
         queue.push({ type: 'sdk_user_sent', uuid: this.activeTurnId || '' });
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Codex App Server 执行失败。';
+        const message = error instanceof Error
+          ? error.message || 'Codex App Server 执行失败。'
+          : 'Codex App Server 执行失败。';
+        void appendRuntimeDiagnosticLog(`query-error ${message}`);
         queue.push({ type: 'error', content: message });
         queue.finish();
       }

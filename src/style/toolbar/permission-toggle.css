@@ -3,15 +3,19 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-left: auto;
-  padding-left: 12px;
-  padding-right: 8px;
+  margin-left: 0;
+  padding-left: 0;
+  padding-right: 0;
+  flex: 0 0 auto;
+  min-height: 26px;
 }
 
 .claudian-permission-label {
   font-size: 11px;
   color: var(--text-muted);
-  min-width: 28px;
+  min-width: 30px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .claudian-permission-label.plan-active {
@@ -20,21 +24,22 @@
 }
 
 .claudian-toggle-switch {
-  width: 32px;
-  height: 18px;
-  border-radius: 9px;
-  background: var(--background-modifier-border);
+  width: 28px;
+  height: 16px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--background-modifier-border) 88%, var(--background-primary));
   cursor: pointer;
   position: relative;
-  transition: background 0.2s ease;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 92%, transparent);
+  transition: background 0.18s ease, border-color 0.18s ease;
   flex-shrink: 0;
 }
 
 .claudian-toggle-switch::after {
   content: '';
   position: absolute;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: var(--text-muted);
   top: 2px;
@@ -51,6 +56,6 @@
 }
 
 .claudian-toggle-switch.active::after {
-  transform: translateX(14px);
+  transform: translateX(12px);
   background: var(--claudian-brand);
 }

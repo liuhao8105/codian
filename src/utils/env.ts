@@ -9,6 +9,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
+import type { CodianSettings, ProviderId } from '../core/types/settings';
 import { parsePathEntries, resolveNvmDefaultBin } from './path';
 
 const isWindows = process.platform === 'win32';
@@ -346,6 +347,104 @@ const CUSTOM_MODEL_ENV_KEYS = [
   'ANTHROPIC_DEFAULT_SONNET_MODEL',
   'ANTHROPIC_DEFAULT_HAIKU_MODEL',
 ] as const;
+
+export const DEEPSEEK_MODEL_OPTIONS: { value: string; label: string; description: string }[] = [
+  { value: 'deepseek-chat', label: 'DeepSeek Chat', description: 'DeepSeek 通用对话模型' },
+  { value: 'deepseek-reasoner', label: 'DeepSeek Reasoner', description: 'DeepSeek 推理模型' },
+];
+
+export function stringifyEnvironmentVariables(envVars: Record<string, string>): string {
+  return Object.entries(envVars)
+    .filter(([, value]) => typeof value === 'string' && value.trim().length > 0)
+    .map(([key, value]) => `${key}=${value}`)
+    .join('\n');
+}
+
+function mergeEnvironmentRecords(
+  base: Record<string, string>,
+  overrides: Record<string, string>
+): Record<string, string> {
+  return {
+    ...base,
+    ...overrides,
+  };
+}
+
+export function getProviderModels(
+  provider: ProviderId,
+  envVars: Record<string, string>
+): { value: string; label: string; description: string }[] {
+  if (provider === 'deepseek') {
+    const configuredModel = envVars.OPENAI_MODEL;
+    if (!configuredModel) {
+      return [...DEEPSEEK_MODEL_OPTIONS];
+    }
+
+    return [
+      {
+        value: configuredModel,
+        label: configuredModel,
+        description: '当前配置的 DeepSeek 模型',
+      },
+    ];
+  }
+
+  const customModels = getModelsFromEnvironment(envVars);
+  return customModels.length > 0 ? customModels : [];
+}
+
+export function buildProviderEnvironment(
+  settings: Pick<CodianSettings, 'currentProvider' | 'providerConfigs' | 'environmentVariables'>,
+  providerOverride?: ProviderId
+): Record<string, string> {
+  const provider = providerOverride ?? settings.currentProvider;
+  const advancedOverrides = parseEnvironmentVariables(settings.environmentVariables || '');
+
+  if (provider === 'deepseek') {
+    const deepseekConfig = settings.providerConfigs.deepseek;
+    const baseEnv: Record<string, string> = {};
+    if (deepseekConfig.apiKey) {
+      baseEnv.OPENAI_API_KEY = deepseekConfig.apiKey;
+    }
+    if (deepseekConfig.baseUrl) {
+      baseEnv.OPENAI_BASE_URL = deepseekConfig.baseUrl;
+    }
+    if (deepseekConfig.model) {
+      baseEnv.OPENAI_MODEL = deepseekConfig.model;
+    }
+
+    return mergeEnvironmentRecords(baseEnv, advancedOverrides);
+  }
+
+  return advancedOverrides;
+}
+
+export function buildProviderEnvironmentText(
+  settings: Pick<CodianSettings, 'currentProvider' | 'providerConfigs' | 'environmentVariables'>,
+  providerOverride?: ProviderId
+): string {
+  return stringifyEnvironmentVariables(buildProviderEnvironment(settings, providerOverride));
+}
+
+export function isProviderConfigured(
+  settings: Pick<CodianSettings, 'providerConfigs'>,
+  provider: ProviderId
+): { ok: true } | { ok: false; error: string } {
+  if (provider === 'deepseek') {
+    const config = settings.providerConfigs.deepseek;
+    if (!config.apiKey.trim()) {
+      return { ok: false, error: 'DeepSeek API Key 为空。请先在设置中填写。' };
+    }
+    if (!config.baseUrl.trim()) {
+      return { ok: false, error: 'DeepSeek Base URL 为空。请先在设置中填写。' };
+    }
+    if (!config.model.trim()) {
+      return { ok: false, error: 'DeepSeek 默认模型为空。请先在设置中填写。' };
+    }
+  }
+
+  return { ok: true };
+}
 
 function getModelTypeFromEnvKey(envKey: string): string {
   if (envKey === 'OPENAI_MODEL') return 'openai';

@@ -3,7 +3,9 @@
   position: relative;
   display: flex;
   align-items: center;
-  margin-left: 8px;
+  margin-left: 0;
+  flex: 0 0 auto;
+  min-height: 26px;
 }
 
 .claudian-mcp-selector-icon-wrapper {
@@ -21,16 +23,21 @@
   width: 24px;
   height: 24px;
   color: var(--text-faint);
-  transition: color 0.15s ease;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
 }
 
 .claudian-mcp-selector-icon-wrapper:hover .claudian-mcp-selector-icon {
   color: var(--text-normal);
+  background: var(--background-modifier-hover);
+  border-color: color-mix(in srgb, var(--background-modifier-border) 85%, transparent);
 }
 
 .claudian-mcp-selector-icon.active {
   color: var(--claudian-brand);
-  animation: mcp-glow 2s ease-in-out infinite;
+  background: rgba(var(--claudian-brand-rgb), 0.12);
+  border-color: rgba(var(--claudian-brand-rgb), 0.14);
 }
 
 .claudian-mcp-selector-icon svg {
@@ -64,8 +71,8 @@
   max-width: 280px;
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.15s ease, visibility 0.15s ease;
@@ -123,7 +130,7 @@
 }
 
 .claudian-mcp-selector-item.enabled {
-  background: rgba(var(--claudian-brand-rgb), 0.1);
+  background: rgba(var(--claudian-brand-rgb), 0.08);
 }
 
 .claudian-mcp-selector-check {

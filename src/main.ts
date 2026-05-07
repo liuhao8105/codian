@@ -6,7 +6,7 @@
  */
 
 import type { Editor, MarkdownView } from 'obsidian';
-import { Notice, Plugin } from 'obsidian';
+import { addIcon, Notice, Plugin } from 'obsidian';
 
 import { AgentManager } from './core/agents';
 import { McpServerManager } from './core/mcp';
@@ -19,6 +19,7 @@ import type {
   CodianSettings,
   Conversation,
   ConversationMeta,
+  ProviderId,
   SlashCommand,
   SubagentInfo,
   ToolCallInfo,
@@ -34,9 +35,18 @@ import { CodianView } from './features/chat/CodianView';
 import { type InlineEditContext, InlineEditModal } from './features/inline-edit/ui/InlineEditModal';
 import { CodianSettingTab } from './features/settings/CodianSettings';
 import { setLocale } from './i18n';
+import { CODIAN_ICON_SVG } from './shared';
+import { normalizeCodexModelForRuntime } from './core/runtime/codexExec';
 import { ClaudeCliResolver } from './utils/claudeCli';
 import { buildCursorContext } from './utils/editor';
-import { getCurrentModelFromEnvironment, getModelsFromEnvironment, parseEnvironmentVariables } from './utils/env';
+import {
+  buildProviderEnvironmentText,
+  getCurrentModelFromEnvironment,
+  getModelsFromEnvironment,
+  getProviderModels,
+  isProviderConfigured,
+  parseEnvironmentVariables,
+} from './utils/env';
 import { filterValidPaths } from './utils/externalContext';
 import { getVaultPath } from './utils/path';
 import {
@@ -193,6 +203,7 @@ export default class CodianPlugin extends Plugin {
   private runtimeEnvironmentVariables = '';
 
   async onload() {
+    addIcon('codian-mark', CODIAN_ICON_SVG);
     await this.loadSettings();
 
     this.cliResolver = new ClaudeCliResolver();
@@ -215,7 +226,7 @@ export default class CodianPlugin extends Plugin {
       (leaf) => new CodianView(leaf, this)
     );
 
-    this.addRibbonIcon('bot', 'Open Codian', () => {
+    this.addRibbonIcon('codian-mark', 'Open Codian', () => {
       this.activateView();
     });
 
@@ -379,6 +390,27 @@ export default class CodianPlugin extends Plugin {
       ...claudian,
       slashCommands,
     };
+    this.settings.currentProvider ??= DEFAULT_SETTINGS.currentProvider;
+    this.settings.providerConfigs = {
+      ...DEFAULT_SETTINGS.providerConfigs,
+      ...(claudian.providerConfigs || {}),
+      codex: {
+        ...DEFAULT_SETTINGS.providerConfigs.codex,
+        ...(claudian.providerConfigs?.codex || {}),
+      },
+      deepseek: {
+        ...DEFAULT_SETTINGS.providerConfigs.deepseek,
+        ...(claudian.providerConfigs?.deepseek || {}),
+      },
+    };
+    const providerValidation = isProviderConfigured(this.settings, this.settings.currentProvider);
+    const didFallbackProvider = !providerValidation.ok && this.settings.currentProvider === 'deepseek';
+    if (didFallbackProvider) {
+      this.settings.currentProvider = 'codex';
+      this.settings.model = this.getPreferredModelForProvider('codex');
+      this.settings.thinkingBudget = DEFAULT_SETTINGS.thinkingBudget;
+    }
+    this.settings.model = this.getPreferredModelForProvider(this.settings.currentProvider);
     this.storage.localMemory.setBasePath(this.settings.localMemoryPath || DEFAULT_SETTINGS.localMemoryPath);
 
     const sanitizedPersistentPaths = filterValidPaths(this.settings.persistentExternalContextPaths || []);
@@ -488,14 +520,17 @@ export default class CodianPlugin extends Plugin {
     if (failedCount > 0) {
       new Notice(`Failed to load ${failedCount} conversation${failedCount > 1 ? 's' : ''}`);
     }
+    if (didFallbackProvider && !providerValidation.ok) {
+      new Notice(`DeepSeek 配置已跳过：${providerValidation.error}`);
+    }
     setLocale(this.settings.locale);
 
     const backfilledConversations = this.backfillConversationResponseTimestamps();
 
-    this.runtimeEnvironmentVariables = this.settings.environmentVariables || '';
+    this.runtimeEnvironmentVariables = this.computeRuntimeEnvironmentVariables();
     const { changed, invalidatedConversations } = this.reconcileModelWithEnvironment(this.runtimeEnvironmentVariables);
 
-    if (changed || didMigrateCliPath || didSanitizePersistentPaths) {
+    if (changed || didMigrateCliPath || didSanitizePersistentPaths || didFallbackProvider) {
       await this.saveSettings();
     }
 
@@ -545,83 +580,54 @@ export default class CodianPlugin extends Plugin {
 
   /** Updates and persists environment variables, restarting processes to apply changes. */
   async applyEnvironmentVariables(envText: string): Promise<void> {
-    const envChanged = envText !== this.runtimeEnvironmentVariables;
-
     this.settings.environmentVariables = envText;
-
-    if (!envChanged) {
-      await this.saveSettings();
-      return;
-    }
-
-    // Update runtime env vars so new processes use them
-    this.runtimeEnvironmentVariables = envText;
-
-    const { changed, invalidatedConversations } = this.reconcileModelWithEnvironment(envText);
-    await this.saveSettings();
-
-    if (invalidatedConversations.length > 0) {
-      for (const conv of invalidatedConversations) {
-        if (conv.isNative) {
-          await this.storage.sessions.saveMetadata(
-            this.storage.sessions.toSessionMetadata(conv)
-          );
-        } else {
-          await this.storage.sessions.saveConversation(conv);
-        }
-      }
-    }
-
-    const view = this.getView();
-    const tabManager = view?.getTabManager();
-
-    if (tabManager) {
-      for (const tab of tabManager.getAllTabs()) {
-        if (tab.state.isStreaming) {
-          tab.controllers.inputController?.cancelStreaming();
-        }
-      }
-
-      let failedTabs = 0;
-      if (changed) {
-        for (const tab of tabManager.getAllTabs()) {
-          if (!tab.service || !tab.serviceInitialized) {
-            continue;
-          }
-          try {
-            const externalContextPaths = tab.ui.externalContextSelector?.getExternalContexts() ?? [];
-            tab.service.resetSession();
-            await tab.service.ensureReady({ externalContextPaths });
-          } catch {
-            failedTabs++;
-          }
-        }
-      } else {
-        // Restart initialized tabs to pick up env changes
-        try {
-          await tabManager.broadcastToAllTabs(
-            async (service) => { await service.ensureReady({ force: true }); }
-          );
-        } catch {
-          failedTabs++;
-        }
-      }
-      if (failedTabs > 0) {
-        new Notice(`Environment changes applied, but ${failedTabs} tab(s) failed to restart.`);
-      }
-    }
-
-    view?.refreshModelSelector();
-
-    const noticeText = changed
-      ? 'Environment variables applied. Sessions will be rebuilt on next message.'
-      : 'Environment variables applied.';
-    new Notice(noticeText);
+    await this.applyRuntimeEnvironmentUpdate('环境变量已应用。', '环境变量已应用，后续消息会重建会话。');
   }
 
   /** Returns the runtime environment variables (fixed at plugin load). */
   getActiveEnvironmentVariables(): string {
     return this.runtimeEnvironmentVariables;
+  }
+
+  getAvailableModelsForCurrentProvider(): { value: string; label: string; description: string }[] {
+    const envVars = parseEnvironmentVariables(this.getActiveEnvironmentVariables());
+    const providerModels = getProviderModels(this.settings.currentProvider, envVars);
+    return providerModels.length > 0 ? providerModels : [...DEFAULT_CODEX_MODELS];
+  }
+
+  getEnabledProviders(): ProviderId[] {
+    const providers: ProviderId[] = ['codex'];
+    const deepseek = this.settings.providerConfigs.deepseek;
+    const hasUsableDeepSeekConfig =
+      !!deepseek.apiKey.trim() &&
+      !!deepseek.baseUrl.trim() &&
+      !!deepseek.model.trim();
+    if (deepseek.enabled || hasUsableDeepSeekConfig) {
+      providers.push('deepseek');
+    }
+    return providers;
+  }
+
+  async setCurrentProvider(provider: ProviderId): Promise<void> {
+    if (provider === this.settings.currentProvider) {
+      return;
+    }
+
+    const validation = isProviderConfigured(this.settings, provider);
+    if (!validation.ok) {
+      throw new Error(validation.error);
+    }
+
+    this.settings.currentProvider = provider;
+    this.settings.model = this.getPreferredModelForProvider(provider);
+    await this.applyRuntimeEnvironmentUpdate(
+      `已切换到 ${provider === 'deepseek' ? 'DeepSeek' : 'Codex'}。`,
+      `已切换到 ${provider === 'deepseek' ? 'DeepSeek' : 'Codex'}，后续消息会重建会话。`
+    );
+  }
+
+  async refreshRuntimeEnvironmentFromSettings(baseNotice = 'Provider 配置已更新。', changedNotice = 'Provider 配置已更新，后续消息会重建会话。'): Promise<void> {
+    await this.applyRuntimeEnvironmentUpdate(baseNotice, changedNotice);
   }
 
   getResolvedClaudeCliPath(): string | null {
@@ -636,12 +642,104 @@ export default class CodianPlugin extends Plugin {
     return DEFAULT_CODEX_MODELS.map((m) => m.value);
   }
 
+  private computeRuntimeEnvironmentVariables(providerOverride?: ProviderId): string {
+    return buildProviderEnvironmentText(this.settings, providerOverride);
+  }
+
+  private async persistInvalidatedConversations(invalidatedConversations: Conversation[]): Promise<void> {
+    for (const conv of invalidatedConversations) {
+      if (conv.isNative) {
+        await this.storage.sessions.saveMetadata(
+          this.storage.sessions.toSessionMetadata(conv)
+        );
+      } else {
+        await this.storage.sessions.saveConversation(conv);
+      }
+    }
+  }
+
+  private async restartTabsAfterEnvironmentChange(changed: boolean): Promise<number> {
+    const view = this.getView();
+    const tabManager = view?.getTabManager();
+    if (!tabManager) {
+      view?.refreshToolbarState();
+      return 0;
+    }
+
+    for (const tab of tabManager.getAllTabs()) {
+      if (tab.state.isStreaming) {
+        tab.controllers.inputController?.cancelStreaming();
+      }
+    }
+
+    let failedTabs = 0;
+    if (changed) {
+      for (const tab of tabManager.getAllTabs()) {
+        if (!tab.service || !tab.serviceInitialized) {
+          continue;
+        }
+        try {
+          const externalContextPaths = tab.ui.externalContextSelector?.getExternalContexts() ?? [];
+          tab.service.resetSession();
+          await tab.service.ensureReady({ externalContextPaths });
+        } catch {
+          failedTabs++;
+        }
+      }
+    } else {
+      try {
+        await tabManager.broadcastToAllTabs(
+          async (service) => { await service.ensureReady({ force: true }); }
+        );
+      } catch {
+        failedTabs++;
+      }
+    }
+
+    view?.refreshToolbarState();
+    return failedTabs;
+  }
+
+  private async applyRuntimeEnvironmentUpdate(baseNotice: string, changedNotice: string): Promise<void> {
+    const nextRuntimeEnvironment = this.computeRuntimeEnvironmentVariables();
+    const envChanged = nextRuntimeEnvironment !== this.runtimeEnvironmentVariables;
+    this.runtimeEnvironmentVariables = nextRuntimeEnvironment;
+
+    const { changed, invalidatedConversations } = this.reconcileModelWithEnvironment(nextRuntimeEnvironment);
+    await this.saveSettings();
+    await this.persistInvalidatedConversations(invalidatedConversations);
+
+    const failedTabs = await this.restartTabsAfterEnvironmentChange(changed || envChanged);
+    if (failedTabs > 0) {
+      new Notice(`环境已更新，但有 ${failedTabs} 个标签页重启失败。`);
+    }
+
+    new Notice((changed || envChanged) ? changedNotice : baseNotice);
+  }
+
   private getPreferredCustomModel(envVars: Record<string, string>, customModels: { value: string }[]): string {
     const envPreferred = getCurrentModelFromEnvironment(envVars);
     if (envPreferred && customModels.some((m) => m.value === envPreferred)) {
       return envPreferred;
     }
     return customModels[0].value;
+  }
+
+  private getPreferredModelForProvider(provider: ProviderId, envText?: string): string {
+    if (provider === 'deepseek') {
+      const configuredModel = this.settings.providerConfigs.deepseek.model?.trim();
+      return configuredModel || 'deepseek-chat';
+    }
+
+    const envVars = parseEnvironmentVariables(
+      envText ?? this.computeRuntimeEnvironmentVariables(provider)
+    );
+    const providerModels = getProviderModels(provider, envVars);
+    if (providerModels.length > 0) {
+      return this.getPreferredCustomModel(envVars, providerModels);
+    }
+
+    return normalizeCodexModelForRuntime(this.settings.model) || DEFAULT_CODEX_MODELS[0].value;
   }
 
   /** Computes a hash of model and provider base URL environment variables for change detection. */
@@ -657,6 +755,7 @@ export default class CodianPlugin extends Plugin {
     ];
     const providerKeys = [
       'ANTHROPIC_BASE_URL',
+      'OPENAI_BASE_URL',
     ];
     const allKeys = [...modelKeys, ...providerKeys];
     const relevantPairs = allKeys
@@ -664,7 +763,7 @@ export default class CodianPlugin extends Plugin {
       .map(key => `${key}=${envVars[key]}`)
       .sort()
       .join('|');
-    return relevantPairs;
+    return `${this.settings.currentProvider}|${relevantPairs}`;
   }
 
   /**
@@ -680,9 +779,9 @@ export default class CodianPlugin extends Plugin {
     const currentHash = this.computeEnvHash(envText);
     const savedHash = this.settings.lastEnvHash || '';
     const envVars = parseEnvironmentVariables(envText || '');
-    const customModels = getModelsFromEnvironment(envVars);
-    const availableModels = customModels.length > 0
-      ? customModels.map((model) => model.value)
+    const providerModels = getProviderModels(this.settings.currentProvider, envVars);
+    const availableModels = providerModels.length > 0
+      ? providerModels.map((model) => model.value)
       : this.getDefaultModelValues();
 
     if (currentHash === savedHash && availableModels.includes(this.settings.model)) {
@@ -702,11 +801,7 @@ export default class CodianPlugin extends Plugin {
       }
     }
 
-    if (customModels.length > 0) {
-      this.settings.model = this.getPreferredCustomModel(envVars, customModels);
-    } else {
-      this.settings.model = DEFAULT_CODEX_MODELS[0].value;
-    }
+    this.settings.model = this.getPreferredModelForProvider(this.settings.currentProvider, envText);
 
     this.settings.lastEnvHash = currentHash;
     return { changed: true, invalidatedConversations };

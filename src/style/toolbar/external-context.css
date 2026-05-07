@@ -3,7 +3,9 @@
   position: relative;
   display: flex;
   align-items: center;
-  margin-left: 8px;
+  margin-left: 0;
+  flex: 0 0 auto;
+  min-height: 26px;
 }
 
 .claudian-external-context-icon-wrapper {
@@ -21,16 +23,21 @@
   width: 24px;
   height: 24px;
   color: var(--text-faint);
-  transition: color 0.15s ease;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
 }
 
 .claudian-external-context-icon-wrapper:hover .claudian-external-context-icon {
   color: var(--text-normal);
+  background: var(--background-modifier-hover);
+  border-color: color-mix(in srgb, var(--background-modifier-border) 85%, transparent);
 }
 
 .claudian-external-context-icon.active {
   color: var(--claudian-brand);
-  animation: external-context-glow 2s ease-in-out infinite;
+  background: rgba(var(--claudian-brand-rgb), 0.12);
+  border-color: rgba(var(--claudian-brand-rgb), 0.14);
 }
 
 .claudian-external-context-icon svg {

@@ -183,6 +183,11 @@ describe('extractContentBeforeXmlContext', () => {
       expect(extractContentBeforeXmlContext(null as unknown as string)).toBeUndefined();
       expect(extractContentBeforeXmlContext(undefined as unknown as string)).toBeUndefined();
     });
+
+    it('extracts user content from wrapped codian user_request prompts', () => {
+      const prompt = '<codian_system_instructions>\ninternal\n</codian_system_instructions>\n\n<user_request>\n你好\n\n<current_note>\nnotes/test.md\n</current_note>\n</user_request>';
+      expect(extractContentBeforeXmlContext(prompt)).toBe('你好');
+    });
   });
 });
 
@@ -234,6 +239,11 @@ describe('extractUserQuery', () => {
     it('strips multiple tag types', () => {
       const prompt = '<current_note>a.md</current_note>Query<context_files>b.md</context_files>';
       expect(extractUserQuery(prompt)).toBe('Query');
+    });
+
+    it('strips codian wrappers and internal helper blocks', () => {
+      const prompt = '<codian_system_instructions>\ninternal\n</codian_system_instructions>\n\n<user_request>\n你好\n\n<local_memory>\nremember this\n</local_memory>\n\n<quick_reply_reference>\nanchor\n</quick_reply_reference>\n\n<response_style>\ndirect\n</response_style>\n</user_request>';
+      expect(extractUserQuery(prompt)).toBe('你好');
     });
   });
 

@@ -119,6 +119,7 @@ export function createTab(options: TabCreateOptions): TabData {
     ui: {
       fileContextManager: null,
       imageContextManager: null,
+      providerSelector: null,
       modelSelector: null,
       thinkingBudgetSelector: null,
       externalContextSelector: null,
@@ -430,11 +431,32 @@ function initializeInputToolbar(tab: TabData, plugin: CodianPlugin): void {
   const inputToolbar = dom.inputWrapper.createDiv({ cls: 'claudian-input-toolbar' });
   const toolbarComponents = createInputToolbar(inputToolbar, {
     getSettings: () => ({
+      provider: plugin.settings.currentProvider,
       model: plugin.settings.model,
       thinkingBudget: plugin.settings.thinkingBudget,
       permissionMode: plugin.settings.permissionMode,
     }),
+    getAvailableProviders: () => plugin.getEnabledProviders().map((provider) => ({
+      value: provider,
+      label: provider === 'deepseek' ? 'DeepSeek' : 'Codex',
+      description: provider === 'deepseek' ? 'DeepSeek OpenAI 兼容接口' : '默认 Codex Provider',
+    })),
+    getAvailableModels: () => plugin.getAvailableModelsForCurrentProvider(),
     getEnvironmentVariables: () => plugin.getActiveEnvironmentVariables(),
+    onProviderChange: async (provider) => {
+      try {
+        await plugin.setCurrentProvider(provider);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Provider 切换失败。';
+        new Notice(message);
+      } finally {
+        tab.ui.providerSelector?.updateDisplay();
+        tab.ui.providerSelector?.renderOptions();
+        tab.ui.modelSelector?.updateDisplay();
+        tab.ui.modelSelector?.renderOptions();
+        tab.ui.thinkingBudgetSelector?.updateDisplay();
+      }
+    },
     onModelChange: async (model: ClaudeModel) => {
       plugin.settings.model = model;
       const isDefaultModel = DEFAULT_CODEX_MODELS.find((m) => m.value === model);
@@ -473,6 +495,7 @@ function initializeInputToolbar(tab: TabData, plugin: CodianPlugin): void {
     },
   });
 
+  tab.ui.providerSelector = toolbarComponents.providerSelector;
   tab.ui.modelSelector = toolbarComponents.modelSelector;
   tab.ui.thinkingBudgetSelector = toolbarComponents.thinkingBudgetSelector;
   tab.ui.contextUsageMeter = toolbarComponents.contextUsageMeter;

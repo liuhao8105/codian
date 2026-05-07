@@ -7,6 +7,7 @@ import {
   McpServerSelector,
   ModelSelector,
   PermissionToggle,
+  ProviderSelector,
   ThinkingBudgetSelector,
 } from '@/features/chat/ui/InputToolbar';
 
@@ -29,11 +30,13 @@ function makeUsage(overrides: Partial<UsageInfo> = {}): UsageInfo {
 
 function createMockCallbacks(overrides: Record<string, any> = {}) {
   return {
+    onProviderChange: jest.fn().mockResolvedValue(undefined),
     onModelChange: jest.fn().mockResolvedValue(undefined),
     onThinkingBudgetChange: jest.fn().mockResolvedValue(undefined),
     onPermissionModeChange: jest.fn().mockResolvedValue(undefined),
     getSettings: jest.fn().mockReturnValue({
-      model: 'sonnet',
+      provider: 'codex',
+      model: 'gpt-5',
       thinkingBudget: 'low',
       permissionMode: 'normal',
     }),
@@ -41,6 +44,35 @@ function createMockCallbacks(overrides: Record<string, any> = {}) {
     ...overrides,
   };
 }
+
+describe('ProviderSelector', () => {
+  it('should display current provider label', () => {
+    const parentEl = createMockEl();
+    const callbacks = createMockCallbacks();
+    new ProviderSelector(parentEl, callbacks);
+
+    const label = parentEl.querySelector('.claudian-provider-label');
+    expect(label?.textContent).toBe('Codex');
+  });
+
+  it('should call onProviderChange when option clicked', async () => {
+    const parentEl = createMockEl();
+    const callbacks = createMockCallbacks({
+      getAvailableProviders: jest.fn().mockReturnValue([
+        { value: 'codex', label: 'Codex', description: '默认 Provider' },
+        { value: 'deepseek', label: 'DeepSeek', description: 'DeepSeek OpenAI 兼容接口' },
+      ]),
+    });
+    new ProviderSelector(parentEl, callbacks);
+
+    const dropdown = parentEl.querySelector('.claudian-provider-dropdown');
+    const options = dropdown?.children || [];
+    const deepseekOption = options.find((o: any) => o.children[0]?.textContent === 'DeepSeek');
+
+    await deepseekOption?.dispatchEvent('click', { stopPropagation: () => {} });
+    expect(callbacks.onProviderChange).toHaveBeenCalledWith('deepseek');
+  });
+});
 
 describe('ModelSelector', () => {
   let parentEl: any;
@@ -60,52 +92,46 @@ describe('ModelSelector', () => {
   });
 
   it('should display current model label', () => {
-    // Default model is 'sonnet' which maps to 'Sonnet'
     const btn = parentEl.querySelector('.claudian-model-btn');
     expect(btn).not.toBeNull();
     const label = btn?.querySelector('.claudian-model-label');
     expect(label).not.toBeNull();
-    expect(label?.textContent).toBe('Sonnet');
+    expect(label?.textContent).toBe('GPT-5');
   });
 
   it('should display first model when current model not found', () => {
     callbacks.getSettings.mockReturnValue({
+      provider: 'codex',
       model: 'nonexistent',
       thinkingBudget: 'low',
       permissionMode: 'normal',
     });
     selector.updateDisplay();
     const label = parentEl.querySelector('.claudian-model-label');
-    expect(label?.textContent).toBe('Haiku');
+    expect(label?.textContent).toBe('GPT-5');
   });
 
-  it('should render model options in reverse order', () => {
+  it('should render default model option', () => {
     const dropdown = parentEl.querySelector('.claudian-model-dropdown');
     expect(dropdown).not.toBeNull();
-    // DEFAULT_CLAUDE_MODELS is [haiku, sonnet, opus] -> reversed is [opus, sonnet, haiku]
     const options = dropdown?.children || [];
-    expect(options.length).toBe(3);
-    // Text is in child span, check first child's textContent
-    expect(options[0]?.children[0]?.textContent).toBe('Opus');
-    expect(options[1]?.children[0]?.textContent).toBe('Sonnet');
-    expect(options[2]?.children[0]?.textContent).toBe('Haiku');
+    expect(options.length).toBe(1);
+    expect(options[0]?.children[0]?.textContent).toBe('GPT-5');
   });
 
   it('should mark current model as selected', () => {
     const dropdown = parentEl.querySelector('.claudian-model-dropdown');
     const options = dropdown?.children || [];
-    // Sonnet is current (index 1 in reversed order)
-    const sonnetOption = options.find((o: any) => o.children[0]?.textContent === 'Sonnet');
-    expect(sonnetOption?.hasClass('selected')).toBe(true);
+    expect(options[0]?.hasClass('selected')).toBe(true);
   });
 
   it('should call onModelChange when option clicked', async () => {
     const dropdown = parentEl.querySelector('.claudian-model-dropdown');
     const options = dropdown?.children || [];
-    const opusOption = options.find((o: any) => o.children[0]?.textContent === 'Opus');
+    const modelOption = options.find((o: any) => o.children[0]?.textContent === 'GPT-5');
 
-    await opusOption?.dispatchEvent('click', { stopPropagation: () => {} });
-    expect(callbacks.onModelChange).toHaveBeenCalledWith('opus');
+    await modelOption?.dispatchEvent('click', { stopPropagation: () => {} });
+    expect(callbacks.onModelChange).toHaveBeenCalledWith('gpt-5');
   });
 
   it('should update display when setReady is called', () => {
@@ -117,16 +143,17 @@ describe('ModelSelector', () => {
     expect(btn?.hasClass('ready')).toBe(false);
   });
 
-  it('should show Sonnet (1M) when show1MModel is enabled', () => {
+  it('should ignore legacy 1M flag for codex default model', () => {
     callbacks.getSettings.mockReturnValue({
-      model: 'sonnet',
+      provider: 'codex',
+      model: 'gpt-5',
       thinkingBudget: 'low',
       permissionMode: 'normal',
       show1MModel: true,
     });
     selector.updateDisplay();
     const label = parentEl.querySelector('.claudian-model-label');
-    expect(label?.textContent).toBe('Sonnet (1M)');
+    expect(label?.textContent).toBe('GPT-5');
   });
 
   it('should use custom models from environment variables', () => {
@@ -134,6 +161,7 @@ describe('ModelSelector', () => {
       'CLAUDE_CODE_USE_BEDROCK=1\nANTHROPIC_MODEL=us.anthropic.claude-sonnet-4-20250514-v1:0'
     );
     callbacks.getSettings.mockReturnValue({
+      provider: 'codex',
       model: 'us.anthropic.claude-sonnet-4-20250514-v1:0',
       thinkingBudget: 'low',
       permissionMode: 'normal',
@@ -175,7 +203,8 @@ describe('ThinkingBudgetSelector', () => {
 
   it('should display Off when budget is off', () => {
     callbacks.getSettings.mockReturnValue({
-      model: 'sonnet',
+      provider: 'codex',
+      model: 'gpt-5',
       thinkingBudget: 'off',
       permissionMode: 'normal',
     });
@@ -248,7 +277,8 @@ describe('PermissionToggle', () => {
 
   it('should display YOLO label when in yolo mode', () => {
     callbacks.getSettings.mockReturnValue({
-      model: 'sonnet',
+      provider: 'codex',
+      model: 'gpt-5',
       thinkingBudget: 'low',
       permissionMode: 'yolo',
     });
@@ -261,7 +291,8 @@ describe('PermissionToggle', () => {
 
   it('should show PLAN label and hide toggle in plan mode', () => {
     callbacks.getSettings.mockReturnValue({
-      model: 'sonnet',
+      provider: 'codex',
+      model: 'gpt-5',
       thinkingBudget: 'low',
       permissionMode: 'plan',
     });
@@ -278,7 +309,8 @@ describe('PermissionToggle', () => {
 
   it('should add active class when in yolo mode', () => {
     callbacks.getSettings.mockReturnValue({
-      model: 'sonnet',
+      provider: 'codex',
+      model: 'gpt-5',
       thinkingBudget: 'low',
       permissionMode: 'yolo',
     });
@@ -302,7 +334,8 @@ describe('PermissionToggle', () => {
 
   it('should toggle from yolo to normal on click', async () => {
     callbacks.getSettings.mockReturnValue({
-      model: 'sonnet',
+      provider: 'codex',
+      model: 'gpt-5',
       thinkingBudget: 'low',
       permissionMode: 'yolo',
     });
@@ -653,6 +686,7 @@ describe('createInputToolbar', () => {
     const callbacks = createMockCallbacks();
     const toolbar = createInputToolbar(parentEl, callbacks);
 
+    expect(toolbar.providerSelector).toBeInstanceOf(ProviderSelector);
     expect(toolbar.modelSelector).toBeInstanceOf(ModelSelector);
     expect(toolbar.thinkingBudgetSelector).toBeInstanceOf(ThinkingBudgetSelector);
     expect(toolbar.contextUsageMeter).toBeInstanceOf(ContextUsageMeter);

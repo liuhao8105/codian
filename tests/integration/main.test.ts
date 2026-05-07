@@ -364,7 +364,7 @@ describe('ClaudianPlugin', () => {
       };
       const mockView = {
         getTabManager: jest.fn().mockReturnValue(mockTabManager),
-        refreshModelSelector: jest.fn(),
+        refreshToolbarState: jest.fn(),
       };
       jest.spyOn(plugin, 'getView').mockReturnValue(mockView as any);
 
@@ -373,6 +373,50 @@ describe('ClaudianPlugin', () => {
 
       expect(mockBroadcast).toHaveBeenCalled();
       expect(mockEnsureReady).toHaveBeenCalledWith({ force: true });
+    });
+
+    it('switches to deepseek and rebuilds runtime environment', async () => {
+      await plugin.onload();
+      plugin.settings.providerConfigs.deepseek = {
+        enabled: true,
+        apiKey: 'sk-test',
+        baseUrl: 'https://deepseek-gateway.example.com/v1',
+        model: 'deepseek-chat',
+      };
+
+      const mockEnsureReady = jest.fn().mockResolvedValue(true);
+      const mockBroadcast = jest.fn().mockImplementation(async (fn) => {
+        await fn({ ensureReady: mockEnsureReady });
+      });
+      const mockTabManager = {
+        broadcastToAllTabs: mockBroadcast,
+        getAllTabs: jest.fn().mockReturnValue([]),
+      };
+      const mockView = {
+        getTabManager: jest.fn().mockReturnValue(mockTabManager),
+        refreshToolbarState: jest.fn(),
+      };
+      jest.spyOn(plugin, 'getView').mockReturnValue(mockView as any);
+
+      await plugin.setCurrentProvider('deepseek');
+
+      expect(plugin.settings.currentProvider).toBe('deepseek');
+      expect(plugin.getActiveEnvironmentVariables()).toContain('OPENAI_API_KEY=sk-test');
+      expect(plugin.getActiveEnvironmentVariables()).toContain('OPENAI_MODEL=deepseek-chat');
+      expect(mockBroadcast).toHaveBeenCalled();
+    });
+
+    it('rejects deepseek switch when api key is missing', async () => {
+      await plugin.onload();
+      plugin.settings.providerConfigs.deepseek = {
+        enabled: true,
+        apiKey: '',
+        baseUrl: 'https://deepseek-gateway.example.com/v1',
+        model: 'deepseek-chat',
+      };
+
+      await expect(plugin.setCurrentProvider('deepseek')).rejects.toThrow('DeepSeek API Key 为空');
+      expect(plugin.settings.currentProvider).toBe('codex');
     });
   });
 

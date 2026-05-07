@@ -119,7 +119,7 @@ class AgentModal extends Modal {
     this.modalEl.addClass('claudian-sp-modal');
 
     const { contentEl } = this;
-    const envVars = parseEnvironmentVariables(this.plugin.settings.environmentVariables);
+    const envVars = parseEnvironmentVariables(this.plugin.getActiveEnvironmentVariables());
     const availableModels = getModelsFromEnvironment(envVars);
     const modelOptions = [
       { value: 'inherit', label: 'Inherit' },

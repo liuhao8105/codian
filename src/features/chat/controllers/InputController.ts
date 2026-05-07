@@ -69,6 +69,19 @@ function appendEmbeddedImageOrder(prompt: string, references: Array<{ index: num
   );
 }
 
+const VISUAL_REQUEST_PATTERN = /(?:图片|图像|照片|截图|配图|封面|海报|视觉|画面|看图|识图|分析图|analy[sz]e image|image|photo|screenshot|poster|cover)/i;
+const MAX_AUTO_ATTACHED_NOTE_IMAGES = 4;
+/** Skip auto-attached images larger than 500KB raw to avoid input overflow. */
+const MAX_AUTO_ATTACHED_IMAGE_BYTES = 500_000;
+
+function shouldAttachCurrentNoteEmbeddedImages(rawContent: string): boolean {
+  return VISUAL_REQUEST_PATTERN.test(rawContent);
+}
+
+function shouldAppendCurrentNoteEmbeddedImageOrder(rawContent: string): boolean {
+  return shouldAttachCurrentNoteEmbeddedImages(rawContent);
+}
+
 function normalizeQuickReplyQuestion(text: string): string {
   return text
     .trim()
@@ -520,18 +533,29 @@ export class InputController {
         const currentNoteFile = plugin.app.vault.getFileByPath(currentNotePath);
         if (currentNoteFile) {
           const currentNoteMarkdown = await plugin.app.vault.cachedRead(currentNoteFile);
-          const embeddedImages = await extractEmbeddedImageAttachments(
-            plugin.app,
-            currentNoteMarkdown,
-            plugin.settings.mediaFolder
-          );
-          const embeddedImageRefs = extractEmbeddedImageReferences(
-            plugin.app,
-            currentNoteMarkdown,
-            plugin.settings.mediaFolder
-          );
-          imagesForMessage = mergeImages(imagesForMessage, embeddedImages);
-          promptToSend = appendEmbeddedImageOrder(promptToSend, embeddedImageRefs);
+          if (shouldAttachCurrentNoteEmbeddedImages(effectiveContent)) {
+            const embeddedImages = await extractEmbeddedImageAttachments(
+              plugin.app,
+              currentNoteMarkdown,
+              plugin.settings.mediaFolder
+            );
+            const sizedImages = embeddedImages
+              .filter(img => img.size <= MAX_AUTO_ATTACHED_IMAGE_BYTES)
+              .slice(0, MAX_AUTO_ATTACHED_NOTE_IMAGES);
+            imagesForMessage = mergeImages(imagesForMessage, sizedImages);
+          }
+
+          if (shouldAppendCurrentNoteEmbeddedImageOrder(effectiveContent)) {
+            const embeddedImageRefs = extractEmbeddedImageReferences(
+              plugin.app,
+              currentNoteMarkdown,
+              plugin.settings.mediaFolder
+            );
+            promptToSend = appendEmbeddedImageOrder(
+              promptToSend,
+              embeddedImageRefs.slice(0, MAX_AUTO_ATTACHED_NOTE_IMAGES)
+            );
+          }
         }
       }
 

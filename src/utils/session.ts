@@ -7,6 +7,8 @@
 import type { ChatMessage, ToolCallInfo } from '../core/types';
 import { extractUserQuery, formatCurrentNote } from './context';
 
+const MAX_REBUILT_HISTORY_CONTEXT_CHARS = 50_000;
+
 // ============================================
 // Session Recovery
 // ============================================
@@ -164,7 +166,9 @@ export function buildContextFromHistory(messages: ChatMessage[]): string {
 
     const role = message.role === 'user' ? 'User' : 'Assistant';
     const lines: string[] = [];
-    const content = message.content?.trim();
+    const content = message.role === 'user'
+      ? (message.displayContent?.trim() || extractUserQuery(message.content))
+      : message.content?.trim();
     const contextLine = formatContextLine(message);
 
     const userPayload = contextLine
@@ -194,7 +198,29 @@ export function buildContextFromHistory(messages: ChatMessage[]): string {
     parts.push(lines.join('\n'));
   }
 
-  return parts.join('\n\n');
+  if (parts.length === 0) {
+    return '';
+  }
+
+  const selectedParts: string[] = [];
+  let totalLength = 0;
+
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const part = parts[i];
+    const separatorLength = selectedParts.length > 0 ? 2 : 0;
+    if (selectedParts.length > 0 && totalLength + separatorLength + part.length > MAX_REBUILT_HISTORY_CONTEXT_CHARS) {
+      break;
+    }
+    if (selectedParts.length === 0 && part.length > MAX_REBUILT_HISTORY_CONTEXT_CHARS) {
+      selectedParts.unshift(part.slice(-MAX_REBUILT_HISTORY_CONTEXT_CHARS));
+      totalLength = selectedParts[0].length;
+      break;
+    }
+    selectedParts.unshift(part);
+    totalLength += separatorLength + part.length;
+  }
+
+  return selectedParts.join('\n\n');
 }
 
 export function getLastUserMessage(messages: ChatMessage[]): ChatMessage | undefined {

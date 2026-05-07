@@ -8,6 +8,7 @@
 const CURRENT_NOTE_PREFIX_REGEX = /^<current_note>\n[\s\S]*?<\/current_note>\n\n/;
 // Matches <current_note> at the END of prompt (current format)
 const CURRENT_NOTE_SUFFIX_REGEX = /\n\n<current_note>\n[\s\S]*?<\/current_note>$/;
+const USER_REQUEST_REGEX = /<user_request>\n?([\s\S]*?)\n?<\/user_request>/;
 
 /**
  * Pattern to match XML context tags appended to prompts.
@@ -16,6 +17,11 @@ const CURRENT_NOTE_SUFFIX_REGEX = /\n\n<current_note>\n[\s\S]*?<\/current_note>$
  * context_files, canvas_selection, browser_selection
  */
 export const XML_CONTEXT_PATTERN = /\n\n<(?:current_note|editor_selection|editor_cursor|context_files|canvas_selection|browser_selection)[\s>]/;
+
+function unwrapCodianUserRequest(text: string): string {
+  const match = text.match(USER_REQUEST_REGEX);
+  return match?.[1]?.trim() || text;
+}
 
 export function formatCurrentNote(notePath: string): string {
   return `<current_note>\n${notePath}\n</current_note>`;
@@ -47,18 +53,19 @@ export function stripCurrentNoteContext(prompt: string): string {
  */
 export function extractContentBeforeXmlContext(text: string): string | undefined {
   if (!text) return undefined;
+  const candidate = unwrapCodianUserRequest(text);
 
   // Legacy format: content inside <query> tags
-  const queryMatch = text.match(/<query>\n?([\s\S]*?)\n?<\/query>/);
+  const queryMatch = candidate.match(/<query>\n?([\s\S]*?)\n?<\/query>/);
   if (queryMatch) {
     return queryMatch[1].trim();
   }
 
   // Current format: user content before any XML context tags
   // Context tags are always appended with \n\n separator
-  const xmlMatch = text.match(XML_CONTEXT_PATTERN);
+  const xmlMatch = candidate.match(XML_CONTEXT_PATTERN);
   if (xmlMatch?.index !== undefined) {
-    return text.substring(0, xmlMatch.index).trim();
+    return candidate.substring(0, xmlMatch.index).trim();
   }
 
   return undefined;
@@ -73,15 +80,21 @@ export function extractContentBeforeXmlContext(text: string): string | undefined
  */
 export function extractUserQuery(prompt: string): string {
   if (!prompt) return '';
+  const candidate = unwrapCodianUserRequest(prompt);
 
   // Try to extract content before XML context
-  const extracted = extractContentBeforeXmlContext(prompt);
+  const extracted = extractContentBeforeXmlContext(candidate);
   if (extracted !== undefined) {
     return extracted;
   }
 
   // No XML context - return the whole prompt stripped of any remaining tags
-  return prompt
+  return candidate
+    .replace(/<codian_system_instructions>[\s\S]*?<\/codian_system_instructions>\s*/g, '')
+    .replace(/<response_style>[\s\S]*?<\/response_style>\s*/g, '')
+    .replace(/<quick_reply_reference>[\s\S]*?<\/quick_reply_reference>\s*/g, '')
+    .replace(/<requested_subagents>[\s\S]*?<\/requested_subagents>\s*/g, '')
+    .replace(/<local_memory>[\s\S]*?<\/local_memory>\s*/g, '')
     .replace(/<current_note>[\s\S]*?<\/current_note>\s*/g, '')
     .replace(/<editor_selection[\s\S]*?<\/editor_selection>\s*/g, '')
     .replace(/<editor_cursor[\s\S]*?<\/editor_cursor>\s*/g, '')

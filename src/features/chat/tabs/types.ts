@@ -24,6 +24,7 @@ import type {
   McpServerSelector,
   ModelSelector,
   PermissionToggle,
+  ProviderSelector,
   StatusPanel,
   ThinkingBudgetSelector,
 } from '../ui';
@@ -124,6 +125,7 @@ export interface TabServices {
 export interface TabUIComponents {
   fileContextManager: FileContextManager | null;
   imageContextManager: ImageContextManager | null;
+  providerSelector: ProviderSelector | null;
   modelSelector: ModelSelector | null;
   thinkingBudgetSelector: ThinkingBudgetSelector | null;
   externalContextSelector: ExternalContextSelector | null;

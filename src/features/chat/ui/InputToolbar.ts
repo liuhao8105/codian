@@ -6,6 +6,7 @@ import type {
   ClaudeModel,
   CodianMcpServer,
   PermissionMode,
+  ProviderId,
   ThinkingBudget,
   UsageInfo
 } from '../../../core/types';
@@ -19,17 +20,115 @@ import { filterValidPaths, findConflictingPath, isDuplicatePath, isValidDirector
 import { expandHomePath, normalizePathForFilesystem } from '../../../utils/path';
 
 export interface ToolbarSettings {
+  provider: ProviderId;
   model: ClaudeModel;
   thinkingBudget: ThinkingBudget;
   permissionMode: PermissionMode;
 }
 
 export interface ToolbarCallbacks {
+  onProviderChange: (provider: ProviderId) => Promise<void>;
   onModelChange: (model: ClaudeModel) => Promise<void>;
   onThinkingBudgetChange: (budget: ThinkingBudget) => Promise<void>;
   onPermissionModeChange: (mode: PermissionMode) => Promise<void>;
   getSettings: () => ToolbarSettings;
+  getAvailableProviders?: () => { value: ProviderId; label: string; description: string }[];
+  getAvailableModels?: () => { value: string; label: string; description: string }[];
   getEnvironmentVariables?: () => string;
+}
+
+export class ProviderSelector {
+  private container: HTMLElement;
+  private buttonEl: HTMLElement | null = null;
+  private dropdownEl: HTMLElement | null = null;
+  private callbacks: ToolbarCallbacks;
+  private isOpen = false;
+
+  constructor(parentEl: HTMLElement, callbacks: ToolbarCallbacks) {
+    this.callbacks = callbacks;
+    this.container = parentEl.createDiv({ cls: 'claudian-provider-selector' });
+    this.render();
+  }
+
+  private getAvailableProviders() {
+    if (this.callbacks.getAvailableProviders) {
+      return this.callbacks.getAvailableProviders();
+    }
+
+    return [
+      { value: 'codex' as ProviderId, label: 'Codex', description: '默认 Provider' },
+    ];
+  }
+
+  private render() {
+    this.container.empty();
+    this.buttonEl = this.container.createDiv({ cls: 'claudian-provider-btn' });
+    this.updateDisplay();
+    this.dropdownEl = this.container.createDiv({ cls: 'claudian-provider-dropdown' });
+    this.renderOptions();
+    this.buttonEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.isOpen = !this.isOpen;
+      this.syncOpenState();
+    });
+    document.addEventListener('click', this.handleDocumentClick, true);
+  }
+
+  updateDisplay() {
+    if (!this.buttonEl) return;
+    const currentProvider = this.callbacks.getSettings().provider;
+    const providers = this.getAvailableProviders();
+    const providerInfo = providers.find((provider) => provider.value === currentProvider) || providers[0];
+
+    this.buttonEl.empty();
+    this.buttonEl.setAttribute('title', providerInfo?.label || 'Provider');
+    this.buttonEl.createSpan({
+      cls: 'claudian-provider-label',
+      text: providerInfo?.label || 'Provider',
+    });
+    this.buttonEl.createSpan({
+      cls: 'claudian-provider-chevron',
+      text: '▾',
+    });
+  }
+
+  renderOptions() {
+    if (!this.dropdownEl) return;
+    this.dropdownEl.empty();
+
+    const currentProvider = this.callbacks.getSettings().provider;
+    const providers = this.getAvailableProviders();
+
+    for (const provider of [...providers].reverse()) {
+      const option = this.dropdownEl.createDiv({ cls: 'claudian-provider-option' });
+      if (provider.value === currentProvider) {
+        option.addClass('selected');
+      }
+      option.createSpan({ text: provider.label });
+      if (provider.description) {
+        option.setAttribute('title', provider.description);
+      }
+      option.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await this.callbacks.onProviderChange(provider.value);
+        this.isOpen = false;
+        this.syncOpenState();
+        this.updateDisplay();
+        this.renderOptions();
+      });
+    }
+  }
+
+  private syncOpenState() {
+    this.container.toggleClass('is-open', this.isOpen);
+  }
+
+  private handleDocumentClick = (event: MouseEvent) => {
+    if (!this.isOpen) return;
+    if (this.container.contains(event.target as Node)) return;
+    this.isOpen = false;
+    this.syncOpenState();
+  };
 }
 
 export class ModelSelector {
@@ -46,6 +145,10 @@ export class ModelSelector {
   }
 
   private getAvailableModels() {
+    if (this.callbacks.getAvailableModels) {
+      return this.callbacks.getAvailableModels();
+    }
+
     let models: { value: string; label: string; description: string }[] = [];
 
     if (this.callbacks.getEnvironmentVariables) {
@@ -85,6 +188,7 @@ export class ModelSelector {
     const displayModel = modelInfo || models[0];
 
     this.buttonEl.empty();
+    this.buttonEl.setAttribute('title', displayModel?.label || 'Unknown');
 
     const labelEl = this.buttonEl.createSpan({ cls: 'claudian-model-label' });
     labelEl.setText(displayModel?.label || 'Unknown');
@@ -883,6 +987,7 @@ export function createInputToolbar(
   parentEl: HTMLElement,
   callbacks: ToolbarCallbacks
 ): {
+  providerSelector: ProviderSelector;
   modelSelector: ModelSelector;
   thinkingBudgetSelector: ThinkingBudgetSelector;
   contextUsageMeter: ContextUsageMeter | null;
@@ -890,12 +995,23 @@ export function createInputToolbar(
   mcpServerSelector: McpServerSelector;
   permissionToggle: PermissionToggle;
 } {
-  const modelSelector = new ModelSelector(parentEl, callbacks);
-  const thinkingBudgetSelector = new ThinkingBudgetSelector(parentEl, callbacks);
-  const contextUsageMeter = new ContextUsageMeter(parentEl);
-  const externalContextSelector = new ExternalContextSelector(parentEl, callbacks);
-  const mcpServerSelector = new McpServerSelector(parentEl);
-  const permissionToggle = new PermissionToggle(parentEl, callbacks);
+  const primaryRow = parentEl.createDiv({ cls: 'claudian-input-toolbar-row claudian-input-toolbar-row-primary' });
+  const secondaryRow = parentEl.createDiv({ cls: 'claudian-input-toolbar-row claudian-input-toolbar-row-secondary' });
+  const secondaryLeft = secondaryRow.createDiv({ cls: 'claudian-input-toolbar-secondary-left' });
+  const secondaryRight = secondaryRow.createDiv({ cls: 'claudian-input-toolbar-secondary-right' });
 
-  return { modelSelector, thinkingBudgetSelector, contextUsageMeter, externalContextSelector, mcpServerSelector, permissionToggle };
+  const thinkingGroup = secondaryLeft.createDiv({ cls: 'claudian-toolbar-group claudian-toolbar-group-status' });
+  const usageGroup = secondaryLeft.createDiv({ cls: 'claudian-toolbar-group claudian-toolbar-group-usage' });
+  const toolsGroup = secondaryRight.createDiv({ cls: 'claudian-toolbar-group claudian-toolbar-group-tools' });
+  const permissionGroup = secondaryRight.createDiv({ cls: 'claudian-toolbar-group claudian-toolbar-group-permission' });
+
+  const providerSelector = new ProviderSelector(primaryRow, callbacks);
+  const modelSelector = new ModelSelector(primaryRow, callbacks);
+  const thinkingBudgetSelector = new ThinkingBudgetSelector(thinkingGroup, callbacks);
+  const contextUsageMeter = new ContextUsageMeter(usageGroup);
+  const externalContextSelector = new ExternalContextSelector(toolsGroup, callbacks);
+  const mcpServerSelector = new McpServerSelector(toolsGroup);
+  const permissionToggle = new PermissionToggle(permissionGroup, callbacks);
+
+  return { providerSelector, modelSelector, thinkingBudgetSelector, contextUsageMeter, externalContextSelector, mcpServerSelector, permissionToggle };
 }

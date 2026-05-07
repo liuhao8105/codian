@@ -1,5 +1,6 @@
 # Build output
 main.js
+app.js
 styles.css
 *.js.map
 dist/
@@ -91,4 +92,4 @@ dev
 # package-lock.json
 
 .claude/
-.codex/
+.codex/app.js

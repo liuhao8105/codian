@@ -1,31 +1,69 @@
 /* Model selector */
-.claudian-model-selector {
+.claudian-model-selector,
+.claudian-provider-selector {
   position: relative;
+  min-width: 0;
+  flex: 0 0 auto;
 }
 
-.claudian-model-btn {
+.claudian-model-btn,
+.claudian-provider-btn {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: 7px;
   cursor: pointer;
   color: var(--text-muted);
   font-size: 12px;
-  transition: color 0.2s ease;
+  line-height: 1;
+  transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+  min-width: 0;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  background: transparent;
+}
+
+.claudian-provider-btn {
+  user-select: none;
+  max-width: 140px;
+  background: color-mix(in srgb, var(--background-primary-alt) 20%, transparent);
+  border-color: color-mix(in srgb, var(--background-modifier-border) 42%, transparent);
+  color: var(--text-normal);
+}
+
+.claudian-model-btn {
+  max-width: 280px;
+  color: var(--text-normal);
 }
 
 .claudian-model-btn.ready {
   color: var(--claudian-brand);
+  background: color-mix(in srgb, rgba(var(--claudian-brand-rgb), 0.05) 34%, transparent);
+  border-color: rgba(var(--claudian-brand-rgb), 0.08);
 }
 
-.claudian-model-label {
-  font-weight: 500;
+.claudian-model-btn:hover,
+.claudian-provider-btn:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover);
+}
+
+.claudian-model-label,
+.claudian-provider-label {
+  font-weight: 600;
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.005em;
 }
 
 .claudian-model-chevron {
   display: flex;
   align-items: center;
+  opacity: 0.7;
 }
 
 .claudian-model-chevron svg {
@@ -33,18 +71,19 @@
   height: 12px;
 }
 
-.claudian-model-dropdown {
+.claudian-model-dropdown,
+.claudian-provider-dropdown {
   position: absolute;
   bottom: 100%;
   left: 0;
-  margin-bottom: 0;
+  margin-bottom: 6px;
   display: flex;
   flex-direction: column;
   gap: 2px;
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 4px;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
   z-index: 1000;
   width: max-content;
   padding: 4px;
@@ -53,28 +92,44 @@
   transition: opacity 0.15s ease, visibility 0.15s ease;
 }
 
-.claudian-model-selector:hover .claudian-model-dropdown {
+.claudian-model-selector:hover .claudian-model-dropdown,
+.claudian-provider-selector.is-open .claudian-provider-dropdown {
   opacity: 1;
   visibility: visible;
 }
 
-.claudian-model-option {
-  padding: 4px 8px;
+.claudian-model-option,
+.claudian-provider-option {
+  padding: 6px 10px;
   cursor: pointer;
   font-size: 12px;
   color: var(--text-muted);
-  border-radius: 3px;
+  border-radius: 7px;
   transition: background 0.1s ease, color 0.1s ease;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.claudian-model-option:hover {
+.claudian-model-option:hover,
+.claudian-provider-option:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.claudian-model-option.selected {
+.claudian-model-option.selected,
+.claudian-provider-option.selected {
   background: rgba(var(--claudian-brand-rgb), 0.15);
   color: var(--claudian-brand);
   font-weight: 500;
+}
+
+.claudian-provider-chevron {
+  font-size: 10px;
+  color: var(--text-faint);
+  line-height: 1;
+}
+
+.claudian-provider-selector.is-open .claudian-provider-btn {
+  color: var(--text-normal);
 }

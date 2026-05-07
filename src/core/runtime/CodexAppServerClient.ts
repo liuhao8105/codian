@@ -1,10 +1,17 @@
 import { spawn, type ChildProcess } from 'child_process';
+import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import * as readline from 'readline';
 
 import type CodianPlugin from '../../main';
 import { getEnhancedPath, parseEnvironmentVariables } from '../../utils/env';
-import { resolveCodexCliPath } from './codexExec';
+import {
+  buildCodexConfigOverrideArgs,
+  extractReadableCodexErrorMessage,
+  normalizeCodexModelForRuntime,
+  resolveCodexCliPath,
+} from './codexExec';
 
 type JsonRpcId = string;
 
@@ -29,6 +36,16 @@ export interface AppServerNotification {
   params: Record<string, unknown>;
 }
 
+const CODIAN_DIAGNOSTIC_LOG = path.join(os.tmpdir(), 'codian-app-server.log');
+
+function appendDiagnosticLog(message: string): void {
+  try {
+    fs.appendFileSync(CODIAN_DIAGNOSTIC_LOG, `[${new Date().toISOString()}] ${message}\n`, 'utf8');
+  } catch {
+    // Ignore logging failures.
+  }
+}
+
 function buildRuntimeEnv(plugin: CodianPlugin, codexPath: string): NodeJS.ProcessEnv {
   const customEnv = parseEnvironmentVariables(plugin.getActiveEnvironmentVariables());
   return {
@@ -47,6 +64,7 @@ export class CodexAppServerClient {
   private readonly pending = new Map<JsonRpcId, PendingRequest>();
   private readonly readlineInterface: readline.Interface;
   private readonly notificationHandler: (notification: AppServerNotification) => void;
+  private readonly stderrLines: string[] = [];
   private closed = false;
 
   constructor(
@@ -61,8 +79,18 @@ export class CodexAppServerClient {
 
     this.notificationHandler = notificationHandler;
 
-    this.child = spawn(codexPath, ['app-server', '--listen', 'stdio://'], {
-      env: buildRuntimeEnv(plugin, codexPath),
+    const startupModel = normalizeCodexModelForRuntime(plugin.settings.model);
+    const startupArgs = plugin.settings.currentProvider === 'codex'
+      ? buildCodexConfigOverrideArgs(startupModel)
+      : [];
+    const runtimeEnv = buildRuntimeEnv(plugin, codexPath);
+    appendDiagnosticLog(
+      `spawn provider=${plugin.settings.currentProvider} model=${plugin.settings.model} startupModel=${startupModel ?? 'null'} ` +
+      `baseUrl=${runtimeEnv.OPENAI_BASE_URL || 'none'} cli=${codexPath}`
+    );
+
+    this.child = spawn(codexPath, [...startupArgs, 'app-server', '--listen', 'stdio://'], {
+      env: runtimeEnv,
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
       cwd: path.dirname(codexPath),
@@ -78,20 +106,33 @@ export class CodexAppServerClient {
     });
 
     this.child.on('error', (error) => {
-      this.rejectAll(new Error(`启动 Codex App Server 失败：${error.message}`));
+      appendDiagnosticLog(`child-error ${error.message}`);
+      this.rejectAll(this.withStderrContext(`启动 Codex App Server 失败：${error.message}`));
     });
 
     this.child.on('close', (code, signal) => {
+      appendDiagnosticLog(`child-close code=${code ?? 'unknown'} signal=${signal ?? 'none'} stderr=${this.stderrLines.slice(-3).join(' | ')}`);
       if (this.closed) return;
       const reason = code === 0
-        ? new Error('Codex App Server 已关闭。')
-        : new Error(`Codex App Server 异常退出（code=${code ?? 'unknown'}${signal ? `, signal=${signal}` : ''}）。`);
+        ? new Error(this.withStderrContext('Codex App Server 已关闭。').message)
+        : new Error(this.withStderrContext(
+          `Codex App Server 异常退出（code=${code ?? 'unknown'}${signal ? `, signal=${signal}` : ''}）。`
+        ).message);
       this.rejectAll(reason);
     });
 
     if (this.child.stderr) {
-      this.child.stderr.on('data', () => {
-        // Ignore stderr noise from helper processes.
+      this.child.stderr.on('data', (chunk) => {
+        const text = chunk.toString();
+        for (const line of text.split(/\r?\n/)) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          appendDiagnosticLog(`stderr ${trimmed}`);
+          this.stderrLines.push(trimmed);
+          if (this.stderrLines.length > 20) {
+            this.stderrLines.shift();
+          }
+        }
       });
     }
 
@@ -105,6 +146,7 @@ export class CodexAppServerClient {
   }
 
   async initialize(): Promise<void> {
+    appendDiagnosticLog('request initialize');
     await this.request('initialize', {
       clientInfo: {
         name: 'codian',
@@ -122,6 +164,7 @@ export class CodexAppServerClient {
     if (this.closed || !this.child.stdin?.writable) {
       throw new Error('Codex App Server 不可用。');
     }
+    appendDiagnosticLog(`request ${method}`);
 
     const id = createJsonRpcId();
     const payload = JSON.stringify({ id, method, params });
@@ -131,6 +174,7 @@ export class CodexAppServerClient {
       this.child.stdin!.write(`${payload}\n`, (error) => {
         if (error) {
           this.pending.delete(id);
+          appendDiagnosticLog(`request-write-error ${method} ${error.message}`);
           reject(new Error(`发送 App Server 请求失败：${error.message}`));
         }
       });
@@ -171,7 +215,8 @@ export class CodexAppServerClient {
       this.pending.delete(message.id);
 
       if (message.error) {
-        pending.reject(new Error(message.error.message || 'App Server 请求失败。'));
+        appendDiagnosticLog(`response-error ${message.id} ${message.error.message || 'App Server 请求失败。'}`);
+        pending.reject(new Error(extractReadableCodexErrorMessage(message.error.message || 'App Server 请求失败。')));
         return;
       }
 
@@ -194,5 +239,15 @@ export class CodexAppServerClient {
       this.pending.delete(id);
       pending.reject(error);
     }
+  }
+
+  private withStderrContext(baseMessage: string): Error {
+    const lastRelevantLine = [...this.stderrLines]
+      .reverse()
+      .find((line) => /error|failed|unsupported|invalid|unauthorized|forbidden|denied/i.test(line));
+    if (!lastRelevantLine) {
+      return new Error(baseMessage);
+    }
+    return new Error(`${baseMessage} ${lastRelevantLine}`);
   }
 }

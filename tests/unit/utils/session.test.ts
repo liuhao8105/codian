@@ -684,6 +684,36 @@ describe('session utilities', () => {
       expect(result).toBe(historyContext);
     });
 
+    it('rebuilds history using display content instead of internal wrapped prompt', () => {
+      const messages: ChatMessage[] = [
+        {
+          id: 'msg-1',
+          role: 'user',
+          content: '<codian_system_instructions>\ninternal\n</codian_system_instructions>\n\n<user_request>\n你好\n\n<local_memory>\nfoo\n</local_memory>\n</user_request>',
+          displayContent: '你好',
+          timestamp: 1000,
+        },
+      ];
+
+      expect(buildContextFromHistory(messages)).toBe('User: 你好');
+    });
+
+    it('caps rebuilt history length by dropping oldest entries', () => {
+      const longUser = 'u'.repeat(120000);
+      const longAssistant = 'a'.repeat(120000);
+      const messages: ChatMessage[] = [
+        { id: 'msg-1', role: 'user', content: longUser, displayContent: longUser, timestamp: 1000 },
+        { id: 'msg-2', role: 'assistant', content: longAssistant, timestamp: 2000 },
+        { id: 'msg-3', role: 'user', content: 'latest', displayContent: 'latest', timestamp: 3000 },
+      ];
+
+      const result = buildContextFromHistory(messages);
+
+      expect(result).toContain('User: latest');
+      expect(result.length).toBeLessThanOrEqual(200000);
+      expect(result.startsWith(`User: ${longUser}`)).toBe(false);
+    });
+
     it('avoids duplication when XML-wrapped content matches display content', () => {
       const prompt = [
         '<current_note>',

@@ -74,12 +74,14 @@ export class CodianView extends ItemView {
   }
 
   getIcon(): string {
-    return 'bot';
+    return 'codian-mark';
   }
 
-  /** Refreshes the model selector display (used after env var changes). */
-  refreshModelSelector(): void {
+  /** Refreshes provider/model toolbar state after runtime changes. */
+  refreshToolbarState(): void {
     const activeTab = this.tabManager?.getActiveTab();
+    activeTab?.ui.providerSelector?.updateDisplay();
+    activeTab?.ui.providerSelector?.renderOptions();
     activeTab?.ui.modelSelector?.updateDisplay();
     activeTab?.ui.modelSelector?.renderOptions();
   }
@@ -211,7 +213,10 @@ export class CodianView extends ItemView {
     svg.setAttribute('fill', 'none');
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', LOGO_SVG.path);
-    path.setAttribute('fill', LOGO_SVG.fill);
+    path.setAttribute('stroke', LOGO_SVG.fill);
+    path.setAttribute('stroke-width', '1.8');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
     svg.appendChild(path);
     this.logoEl.appendChild(svg);
 

@@ -3,12 +3,16 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-left: 12px;
+  margin-left: 0;
+  flex: 0 0 auto;
+  min-height: 28px;
 }
 
 .claudian-thinking-label-text {
   font-size: 11px;
   color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0.01em;
 }
 
 .claudian-thinking-gears {
@@ -20,14 +24,21 @@
 
 /* Current selection (visible when collapsed) */
 .claudian-thinking-current {
-  padding: 3px 8px;
+  padding: 4px 8px;
   font-size: 11px;
-  color: var(--claudian-brand);
-  font-weight: 500;
+  color: var(--text-normal);
+  font-weight: 600;
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: 7px;
   white-space: nowrap;
   background: transparent;
+  border: 1px solid transparent;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.claudian-thinking-current:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover);
 }
 
 /* Options container - expands vertically upward */
@@ -41,8 +52,9 @@
   gap: 2px;
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 4px;
+  border-radius: 10px;
   padding: 4px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.15s ease, visibility 0.15s ease;
@@ -55,11 +67,11 @@
 }
 
 .claudian-thinking-gear {
-  padding: 3px 8px;
+  padding: 6px 10px;
   font-size: 11px;
   color: var(--text-muted);
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: 7px;
   transition: background 0.1s ease, color 0.1s ease;
   white-space: nowrap;
 }

@@ -8,7 +8,11 @@ import type { SdkBeta } from '@anthropic-ai/claude-agent-sdk';
 export type ClaudeModel = string;
 
 export const DEFAULT_CODEX_MODELS: { value: ClaudeModel; label: string; description: string }[] = [
-  { value: 'gpt-5', label: 'GPT-5', description: 'Default Codex model' },
+  { value: 'gpt-5.5', label: 'GPT-5.5', description: '当前环境下更稳的默认 Codex 模型' },
+  { value: 'gpt-5.4', label: 'GPT-5.4', description: '兼容性较好的 GPT-5.4 模型' },
+  { value: 'gpt-5.4-mini', label: 'GPT-5.4-Mini', description: '更轻量的 GPT-5.4-Mini 模型' },
+  { value: 'gpt-5.3-codex', label: 'GPT-5.3-Codex', description: '偏编码场景的 Codex 模型' },
+  { value: 'gpt-5.2', label: 'GPT-5.2', description: '较旧但兼容的 GPT-5.2 模型' },
 ];
 
 export const DEFAULT_CLAUDE_MODELS = DEFAULT_CODEX_MODELS;
@@ -54,7 +58,11 @@ export const THINKING_BUDGETS: { value: ThinkingBudget; label: string; tokens: n
 
 /** Default thinking budget per model tier. */
 export const DEFAULT_THINKING_BUDGET: Record<string, ThinkingBudget> = {
-  'gpt-5': 'off',
+  'gpt-5.5': 'off',
+  'gpt-5.4': 'off',
+  'gpt-5.4-mini': 'off',
+  'gpt-5.3-codex': 'off',
+  'gpt-5.2': 'off',
 };
 
 export const CONTEXT_WINDOW_STANDARD = 200_000;

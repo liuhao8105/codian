@@ -51,6 +51,7 @@ export {
   getCurrentPlatformBlockedCommands,
   getCurrentPlatformKey,
   getDefaultBlockedCommands,
+  type DeepSeekProviderConfig,
   type HostnameCliPaths,
   type InstructionRefineResult,
   type KeyboardNavigationSettings,
@@ -60,6 +61,9 @@ export {
   parseCCPermissionRule,
   type PermissionMode,
   type PermissionRule,
+  type ProviderConfigBase,
+  type ProviderConfigs,
+  type ProviderId,
   type PlatformBlockedCommands,
   type PlatformCliPaths,  // Kept for migration
   type SlashCommand,

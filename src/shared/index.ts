@@ -13,7 +13,7 @@ export {
   type SlashCommandDropdownCallbacks,
   type SlashCommandDropdownOptions,
 } from './components/SlashCommandDropdown';
-export { CHECK_ICON_SVG, MCP_ICON_SVG } from './icons';
+export { CHECK_ICON_SVG, CODIAN_ICON_SVG, MCP_ICON_SVG } from './icons';
 export {
   type McpMentionProvider,
   type MentionDropdownCallbacks,

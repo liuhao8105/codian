@@ -117,6 +117,25 @@ export function getCliPlatformKey(): CliPlatformKey {
  */
 export type HostnameCliPaths = Record<string, string>;
 
+export type ProviderId = 'codex' | 'deepseek';
+
+export interface ProviderConfigBase {
+  enabled: boolean;
+}
+
+export interface CodexProviderConfig extends ProviderConfigBase {}
+
+export interface DeepSeekProviderConfig extends ProviderConfigBase {
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+}
+
+export interface ProviderConfigs {
+  codex: CodexProviderConfig;
+  deepseek: DeepSeekProviderConfig;
+}
+
 /** Permission mode for tool execution. */
 export type PermissionMode = 'yolo' | 'plan' | 'normal';
 
@@ -243,6 +262,8 @@ export interface CodianSettings {
   permissionMode: PermissionMode;
 
   // Model & thinking (Claudian uses enum, CC uses full model ID string)
+  currentProvider: ProviderId;
+  providerConfigs: ProviderConfigs;
   model: ClaudeModel;
   thinkingBudget: ThinkingBudget;
   enableAutoTitleGeneration: boolean;
@@ -317,10 +338,22 @@ export const DEFAULT_SETTINGS: CodianSettings = {
   permissionMode: 'yolo',
 
   // Model & thinking
-  model: 'gpt-5',
+  currentProvider: 'codex',
+  providerConfigs: {
+    codex: {
+      enabled: true,
+    },
+    deepseek: {
+      enabled: false,
+      apiKey: '',
+      baseUrl: 'https://api.deepseek.com/v1',
+      model: 'deepseek-chat',
+    },
+  },
+  model: 'gpt-5.5',
   thinkingBudget: 'off',
   enableAutoTitleGeneration: true,
-  titleGenerationModel: '',  // Empty = auto (OPENAI_MODEL / CODEX_MODEL / gpt-5)
+  titleGenerationModel: '',  // Empty = auto (OPENAI_MODEL / CODEX_MODEL / gpt-5.5)
   show1MModel: false,  // Hidden legacy setting
   allowExternalAccess: false,  // Keep vault restriction enabled by default
   enableChrome: false,  // Disabled by default
@@ -358,7 +391,7 @@ export const DEFAULT_SETTINGS: CodianSettings = {
   claudeCliPathsByHost: {},  // Per-device paths keyed by hostname
   loadUserClaudeSettings: true,  // Default on for compatibility
 
-  lastClaudeModel: 'gpt-5',
+  lastClaudeModel: 'gpt-5.5',
   lastCustomModel: '',
   lastEnvHash: '',
 

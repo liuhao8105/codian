@@ -297,7 +297,7 @@ export class EnvSnippetManager {
 
     this.onContextLimitsChange?.();
     const view = this.plugin.app.workspace.getLeavesOfType('codian-view')[0]?.view as CodianView | undefined;
-    view?.refreshModelSelector();
+    view?.refreshToolbarState();
   }
 
   private editSnippet(snippet: EnvSnippet) {

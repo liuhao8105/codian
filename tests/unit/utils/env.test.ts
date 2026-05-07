@@ -5,7 +5,10 @@ import * as path from 'path';
 import * as env from '../../../src/utils/env';
 
 const {
+  buildProviderEnvironment,
+  buildProviderEnvironmentText,
   cliPathRequiresNode,
+  DEEPSEEK_MODEL_OPTIONS,
   findNodeDirectory,
   findNodeExecutable,
   formatContextLimit,
@@ -14,7 +17,9 @@ const {
   getEnhancedPath,
   getMissingNodeError,
   getModelsFromEnvironment,
+  getProviderModels,
   getHostnameKey,
+  isProviderConfigured,
   parseContextLimit,
   parseEnvironmentVariables,
 } = env;
@@ -61,6 +66,124 @@ describe('parseEnvironmentVariables', () => {
   it('handles mixed export and non-export lines', () => {
     const input = 'FOO=bar\nexport BAZ=qux\nQUX=123';
     expect(parseEnvironmentVariables(input)).toEqual({ FOO: 'bar', BAZ: 'qux', QUX: '123' });
+  });
+});
+
+describe('provider environment helpers', () => {
+  it('builds deepseek runtime env with advanced overrides', () => {
+    const result = buildProviderEnvironment({
+      currentProvider: 'deepseek',
+      providerConfigs: {
+        codex: { enabled: true },
+        deepseek: {
+          enabled: true,
+          apiKey: 'sk-test',
+          baseUrl: 'https://deepseek-gateway.example.com/v1',
+          model: 'deepseek-chat',
+        },
+      },
+      environmentVariables: 'OPENAI_MODEL=deepseek-reasoner\nEXTRA_FLAG=1',
+    });
+
+    expect(result).toEqual({
+      OPENAI_API_KEY: 'sk-test',
+      OPENAI_BASE_URL: 'https://deepseek-gateway.example.com/v1',
+      OPENAI_MODEL: 'deepseek-reasoner',
+      EXTRA_FLAG: '1',
+    });
+  });
+
+  it('returns advanced env only for codex provider', () => {
+    const result = buildProviderEnvironment({
+      currentProvider: 'codex',
+      providerConfigs: {
+        codex: { enabled: true },
+        deepseek: {
+          enabled: false,
+          apiKey: '',
+          baseUrl: 'https://deepseek-gateway.example.com/v1',
+          model: 'deepseek-chat',
+        },
+      },
+      environmentVariables: 'CODEX_MODEL=gpt-5\nFOO=bar',
+    });
+
+    expect(result).toEqual({
+      CODEX_MODEL: 'gpt-5',
+      FOO: 'bar',
+    });
+  });
+
+  it('serializes provider env as KEY=VALUE text', () => {
+    const result = buildProviderEnvironmentText({
+      currentProvider: 'deepseek',
+      providerConfigs: {
+        codex: { enabled: true },
+        deepseek: {
+          enabled: true,
+          apiKey: 'sk-test',
+          baseUrl: 'https://deepseek-gateway.example.com/v1',
+          model: 'deepseek-chat',
+        },
+      },
+      environmentVariables: '',
+    });
+
+    expect(result).toContain('OPENAI_API_KEY=sk-test');
+    expect(result).toContain('OPENAI_BASE_URL=https://deepseek-gateway.example.com/v1');
+    expect(result).toContain('OPENAI_MODEL=deepseek-chat');
+  });
+
+  it('validates deepseek config before provider switch', () => {
+    const invalid = isProviderConfigured({
+      providerConfigs: {
+        codex: { enabled: true },
+        deepseek: {
+          enabled: true,
+          apiKey: '',
+          baseUrl: 'https://deepseek-gateway.example.com/v1',
+          model: 'deepseek-chat',
+        },
+      },
+    }, 'deepseek');
+
+    expect(invalid.ok).toBe(false);
+  });
+
+  it('rejects the official DeepSeek endpoint because Codex App Server requires Responses API', () => {
+    const invalid = isProviderConfigured({
+      providerConfigs: {
+        codex: { enabled: true },
+        deepseek: {
+          enabled: true,
+          apiKey: 'sk-test',
+          baseUrl: 'https://api.deepseek.com/v1',
+          model: 'deepseek-v4-flash',
+        },
+      },
+    }, 'deepseek');
+
+    expect(invalid.ok).toBe(false);
+    if (!invalid.ok) {
+      expect(invalid.error).toContain('不能直连 DeepSeek 官方 API');
+      expect(invalid.error).toContain('/v1/responses');
+    }
+  });
+
+  it('returns only configured deepseek model when OPENAI_MODEL is set', () => {
+    const models = getProviderModels('deepseek', parseEnvironmentVariables('OPENAI_MODEL=deepseek-v4-flash'));
+    expect(models).toEqual([
+      {
+        value: 'deepseek-v4-flash',
+        label: 'deepseek-v4-flash',
+        description: '当前配置的 DeepSeek 模型',
+      },
+    ]);
+  });
+
+  it('returns built-in deepseek model options when OPENAI_MODEL is missing', () => {
+    const models = getProviderModels('deepseek', {});
+    expect(models).toEqual(DEEPSEEK_MODEL_OPTIONS);
   });
 });
 

@@ -36,6 +36,7 @@ import {
 import { AGENTS_PATH, AgentVaultStorage } from './AgentVaultStorage';
 import { CC_SETTINGS_PATH, CCSettingsStorage, isLegacyPermissionsFormat } from './CCSettingsStorage';
 import {
+  CODIAN_SETTINGS_PATH,
   CodianSettingsStorage,
   normalizeBlockedCommands,
   type StoredCodianSettings,
@@ -156,6 +157,9 @@ export class StorageService {
 
     const cc = await this.ccSettings.load();
     const claudian = await this.codianSettings.load();
+    if (!(await this.adapter.exists(CODIAN_SETTINGS_PATH))) {
+      await this.codianSettings.save(claudian);
+    }
 
     return { cc, claudian };
   }
@@ -268,6 +272,8 @@ export class StorageService {
       userName: oldSettings.userName ?? DEFAULT_SETTINGS.userName,
       enableBlocklist: oldSettings.enableBlocklist ?? DEFAULT_SETTINGS.enableBlocklist,
       blockedCommands: normalizeBlockedCommands(oldSettings.blockedCommands),
+      currentProvider: DEFAULT_SETTINGS.currentProvider,
+      providerConfigs: DEFAULT_SETTINGS.providerConfigs,
       model: (oldSettings.model as ClaudeModel) ?? DEFAULT_SETTINGS.model,
       thinkingBudget: (oldSettings.thinkingBudget as StoredCodianSettings['thinkingBudget']) ?? DEFAULT_SETTINGS.thinkingBudget,
       permissionMode: (oldSettings.permissionMode as StoredCodianSettings['permissionMode']) ?? DEFAULT_SETTINGS.permissionMode,

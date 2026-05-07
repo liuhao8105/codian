@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import type { App } from 'obsidian';
 import { Notice, PluginSettingTab, Setting } from 'obsidian';
 
+import type { ProviderId } from '../../core/types';
 import { getCurrentPlatformKey, getHostnameKey } from '../../core/types';
 import { DEFAULT_CODEX_MODELS } from '../../core/types/models';
 import { getAvailableLocales, getLocaleDisplayName, setLocale, t } from '../../i18n';
@@ -274,7 +275,7 @@ export class CodianSettingTab extends PluginSettingTab {
           dropdown.addOption('', t('settings.titleModel.auto'));
 
           // Get available models from environment or defaults
-          const envVars = parseEnvironmentVariables(this.plugin.settings.environmentVariables);
+          const envVars = parseEnvironmentVariables(this.plugin.getActiveEnvironmentVariables());
           const customModels = getModelsFromEnvironment(envVars);
           const models = customModels.length > 0 ? customModels : DEFAULT_CODEX_MODELS;
 
@@ -506,11 +507,103 @@ export class CodianSettingTab extends PluginSettingTab {
         text.inputEl.addEventListener('blur', () => this.restartServiceForPromptChange());
       });
 
+    const saveDeepSeekConfig = async (): Promise<void> => {
+      await this.plugin.saveSettings();
+      if (this.plugin.settings.currentProvider === 'deepseek') {
+        await this.plugin.refreshRuntimeEnvironmentFromSettings();
+        this.renderContextLimitsSection();
+      }
+    };
+
+    new Setting(containerEl).setName('Provider 与模型').setHeading();
+
+    new Setting(containerEl)
+      .setName('当前 Provider')
+      .setDesc('选择当前聊天默认使用的模型服务。第一版支持 Codex 和 DeepSeek。')
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption('codex', 'Codex')
+          .addOption('deepseek', 'DeepSeek')
+          .setValue(this.plugin.settings.currentProvider)
+          .onChange(async (value: ProviderId) => {
+            try {
+              await this.plugin.setCurrentProvider(value);
+              dropdown.setValue(this.plugin.settings.currentProvider);
+              this.renderContextLimitsSection();
+            } catch (error) {
+              new Notice(error instanceof Error ? error.message : 'Provider 切换失败。');
+              dropdown.setValue(this.plugin.settings.currentProvider);
+            }
+          });
+      });
+
+    new Setting(containerEl)
+      .setName('启用 DeepSeek')
+      .setDesc('启用后，聊天工具栏里可以切换到 DeepSeek。')
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.providerConfigs.deepseek.enabled)
+          .onChange(async (value) => {
+            this.plugin.settings.providerConfigs.deepseek.enabled = value;
+            await this.plugin.saveSettings();
+            this.plugin.getView()?.refreshToolbarState();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName('DeepSeek API Key')
+      .setDesc('用于访问 DeepSeek 的密钥。仅保存在当前仓库设置中。')
+      .addText((text) => {
+        text
+          .setPlaceholder('sk-...')
+          .setValue(this.plugin.settings.providerConfigs.deepseek.apiKey)
+          .onChange(async (value) => {
+            this.plugin.settings.providerConfigs.deepseek.apiKey = value.trim();
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.type = 'password';
+        text.inputEl.addEventListener('blur', () => {
+          void saveDeepSeekConfig();
+        });
+      });
+
+    new Setting(containerEl)
+      .setName('DeepSeek Base URL')
+      .setDesc('不要直接填 `https://api.deepseek.com/v1`。当前 Codex App Server 需要支持 `/v1/responses` 的 OpenAI 兼容网关。')
+      .addText((text) => {
+        text
+          .setPlaceholder('https://your-gateway.example.com/v1')
+          .setValue(this.plugin.settings.providerConfigs.deepseek.baseUrl)
+          .onChange(async (value) => {
+            this.plugin.settings.providerConfigs.deepseek.baseUrl = value.trim();
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.addEventListener('blur', () => {
+          void saveDeepSeekConfig();
+        });
+      });
+
+    new Setting(containerEl)
+      .setName('DeepSeek 默认模型')
+      .setDesc('填写你的兼容网关实际支持的模型名，例如 `deepseek-v4-flash`。')
+      .addText((text) => {
+        text
+          .setPlaceholder('deepseek-v4-flash')
+          .setValue(this.plugin.settings.providerConfigs.deepseek.model)
+          .onChange(async (value) => {
+            this.plugin.settings.providerConfigs.deepseek.model = value.trim();
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.addEventListener('blur', () => {
+          void saveDeepSeekConfig();
+        });
+      });
+
     new Setting(containerEl).setName(t('settings.environment')).setHeading();
 
     new Setting(containerEl)
       .setName(t('settings.customVariables.name'))
-      .setDesc(t('settings.customVariables.desc'))
+      .setDesc('高级覆盖区：用于兼容特殊场景或手动覆盖 Provider 生成的环境变量。')
       .addTextArea((text) => {
         text
           .setPlaceholder('OPENAI_API_KEY=your-key\nOPENAI_BASE_URL=https://api.example.com/v1\nCODEX_MODEL=gpt-5')
@@ -779,7 +872,7 @@ export class CodianSettingTab extends PluginSettingTab {
 
     container.empty();
 
-    const envVars = parseEnvironmentVariables(this.plugin.settings.environmentVariables);
+    const envVars = parseEnvironmentVariables(this.plugin.getActiveEnvironmentVariables());
     const uniqueModelIds = getCustomModelIds(envVars);
 
     if (uniqueModelIds.size === 0) {

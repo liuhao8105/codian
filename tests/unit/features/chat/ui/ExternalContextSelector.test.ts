@@ -17,11 +17,13 @@ jest.mock('fs');
 // Mock callbacks
 function createMockCallbacks() {
   return {
+    onProviderChange: jest.fn(),
     onModelChange: jest.fn(),
     onThinkingBudgetChange: jest.fn(),
     onPermissionModeChange: jest.fn(),
     getSettings: jest.fn().mockReturnValue({
-      model: 'haiku',
+      provider: 'codex',
+      model: 'gpt-5',
       thinkingBudget: 'off',
       permissionMode: 'yolo',
     }),
