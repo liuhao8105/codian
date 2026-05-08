@@ -188,6 +188,7 @@ export class CodexAppServerClient {
 
   kill(): void {
     if (this.closed) return;
+    appendDiagnosticLog(`client-kill stack=${new Error().stack?.replace(/\n/g, ' ← ') ?? 'none'}`);
     this.closed = true;
     this.rejectAll(new Error('Cancelled'));
     this.readlineInterface.close();

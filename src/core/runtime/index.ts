@@ -23,6 +23,7 @@ import {
 } from '../../features/chat/services/TitleGenerationService';
 import type { InstructionRefineResult } from '../types/settings';
 import { CodexAgentRuntime } from './CodexAgentRuntime';
+import { DeepSeekRuntime } from './DeepSeekRuntime';
 
 export interface AgentRuntime {
   onReadyStateChange(listener: (ready: boolean) => void): () => void;
@@ -96,6 +97,9 @@ export type {
 };
 
 export function createAgentRuntime(plugin: CodianPlugin, mcpManager: McpServerManager): AgentRuntime {
+  if (plugin.settings.currentProvider === 'deepseek') {
+    return new DeepSeekRuntime(plugin);
+  }
   return new CodexAgentRuntime(plugin, mcpManager);
 }
 

@@ -37,6 +37,8 @@ import { CodianSettingTab } from './features/settings/CodianSettings';
 import { setLocale } from './i18n';
 // CODIAN_ICON_SVG kept in shared/icons.ts for reference
 import { normalizeCodexModelForRuntime } from './core/runtime/codexExec';
+import { createAgentRuntime } from './core/runtime';
+import { setupServiceCallbacks } from './features/chat/tabs/Tab';
 import { ClaudeCliResolver } from './utils/claudeCli';
 import { buildCursorContext } from './utils/editor';
 import {
@@ -403,7 +405,8 @@ export default class CodianPlugin extends Plugin {
       },
     };
     const providerValidation = isProviderConfigured(this.settings, this.settings.currentProvider);
-    const didFallbackProvider = !providerValidation.ok && this.settings.currentProvider === 'deepseek';
+    const didFallbackProvider = this.settings.currentProvider === 'deepseek' &&
+      (!providerValidation.ok || !this.settings.providerConfigs.deepseek.enabled);
     if (didFallbackProvider) {
       this.settings.currentProvider = 'codex';
       this.settings.model = this.getPreferredModelForProvider('codex');
@@ -596,12 +599,7 @@ export default class CodianPlugin extends Plugin {
 
   getEnabledProviders(): ProviderId[] {
     const providers: ProviderId[] = ['codex'];
-    const deepseek = this.settings.providerConfigs.deepseek;
-    const hasUsableDeepSeekConfig =
-      !!deepseek.apiKey.trim() &&
-      !!deepseek.baseUrl.trim() &&
-      !!deepseek.model.trim();
-    if (deepseek.enabled || hasUsableDeepSeekConfig) {
+    if (this.settings.providerConfigs.deepseek.enabled) {
       providers.push('deepseek');
     }
     return providers;
@@ -619,6 +617,9 @@ export default class CodianPlugin extends Plugin {
 
     this.settings.currentProvider = provider;
     this.settings.model = this.getPreferredModelForProvider(provider);
+    if (provider === 'deepseek') {
+      this.settings.providerConfigs.deepseek.enabled = true;
+    }
     await this.applyRuntimeEnvironmentUpdate(
       `已切换到 ${provider === 'deepseek' ? 'DeepSeek' : 'Codex'}。`,
       `已切换到 ${provider === 'deepseek' ? 'DeepSeek' : 'Codex'}，后续消息会重建会话。`
@@ -666,9 +667,7 @@ export default class CodianPlugin extends Plugin {
     }
 
     for (const tab of tabManager.getAllTabs()) {
-      if (tab.state.isStreaming) {
-        tab.controllers.inputController?.cancelStreaming();
-      }
+      tab.controllers.inputController?.cancelStreaming();
     }
 
     let failedTabs = 0;
@@ -679,8 +678,19 @@ export default class CodianPlugin extends Plugin {
         }
         try {
           const externalContextPaths = tab.ui.externalContextSelector?.getExternalContexts() ?? [];
-          tab.service.resetSession();
-          await tab.service.ensureReady({ externalContextPaths });
+          // Rebuild runtime to match current provider (provider switch may
+          // require a different AgentRuntime implementation).
+          tab.service.cleanup();
+          const newService = createAgentRuntime(this, this.mcpManager);
+          newService.resetSession();
+          await newService.ensureReady({ externalContextPaths });
+          tab.service = newService;
+          setupServiceCallbacks(tab, this);
+          // Reset streaming state so the next query starts clean. A stale
+          // generation or stuck isStreaming flag can cause the first query
+          // after a provider switch to hang.
+          tab.state.resetStreamingState();
+          tab.state.bumpStreamGeneration();
         } catch {
           failedTabs++;
         }

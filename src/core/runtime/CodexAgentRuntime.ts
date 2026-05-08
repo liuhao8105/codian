@@ -445,6 +445,7 @@ ${prompt}
     };
 
     const handleNotification = (notification: AppServerNotification) => {
+      void appendRuntimeDiagnosticLog(`notification ${notification.method}`);
       switch (notification.method) {
         case 'item/started': {
           const item = asRecord(notification.params.item);
@@ -636,6 +637,7 @@ ${prompt}
 
         case 'error': {
           const rawMessage = asString(notification.params.message) || 'Codex App Server 执行失败。';
+          void appendRuntimeDiagnosticLog(`notification-error raw=${rawMessage} fullParams=${JSON.stringify(notification.params)}`);
           const message = extractReadableErrorMessage(rawMessage);
           queue.push({ type: 'error', content: message });
           queue.finish();
@@ -643,12 +645,19 @@ ${prompt}
         }
 
         case 'turn/completed': {
+          void appendRuntimeDiagnosticLog('notification-turn-completed');
           queue.push({ type: 'done' });
           queue.finish();
           break;
         }
 
+        case 'warning': {
+          void appendRuntimeDiagnosticLog(`notification-warning params=${JSON.stringify(notification.params)}`);
+          break;
+        }
+
         default:
+          void appendRuntimeDiagnosticLog(`notification-unhandled method=${notification.method} params=${JSON.stringify(notification.params)}`);
           break;
       }
     };
@@ -761,6 +770,7 @@ ${prompt}
         yield chunk;
       }
     } finally {
+      void appendRuntimeDiagnosticLog(`query-finally activeTurnId=${this.activeTurnId ?? 'null'} activeClient=${this.activeClient ? 'present' : 'null'} activeAbortController=${this.activeAbortController ? 'present' : 'null'}`);
       this.activeTurnId = null;
       this.activeClient?.kill();
       this.activeClient = null;
@@ -772,6 +782,7 @@ ${prompt}
     if (!this.activeAbortController) {
       return;
     }
+    void appendRuntimeDiagnosticLog(`cancel called activeTurnId=${this.activeTurnId ?? 'null'} stack=${new Error().stack?.replace(/\n/g, ' ← ') ?? 'none'}`);
     this.activeAbortController.abort();
     this.activeClient?.kill();
     this.activeClient = null;

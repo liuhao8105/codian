@@ -517,36 +517,50 @@ export class CodianSettingTab extends PluginSettingTab {
 
     new Setting(containerEl).setName('Provider 与模型').setHeading();
 
+    let rebuildProviderDropdown: (() => void) | null = null;
+
     new Setting(containerEl)
       .setName('当前 Provider')
       .setDesc('选择当前聊天默认使用的模型服务。第一版支持 Codex 和 DeepSeek。')
       .addDropdown((dropdown) => {
-        dropdown
-          .addOption('codex', 'Codex')
-          .addOption('deepseek', 'DeepSeek')
-          .setValue(this.plugin.settings.currentProvider)
-          .onChange(async (value: ProviderId) => {
-            try {
-              await this.plugin.setCurrentProvider(value);
-              dropdown.setValue(this.plugin.settings.currentProvider);
-              this.renderContextLimitsSection();
-            } catch (error) {
-              new Notice(error instanceof Error ? error.message : 'Provider 切换失败。');
-              dropdown.setValue(this.plugin.settings.currentProvider);
-            }
-          });
+        rebuildProviderDropdown = () => {
+          while (dropdown.selectEl.options.length > 0) {
+            dropdown.selectEl.remove(0);
+          }
+          dropdown.addOption('codex', 'Codex');
+          if (this.plugin.settings.providerConfigs.deepseek.enabled) {
+            dropdown.addOption('deepseek', 'DeepSeek');
+          }
+          dropdown.setValue(this.plugin.settings.currentProvider);
+        };
+        rebuildProviderDropdown();
+
+        dropdown.onChange(async (value: ProviderId) => {
+          try {
+            await this.plugin.setCurrentProvider(value);
+            dropdown.setValue(this.plugin.settings.currentProvider);
+            this.renderContextLimitsSection();
+          } catch (error) {
+            new Notice(error instanceof Error ? error.message : 'Provider 切换失败。');
+            dropdown.setValue(this.plugin.settings.currentProvider);
+          }
+        });
       });
 
     new Setting(containerEl)
       .setName('启用 DeepSeek')
-      .setDesc('启用后，聊天工具栏里可以切换到 DeepSeek。')
+      .setDesc('启用后，聊天工具栏里可以切换到 DeepSeek。启用是使用 DeepSeek 的前提条件。')
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.providerConfigs.deepseek.enabled)
           .onChange(async (value) => {
             this.plugin.settings.providerConfigs.deepseek.enabled = value;
+            if (!value && this.plugin.settings.currentProvider === 'deepseek') {
+              await this.plugin.setCurrentProvider('codex');
+            }
             await this.plugin.saveSettings();
             this.plugin.getView()?.refreshToolbarState();
+            rebuildProviderDropdown?.();
           })
       );
 
