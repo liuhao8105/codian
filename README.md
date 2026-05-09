@@ -21,7 +21,7 @@ and the original license notice is preserved in this repository.
 
 - Plugin identity, installation metadata, and key user-facing wording now target `Codex`.
 - Main chat, inline edit, title generation, and instruction refinement now run through a `Codex CLI` adapter.
-- **v1.3.74**: DeepSeek provider with SSE streaming, tool loop (Skill/Read/Grep/Write/Edit/Undo), user approval, transaction log, and vault sandbox.
+- **v1.3.75**: DeepSeek provider with SSE streaming, tool loop (Skill/Read/Grep/Write/Edit/Undo), read-only MCP bridge, user approval, transaction log, vault sandbox, and DSML protocol filtering.
 - Some legacy settings and docs from the upstream project are still being cleaned up.
 
 ## Providers
@@ -30,32 +30,39 @@ Codian supports two AI providers with independent runtime implementations:
 
 | Provider | Runtime | Capabilities |
 |----------|---------|--------------|
-| **Codex** | `CodexAgentRuntime` | Full Agent: all tools, skills, MCP, subagents, rewind, fork, plan mode, Bash, Write |
-| **DeepSeek** | `DeepSeekRuntime` | Chat + Tool Loop: streaming text, Skill/Read/Grep/Write/Edit/Undo, user approval, transaction log |
+| **Codex** | `CodexAgentRuntime` | Full Agent: all tools, skills, MCP (via Codex CLI), subagents, rewind, fork, plan mode, Bash, Write |
+| **DeepSeek** | `DeepSeekRuntime` | Chat + Tool Loop: streaming, Skill/Read/Grep/Write/Edit/Undo, read-only MCP bridge, user approval, transaction log |
 
 ### DeepSeek Provider
 
-**Current capabilities (v1.3.74):**
+**Current capabilities (v1.3.75):**
 
-- SSE streaming chat (natural paragraph-by-paragraph output)
+- SSE streaming chat (natural paragraph-by-paragraph output, DSML protocol filtering)
 - Multi-turn tool loop with duplicate/no-progress detection and auto-summarization
 - **Read-only tools**: Skill (load skill instructions), Read (read vault files), Grep (search vault files)
 - **File modification tools** (with mandatory user confirmation): Write (create/overwrite files), Edit (targeted string replacement), Undo (revert last Write/Edit)
+- **Read-only MCP bridge**: automatically discovers and calls read-only MCP tools from configured servers (e.g., Eagle search, database queries)
 - **TransactionLog**: per-session action journal for undo support
 - **Vault sandbox**: path validation blocks `.git/`, `node_modules/`, `.obsidian/plugins/`, hidden directories
 - Reasoning content preservation (DeepSeek thinking models)
 - Esc interruption
+
+**MCP support:**
+
+| Provider | MCP Source | Scope |
+|----------|-----------|-------|
+| **Codex** | Codex CLI (built-in) | Full MCP: all tools, including write/delete/execute |
+| **DeepSeek** | Codian MCP bridge | Read-only MCP: query/search/list/get tools only |
 
 **Current limitations:**
 
 - No image attachment support
 - No Bash execution
 - No Delete tool (trash-based undo only)
-- **No MCP bridge** — DeepSeek does not use MCP servers configured in Settings. MCP capabilities are exclusive to the Codex provider (via Codex CLI)
+- **MCP write/delete/update not supported** — DeepSeek MCP bridge only allows read-only tools
 - No subagent (Agent/Task) support
 - No rewind/fork support
 - No session resume across restarts
-- **Important**: Installing MCP servers in Settings does not automatically enable them for DeepSeek. This requires a future MCP bridge implementation.
 
 **Configuration:**
 
