@@ -59,6 +59,204 @@ function buildDuplicateKey(name: string, args: Record<string, unknown>): string 
   }
 }
 
+// ── SSE streaming types ──
+
+interface SSEDelta {
+  content?: string | null;
+  reasoning_content?: string | null;
+  tool_calls?: Array<{
+    index: number;
+    id?: string;
+    type?: 'function';
+    function?: {
+      name?: string;
+      arguments?: string;
+    };
+  }>;
+}
+
+interface SSEChoice {
+  index: number;
+  delta: SSEDelta;
+  finish_reason: string | null;
+}
+
+interface AccumulatedToolCall {
+  id: string;
+  type: 'function';
+  function: { name: string; arguments: string };
+}
+
+interface StreamResult {
+  accumulatedText: string;
+  accumulatedReasoning: string;
+  toolCalls: AccumulatedToolCall[];
+  finishReason: string;
+}
+
+/**
+ * Parse an SSE stream from a fetch Response body.
+ * Yields parsed SSEChoice objects for each non-empty data line.
+ * Resolves when the [DONE] marker is received or the stream ends.
+ */
+async function* parseSSEStream(
+  response: Response,
+  signal: AbortSignal,
+): AsyncGenerator<SSEChoice> {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('Response body is not readable.');
+  }
+
+  // Cancel reader on abort
+  const onAbort = () => reader.cancel();
+  signal.addEventListener('abort', onAbort, { once: true });
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      // Keep the last potentially incomplete line in the buffer
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data:')) continue;
+
+        const dataStr = trimmed.slice(5).trim();
+        if (dataStr === '[DONE]') return;
+
+        try {
+          const parsed = JSON.parse(dataStr) as Record<string, unknown>;
+          const choices = parsed.choices as Array<Record<string, unknown>> | undefined;
+          if (!choices || choices.length === 0) continue;
+
+          for (const choice of choices) {
+            const delta = (choice.delta || {}) as SSEDelta;
+            yield {
+              index: (choice.index as number) ?? 0,
+              delta,
+              finish_reason: (choice.finish_reason as string) || null,
+            };
+          }
+        } catch {
+          // Skip unparseable lines
+        }
+      }
+    }
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+    reader.releaseLock();
+  }
+}
+
+/**
+ * Consume an SSE stream and accumulate deltas into a StreamResult.
+ * Yields text chunks with buffering/throttling for natural reading speed.
+ */
+async function* consumeSSEToResult(
+  response: Response,
+  signal: AbortSignal,
+): AsyncGenerator<StreamChunk, StreamResult> {
+  let accumulatedText = '';
+  let accumulatedReasoning = '';
+  const toolCallsByIndex = new Map<number, AccumulatedToolCall>();
+  let finishReason = '';
+
+  // Text buffer for chunk aggregation — tuned for natural paragraph-by-paragraph output
+  const FLUSH_SIZE = 80;        // flush when buffer reaches this many chars
+  const FLUSH_INTERVAL = 150;   // ms — maximum time before forced flush
+  const SENTENCE_END = /[。！？\n]/;   // sentence/paragraph break — flush immediately
+  const CLAUSE_END = /[，；：,;:]/;    // clause break — flush if buffer is substantial (>40 chars)
+  let textBuffer = '';
+  let lastFlushTime = performance.now();
+
+  try {
+    for await (const choice of parseSSEStream(response, signal)) {
+      const { delta } = choice;
+
+      // Accumulate reasoning_content (not buffered — not displayed, just preserved)
+      if (delta.reasoning_content) {
+        accumulatedReasoning += delta.reasoning_content;
+      }
+
+      // Accumulate tool_calls by index
+      if (delta.tool_calls) {
+        // Flush any buffered text before processing tools
+        if (textBuffer) {
+          accumulatedText += textBuffer;
+          yield { type: 'text', content: textBuffer };
+          textBuffer = '';
+        }
+
+        for (const tc of delta.tool_calls) {
+          const existing = toolCallsByIndex.get(tc.index);
+          if (existing) {
+            if (tc.function?.name) existing.function.name += tc.function.name;
+            if (tc.function?.arguments) existing.function.arguments += tc.function.arguments;
+          } else {
+            toolCallsByIndex.set(tc.index, {
+              id: tc.id || '',
+              type: tc.type || 'function',
+              function: {
+                name: tc.function?.name || '',
+                arguments: tc.function?.arguments || '',
+              },
+            });
+          }
+        }
+        continue;
+      }
+
+      // Buffer text content
+      if (delta.content) {
+        textBuffer += delta.content;
+
+        const now = performance.now();
+        const timeSinceLastFlush = now - lastFlushTime;
+        const hasSentenceEnd = SENTENCE_END.test(textBuffer);
+        const hasClauseEnd = CLAUSE_END.test(textBuffer) && textBuffer.length >= 40;
+        const reachedSize = textBuffer.length >= FLUSH_SIZE;
+        const reachedInterval = timeSinceLastFlush >= FLUSH_INTERVAL;
+
+        if (hasSentenceEnd || hasClauseEnd || reachedSize || reachedInterval) {
+          accumulatedText += textBuffer;
+          yield { type: 'text', content: textBuffer };
+          textBuffer = '';
+          lastFlushTime = now;
+        }
+      }
+
+      // Track finish_reason
+      if (choice.finish_reason) {
+        finishReason = choice.finish_reason;
+      }
+    }
+  } finally {
+    // Final flush — must not lose any remaining buffered text
+    if (textBuffer) {
+      accumulatedText += textBuffer;
+      yield { type: 'text', content: textBuffer };
+      textBuffer = '';
+    }
+  }
+
+  return {
+    accumulatedText: accumulatedText.trim(),
+    accumulatedReasoning,
+    toolCalls: Array.from(toolCallsByIndex.values()),
+    finishReason,
+  };
+}
+
+// ── Runtime ──
+
 export class DeepSeekRuntime implements AgentRuntime {
   private readonly plugin: CodianPlugin;
   private activeAbortController: AbortController | null = null;
@@ -108,12 +306,61 @@ export class DeepSeekRuntime implements AgentRuntime {
       userName: this.plugin.settings.userName,
     });
 
-    // Append DeepSeek-specific tool guidance (keeps the Skill section
-    // from the shared prompt, adds concrete tool definitions)
     return base.trim() + '\n\n' + DEEPSEEK_TOOLS_SYSTEM_PROMPT_SECTION;
   }
 
-  // ── Query with tool loop ──
+  // ── Streaming API call (one round of the tool loop) ──
+
+  /**
+   * Makes one streaming API call and consumes the SSE stream.
+   * Returns the accumulated result (text, reasoning, tool_calls, finish_reason).
+   * Yields text chunks incrementally during streaming.
+   */
+  private async *streamAPICall(
+    baseUrl: string,
+    config: { apiKey: string; model: string },
+    messages: DeepSeekMessage[],
+    includeTools: boolean,
+  ): AsyncGenerator<StreamChunk, StreamResult> {
+    const body: Record<string, unknown> = {
+      model: config.model,
+      messages,
+      stream: true,
+    };
+    if (includeTools) {
+      body.tools = DEEPSEEK_P1_TOOLS;
+      body.tool_choice = 'auto';
+    }
+
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: this.activeAbortController!.signal,
+    });
+
+    if (!response.ok) {
+      let errorBody = '';
+      try { errorBody = await response.text(); } catch { /* ignore */ }
+      let errorMsg = `DeepSeek API 返回 HTTP ${response.status}`;
+      try {
+        const parsed = JSON.parse(errorBody) as Record<string, unknown>;
+        const err = (parsed.error as Record<string, unknown> | undefined);
+        if (err?.message) errorMsg += `: ${String(err.message)}`;
+      } catch {
+        if (errorBody) errorMsg += `: ${errorBody.slice(0, 200)}`;
+      }
+      throw new Error(errorMsg);
+    }
+
+    const result = yield* consumeSSEToResult(response, this.activeAbortController!.signal);
+    return result;
+  }
+
+  // ── Query with streaming tool loop ──
 
   async *query(
     prompt: string,
@@ -128,14 +375,12 @@ export class DeepSeekRuntime implements AgentRuntime {
       return;
     }
 
-    // Images not supported yet
     if (images && images.length > 0) {
       yield { type: 'error', content: 'DeepSeek provider 暂不支持图片附件。' };
       return;
     }
 
     const baseUrl = config.baseUrl.replace(/\/+$/, '');
-    const tools = DEEPSEEK_P1_TOOLS;
     const systemPrompt = this.buildSystemPromptContent();
 
     const messages: DeepSeekMessage[] = [];
@@ -149,9 +394,6 @@ export class DeepSeekRuntime implements AgentRuntime {
         if (msg.role === 'user') {
           messages.push({ role: 'user', content: msg.content });
         } else if (msg.role === 'assistant') {
-          // Replay assistant messages from history.
-          // Tool calls from previous turns are not replayed — DeepSeek sees
-          // them as plain assistant text (the rendered content).
           messages.push({ role: 'assistant', content: msg.content || '(tool output)' });
         }
       }
@@ -167,9 +409,9 @@ export class DeepSeekRuntime implements AgentRuntime {
 
     try {
       let round = 0;
-      let accumulatedText = '';
+      let totalAccumulatedText = '';
 
-      // Duplicate / no-progress tracking to prevent runaway exploration
+      // Duplicate / no-progress tracking
       const readFiles = new Set<string>();
       const grepPatterns = new Set<string>();
       let duplicateCount = 0;
@@ -179,147 +421,90 @@ export class DeepSeekRuntime implements AgentRuntime {
       while (round < MAX_TOOL_ROUNDS) {
         round++;
 
-        // Check for cancellation before each API call
+        // Check for cancellation
         if (this.activeAbortController.signal.aborted) {
-          if (accumulatedText) {
-            // Text was already yielded — just stop
-            break;
-          }
+          if (totalAccumulatedText) break;
           yield { type: 'error', content: 'DeepSeek 请求已取消。' };
           return;
         }
 
-        let response: Response;
+        // Streaming API call
+        let result: StreamResult;
         try {
-          response = await fetch(`${baseUrl}/chat/completions`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${config.apiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: config.model,
-              messages,
-              tools: tools.length > 0 ? tools : undefined,
-              tool_choice: tools.length > 0 ? 'auto' : undefined,
-              stream: false,
-            }),
-            signal: this.activeAbortController.signal,
-          });
+          const gen = this.streamAPICall(baseUrl, config, messages, true);
+          result = yield* gen;
         } catch (error) {
           if (error instanceof DOMException && error.name === 'AbortError') {
-            if (accumulatedText) break;
+            if (totalAccumulatedText) break;
             yield { type: 'error', content: 'DeepSeek 请求已取消。' };
             return;
           }
           const message = error instanceof Error ? error.message : String(error);
-          yield { type: 'error', content: `DeepSeek API 连接失败: ${message}` };
+          yield { type: 'error', content: message };
           return;
         }
 
-        if (!response.ok) {
-          let errorBody = '';
-          try { errorBody = await response.text(); } catch { /* ignore */ }
-          let errorMsg = `DeepSeek API 返回 HTTP ${response.status}`;
-          try {
-            const parsed = JSON.parse(errorBody) as Record<string, unknown>;
-            const err = (parsed.error as Record<string, unknown> | undefined);
-            if (err?.message) {
-              errorMsg += `: ${String(err.message)}`;
-            }
-          } catch {
-            if (errorBody) {
-              errorMsg += `: ${errorBody.slice(0, 200)}`;
-            }
-          }
-          yield { type: 'error', content: errorMsg };
-          return;
-        }
+        totalAccumulatedText += result.accumulatedText;
 
-        const data = await response.json() as Record<string, unknown>;
-        const choices = data.choices as Array<Record<string, unknown>> | undefined;
-        const choice = choices?.[0];
-        const message = choice?.message as Record<string, unknown> | undefined;
-
-        if (!message) {
-          yield { type: 'error', content: 'DeepSeek 返回空响应。' };
-          return;
-        }
-
-        const finishReason = String(choice?.finish_reason ?? 'unknown');
-        const textContent = typeof message.content === 'string' ? message.content?.trim() : '';
-        const reasoningContent = typeof message.reasoning_content === 'string' ? message.reasoning_content : null;
-        const rawToolCalls = message.tool_calls as Array<Record<string, unknown>> | undefined;
-
-        const hasToolCalls = Array.isArray(rawToolCalls) && rawToolCalls.length > 0;
-
-        // Yield text if present
-        if (textContent) {
-          accumulatedText += textContent;
-          yield { type: 'text', content: textContent };
-        }
+        const hasToolCalls = result.toolCalls.length > 0;
 
         // If no tool calls, we're done
         if (!hasToolCalls) {
-          if (!accumulatedText && finishReason === 'length') {
+          if (!totalAccumulatedText && result.finishReason === 'length') {
             yield { type: 'error', content: 'DeepSeek 回复被截断（达到最大 token 限制）。' };
             return;
           }
-          if (!accumulatedText) {
-            yield { type: 'error', content: `DeepSeek 返回空回复 (finish_reason: ${finishReason})。` };
+          if (!totalAccumulatedText) {
+            yield { type: 'error', content: `DeepSeek 返回空回复 (finish_reason: ${result.finishReason || 'unknown'})。` };
             return;
           }
           break;
         }
 
-        // Process tool calls
-        // Add assistant message (with tool_calls) to history.
-        // Must preserve reasoning_content for DeepSeek thinking models —
-        // they require it to be passed back in subsequent turns.
+        // Process tool calls — add assistant message to history
+        const formattedToolCalls = result.toolCalls.map((tc) => ({
+          id: tc.id,
+          type: 'function' as const,
+          function: {
+            name: tc.function.name,
+            arguments: tc.function.arguments,
+          },
+        }));
+
         const assistantMsg: DeepSeekMessage = {
           role: 'assistant',
-          content: textContent || null,
-          ...(reasoningContent ? { reasoning_content: reasoningContent } : {}),
-          tool_calls: rawToolCalls.map((tc) => ({
-            id: String(tc.id || ''),
-            type: 'function' as const,
-            function: {
-              name: String((tc.function as Record<string, unknown>)?.name || ''),
-              arguments: String((tc.function as Record<string, unknown>)?.arguments || '{}'),
-            },
-          })),
+          content: result.accumulatedText || null,
+          ...(result.accumulatedReasoning ? { reasoning_content: result.accumulatedReasoning } : {}),
+          tool_calls: formattedToolCalls,
         };
         messages.push(assistantMsg);
 
         // Execute each tool call
         let roundHadNewInfo = false;
-        for (const rawTc of rawToolCalls) {
-          const tcId = String(rawTc.id || generateToolCallId());
-          const tcFunc = rawTc.function as Record<string, unknown> | undefined;
-          const tcName = String(tcFunc?.name || '');
+        for (const tc of result.toolCalls) {
           let tcArgs: Record<string, unknown> = {};
           try {
-            tcArgs = JSON.parse(String(tcFunc?.arguments || '{}')) as Record<string, unknown>;
+            tcArgs = JSON.parse(tc.function.arguments || '{}') as Record<string, unknown>;
           } catch {
             tcArgs = {};
           }
 
           // Duplicate detection
-          const dupKey = buildDuplicateKey(tcName, tcArgs);
+          const dupKey = buildDuplicateKey(tc.function.name, tcArgs);
           if (dupKey) {
             if (readFiles.has(dupKey) || grepPatterns.has(dupKey)) {
               duplicateCount++;
             } else {
-              if (tcName === 'Read') readFiles.add(dupKey);
-              if (tcName === 'Grep') grepPatterns.add(dupKey);
+              if (tc.function.name === 'Read') readFiles.add(dupKey);
+              if (tc.function.name === 'Grep') grepPatterns.add(dupKey);
             }
           }
 
-          // Yield tool_use chunk (same format as Codex)
+          // Yield tool_use chunk
           yield {
             type: 'tool_use',
-            id: tcId,
-            name: tcName,
+            id: tc.id,
+            name: tc.function.name,
             input: tcArgs,
           };
 
@@ -327,31 +512,31 @@ export class DeepSeekRuntime implements AgentRuntime {
           let resultContent: string;
           try {
             resultContent = await executeDeepSeekToolCall(
-              { id: tcId, name: tcName, arguments: tcArgs },
+              { id: tc.id, name: tc.function.name, arguments: tcArgs },
               { plugin: this.plugin },
             );
           } catch (error) {
             resultContent = `Tool execution error: ${error instanceof Error ? error.message : String(error)}`;
           }
 
-          // No-progress detection: compare with previous round's results
-          const resultSummary = `${tcName}:${resultContent.slice(0, 200)}`;
+          // No-progress detection
+          const resultSummary = `${tc.function.name}:${resultContent.slice(0, 200)}`;
           if (resultSummary !== lastToolResultSummary) {
             roundHadNewInfo = true;
           }
           lastToolResultSummary = resultSummary;
 
-          // Yield tool_result chunk (same format as Codex)
+          // Yield tool_result chunk
           yield {
             type: 'tool_result',
-            id: tcId,
+            id: tc.id,
             content: resultContent,
           };
 
           // Add tool result to message history
           messages.push({
             role: 'tool',
-            tool_call_id: tcId,
+            tool_call_id: tc.id,
             content: resultContent,
           });
         }
@@ -363,7 +548,7 @@ export class DeepSeekRuntime implements AgentRuntime {
           consecutiveNoProgress++;
         }
 
-        // Check stop conditions and inject force-answer instruction
+        // Check stop conditions
         const shouldForceStop =
           duplicateCount >= MAX_DUPLICATE_TOOLS ||
           consecutiveNoProgress >= MAX_NO_PROGRESS_ROUNDS ||
@@ -383,40 +568,18 @@ export class DeepSeekRuntime implements AgentRuntime {
               'based on all the information you have gathered so far. ' +
               'Do NOT call any more tools. Provide a complete answer directly.]',
           });
-          // One final API call without tools to force a direct answer
-          try {
-            const finalResponse = await fetch(`${baseUrl}/chat/completions`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${config.apiKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                model: config.model,
-                messages,
-                stream: false,
-              }),
-              signal: this.activeAbortController.signal,
-            });
 
-            if (finalResponse.ok) {
-              const finalData = await finalResponse.json() as Record<string, unknown>;
-              const finalChoice = (finalData.choices as Array<Record<string, unknown>>)?.[0];
-              const finalMessage = finalChoice?.message as Record<string, unknown> | undefined;
-              const finalContent = typeof finalMessage?.content === 'string' ? finalMessage.content?.trim() : '';
-              if (finalContent) {
-                accumulatedText += finalContent;
-                yield { type: 'text', content: finalContent };
-              }
-            }
+          // One final streaming call without tools
+          try {
+            const finalGen = this.streamAPICall(baseUrl, config, messages, false);
+            const finalResult = yield* finalGen;
+            // (text was already streamed incrementally by yield*)
+            totalAccumulatedText += finalResult.accumulatedText;
           } catch {
-            // If the forced-stop fetch fails (e.g. abort), just end the loop.
-            // The model may have already yielded text in a previous round.
+            // If forced-stop call fails, text from previous rounds was already streamed
           }
           break;
         }
-
-        // Continue loop — LLM will see tool results and may call more tools or respond
       }
 
       if (round >= MAX_TOOL_ROUNDS) {
