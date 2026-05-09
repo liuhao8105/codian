@@ -8,7 +8,7 @@
 
 ![Preview](Preview.png)
 
-An Obsidian plugin for using `Codex` inside your vault with a `Codian` Obsidian experience.
+An Obsidian plugin for using `Codex` and `DeepSeek` inside your vault with a `Codian` Obsidian experience.
 
 ## Attribution
 
@@ -21,7 +21,46 @@ and the original license notice is preserved in this repository.
 
 - Plugin identity, installation metadata, and key user-facing wording now target `Codex`.
 - Main chat, inline edit, title generation, and instruction refinement now run through a `Codex CLI` adapter.
+- **New in v1.3.73**: DeepSeek provider with SSE streaming, tool loop (Skill/Read/Grep), and reasoning_content support.
 - Some legacy settings and docs from the upstream project are still being cleaned up.
+
+## Providers
+
+Codian supports two AI providers with independent runtime implementations:
+
+| Provider | Runtime | Capabilities |
+|----------|---------|--------------|
+| **Codex** | `CodexAgentRuntime` | Full Agent: all tools, skills, MCP, subagents, rewind, fork, plan mode, Bash, Write |
+| **DeepSeek** | `DeepSeekRuntime` | Chat + Tool Loop: streaming text, Skill/Read/Grep tools, reasoning_content |
+
+### DeepSeek Provider
+
+**Current capabilities:**
+
+- SSE streaming chat (natural paragraph-by-paragraph output)
+- Multi-turn tool loop (Skill / Read / Grep)
+- Reasoning content preservation (DeepSeek thinking models)
+- Esc interruption
+- Duplicate tool detection and auto-summarization
+
+**Current limitations:**
+
+- No image attachment support
+- No Bash / Write / Delete tools
+- No high-risk MCP actions
+- No subagent (Agent/Task) support
+- No rewind or fork support
+- No session resume across restarts
+
+**Configuration:**
+
+1. Open Codian settings → Provider tab
+2. Select "DeepSeek" as the current provider
+3. Enter your DeepSeek API key
+4. Set Base URL (default: `https://api.deepseek.com/v1`)
+5. Choose model (`deepseek-chat` or `deepseek-reasoner`)
+
+> Read the full architecture documentation: [docs/runtime-architecture.md](docs/runtime-architecture.md)
 
 ## Features
 
@@ -42,9 +81,9 @@ and the original license notice is preserved in this repository.
 
 ## Requirements
 
-- `Codex CLI` installed and available on your machine
+- **Codex provider**: `Codex CLI` installed and available on your machine
+- **DeepSeek provider**: A DeepSeek API key (no local CLI required)
 - Obsidian v1.8.9+
-- A working Codex environment on your machine
 - Desktop only (macOS, Linux, Windows)
 
 ## Installation
@@ -239,11 +278,11 @@ src/
 │   ├── mcp/                     # MCP server config, service, and testing
 │   ├── plugins/                 # Upstream plugin compatibility and management
 │   ├── prompts/                 # System prompts for agents
-│   ├── runtime/                 # Codex App Server + exec runtime
+│   ├── runtime/                 # Codex Agent Runtime + DeepSeek Runtime
 │   ├── sdk/                     # Legacy session/message compatibility utilities
 │   ├── security/                # Approval, blocklist, path validation
 │   ├── storage/                 # Distributed storage system
-│   ├── tools/                   # Tool constants and utilities
+│   ├── tools/                   # Tool constants, schemas, and executor
 │   └── types/                   # Type definitions
 ├── features/                    # Feature modules
 │   ├── chat/                    # Main chat view + UI, rendering, controllers, tabs
@@ -258,6 +297,8 @@ src/
 ├── utils/                       # Modular utility functions
 └── style/                       # Modular CSS (→ styles.css)
 ```
+
+> Full runtime architecture: [docs/runtime-architecture.md](docs/runtime-architecture.md)
 
 ## Roadmap
 

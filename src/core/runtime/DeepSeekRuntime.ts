@@ -16,7 +16,8 @@ import {
   DEEPSEEK_TOOLS_SYSTEM_PROMPT_SECTION,
   type DeepSeekToolDefinition,
 } from '../tools/toolSchemas';
-import { executeDeepSeekToolCall } from '../tools/toolExecutor';
+import { executeDeepSeekToolCall, type ToolExecutionContext } from '../tools/toolExecutor';
+import { TransactionLog } from '../tools/transactionLog';
 import type { McpServerManager } from '../mcp';
 
 /** Maximum tool-calling rounds per user message (final safety net). */
@@ -261,6 +262,8 @@ export class DeepSeekRuntime implements AgentRuntime {
   private readonly plugin: CodianPlugin;
   private activeAbortController: AbortController | null = null;
   private readonly readyStateListeners = new Set<(ready: boolean) => void>();
+  private approvalCallback: ApprovalCallback | null = null;
+  private transactionLog = new TransactionLog();
 
   constructor(plugin: CodianPlugin, _mcpManager?: McpServerManager) {
     this.plugin = plugin;
@@ -511,9 +514,18 @@ export class DeepSeekRuntime implements AgentRuntime {
           // Execute the tool
           let resultContent: string;
           try {
+            const execContext: ToolExecutionContext = {
+              plugin: this.plugin,
+              requestApproval: async (toolName, description, input) => {
+                if (!this.approvalCallback) return false;
+                const decision = await this.approvalCallback(toolName, input, description);
+                return decision === 'allow' || decision === 'allow-always';
+              },
+              transactionLog: this.transactionLog,
+            };
             resultContent = await executeDeepSeekToolCall(
               { id: tc.id, name: tc.function.name, arguments: tcArgs },
-              { plugin: this.plugin },
+              execContext,
             );
           } catch (error) {
             resultContent = `Tool execution error: ${error instanceof Error ? error.message : String(error)}`;
@@ -605,7 +617,9 @@ export class DeepSeekRuntime implements AgentRuntime {
     this.activeAbortController = null;
   }
 
-  resetSession(): void {}
+  resetSession(): void {
+    this.transactionLog = new TransactionLog();
+  }
   getSessionId(): string | null { return null; }
   consumeSessionInvalidation(): boolean { return false; }
 
@@ -625,7 +639,9 @@ export class DeepSeekRuntime implements AgentRuntime {
     return { canRewind: false, error: 'DeepSeek provider 不支持 rewind。' };
   }
 
-  setApprovalCallback(_callback: ApprovalCallback | null): void {}
+  setApprovalCallback(callback: ApprovalCallback | null): void {
+    this.approvalCallback = callback;
+  }
   setApprovalDismisser(_dismisser: (() => void) | null): void {}
   setAskUserQuestionCallback(_callback: ((input: Record<string, unknown>, signal?: AbortSignal) => Promise<Record<string, string> | null>) | null): void {}
   setExitPlanModeCallback(_callback: ((input: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown> | null) | null): void {}

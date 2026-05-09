@@ -1,6 +1,7 @@
 /**
  * OpenAI-compatible tool definitions for DeepSeekRuntime.
- * P1: Skill, Read, Grep only — all read-only, low risk.
+ * P1: Skill, Read, Grep (read-only)
+ * P2: Write, Edit, Undo (with user confirmation)
  */
 
 export interface DeepSeekToolDefinition {
@@ -76,13 +77,74 @@ export const DEEPSEEK_P1_TOOLS: DeepSeekToolDefinition[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'Write',
+      description:
+        'Create a new file or completely overwrite an existing file in the vault. Path must be relative to the vault root. REQUIRES USER CONFIRMATION before the file is modified. You will see a diff preview before the change is applied.',
+      parameters: {
+        type: 'object',
+        properties: {
+          file_path: {
+            type: 'string',
+            description: 'Path relative to the vault root (e.g., "notes/new-note.md").',
+          },
+          content: {
+            type: 'string',
+            description: 'The full Markdown content to write to the file.',
+          },
+        },
+        required: ['file_path', 'content'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'Edit',
+      description:
+        'Make a targeted string replacement in an existing vault file. The old_string must match exactly (including whitespace). REQUIRES USER CONFIRMATION before the edit is applied. You will see a before/after preview.',
+      parameters: {
+        type: 'object',
+        properties: {
+          file_path: {
+            type: 'string',
+            description: 'Path relative to the vault root.',
+          },
+          old_string: {
+            type: 'string',
+            description: 'The exact text to find and replace. Must match character-for-character.',
+          },
+          new_string: {
+            type: 'string',
+            description: 'The replacement text.',
+          },
+        },
+        required: ['file_path', 'old_string', 'new_string'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'Undo',
+      description:
+        'Undo the most recent Write or Edit operation. Only operations recorded in the current session can be undone. REQUIRES USER CONFIRMATION. Shows what will be restored before applying.',
+      parameters: {
+        type: 'object',
+        properties: {},
+        required: [],
+      },
+    },
+  },
 ];
 
 /** Tools description injected into the system prompt for DeepSeek. */
 export const DEEPSEEK_TOOLS_SYSTEM_PROMPT_SECTION = `
 ## Available Tools (DeepSeek)
 
-You have access to the following tools. Use them when needed to gather information before answering.
+You have access to the following tools. Use them when needed.
 
 ### Tool Usage Rules
 1. Use tools to gather information — do not guess or fabricate.
@@ -91,12 +153,20 @@ You have access to the following tools. Use them when needed to gather informati
 4. You may call multiple tools in a single turn if independent.
 5. Maximum 10 tool calls per user message.
 
-### Skill Tool
-Invoke skills to load specialized instructions. When a skill is loaded, follow its instructions carefully. Skills are read-only — they provide guidance, not execution capabilities.
+### Read-Only Tools
+- **Skill**: Load skill instructions into context (read-only).
+- **Read**: Read files from the vault (read-only).
+- **Grep**: Search for patterns in vault files (read-only).
 
-### Read Tool
-Read files from the vault. Use relative paths from the vault root.
+### File Modification Tools (REQUIRE USER CONFIRMATION)
+- **Write**: Create or overwrite a vault file. The user will be asked to confirm before any changes are made. A diff preview is shown.
+- **Edit**: Replace text in a vault file. The user will be asked to confirm. A before/after preview is shown.
+- **Undo**: Revert the most recent Write or Edit in this session. The user must confirm.
 
-### Grep Tool
-Search for patterns in vault files. Returns matching lines with file paths.
+### Safety Rules
+1. NEVER write outside the vault directory.
+2. NEVER write to .git/, node_modules/, .obsidian/plugins/, .obsidian/themes/, or hidden directories.
+3. Always Read a file before Editing it to ensure old_string matches.
+4. If old_string is not found, report the error — do not guess.
+5. For new files, use Write. For targeted changes, use Edit.
 `;
