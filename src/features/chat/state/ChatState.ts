@@ -37,6 +37,7 @@ function createInitialState(): ChatStateData {
     currentTodos: null,
     needsAttention: false,
     autoScrollEnabled: true, // Default; controllers will override based on settings
+    lastProgrammaticScrollTime: 0,
     responseStartTime: null,
     flavorTimerInterval: null,
     pendingNewSessionPlan: null,
@@ -308,6 +309,15 @@ export class ChatState {
     if (changed) {
       this._callbacks.onAutoScrollChanged?.(value);
     }
+  }
+
+  /** Timestamp of last programmatic scrollToBottom call. Used by scroll handler to avoid race conditions. */
+  get lastProgrammaticScrollTime(): number {
+    return this.state.lastProgrammaticScrollTime;
+  }
+
+  set lastProgrammaticScrollTime(value: number) {
+    this.state.lastProgrammaticScrollTime = value;
   }
 
   // ============================================

@@ -98,7 +98,7 @@ export type {
 
 export function createAgentRuntime(plugin: CodianPlugin, mcpManager: McpServerManager): AgentRuntime {
   if (plugin.settings.currentProvider === 'deepseek') {
-    return new DeepSeekRuntime(plugin);
+    return new DeepSeekRuntime(plugin, mcpManager);
   }
   return new CodexAgentRuntime(plugin, mcpManager);
 }

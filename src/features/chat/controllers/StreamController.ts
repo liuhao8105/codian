@@ -1155,6 +1155,9 @@ export class StreamController {
 
     const messagesEl = this.deps.getMessagesEl();
     messagesEl.scrollTop = messagesEl.scrollHeight;
+    // Mark programmatic scroll so the scroll handler won't incorrectly
+    // disable autoScrollEnabled on the scroll event this triggers.
+    state.lastProgrammaticScrollTime = performance.now();
   }
 
   resetStreamingState(): void {

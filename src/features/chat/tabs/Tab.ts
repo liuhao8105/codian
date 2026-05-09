@@ -1027,6 +1027,13 @@ export function wireTabInputEvents(tab: TabData, plugin: CodianPlugin): void {
     const isAtBottom = scrollHeight - scrollTop - clientHeight <= SCROLL_THRESHOLD;
 
     if (!isAtBottom) {
+      // Ignore scroll events triggered by programmatic scrollToBottom calls.
+      // Without this guard, DOM mutations (e.g. hideThinkingIndicator removing
+      // an element) can fire scroll events between the programmatic scroll and
+      // the next paint, causing autoScrollEnabled to be incorrectly set to false.
+      if (performance.now() - state.lastProgrammaticScrollTime < 100) {
+        return;
+      }
       // Immediately disable when user scrolls up
       if (reEnableTimeout) {
         clearTimeout(reEnableTimeout);

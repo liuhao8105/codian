@@ -990,16 +990,31 @@ export class InputController {
   }
 
   private syncScrollToBottomAfterRenderUpdates(): void {
-    const { plugin, state } = this.deps;
+    const { plugin } = this.deps;
     if (!(plugin.settings.enableAutoScroll ?? true)) return;
-    if (!state.autoScrollEnabled) return;
 
+    // Double rAF ensures layout is fully recomputed after DOM mutations
+    // (hideThinkingIndicator removes element, finalizeCurrentTextBlock adds copy button)
+    // before we read scrollHeight. Single rAF can fire before layout in Electron.
     requestAnimationFrame(() => {
-      if (!(this.deps.plugin.settings.enableAutoScroll ?? true)) return;
-      if (!this.deps.state.autoScrollEnabled) return;
+      requestAnimationFrame(() => {
+        if (!(this.deps.plugin.settings.enableAutoScroll ?? true)) return;
 
-      const messagesEl = this.deps.getMessagesEl();
-      messagesEl.scrollTop = messagesEl.scrollHeight;
+        const messagesEl = this.deps.getMessagesEl();
+        const { scrollTop, scrollHeight, clientHeight } = messagesEl;
+        const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+
+        // Use a generous threshold (one viewport height) instead of strict
+        // autoScrollEnabled check. This handles the race condition where
+        // hideThinkingIndicator() triggers a scroll event that incorrectly
+        // sets autoScrollEnabled = false before this runs.
+        // If user has scrolled far up (>1 viewport), respect their position.
+        if (distanceFromBottom <= Math.max(clientHeight, 200)) {
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+          // Mark programmatic scroll so subsequent scroll events won't re-disable
+          this.deps.state.lastProgrammaticScrollTime = performance.now();
+        }
+      });
     });
   }
 

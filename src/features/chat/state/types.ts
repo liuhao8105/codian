@@ -95,6 +95,9 @@ export interface ChatStateData {
   // Auto-scroll control during streaming
   autoScrollEnabled: boolean;
 
+  // Timestamp of last programmatic scrollToBottom (used to prevent false disable)
+  lastProgrammaticScrollTime: number;
+
   // Response timer state
   responseStartTime: number | null;
   flavorTimerInterval: ReturnType<typeof setInterval> | null;
