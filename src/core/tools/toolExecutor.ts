@@ -10,14 +10,18 @@ import * as path from 'path';
 import type { TFile } from 'obsidian';
 
 import type CodianPlugin from '../../main';
+import type { McpServerManager } from '../mcp';
 import { getVaultPath, isPathWithinVault } from '../../utils/path';
 import type { TransactionLog } from './transactionLog';
+import { callMcpTool } from './mcpBridge';
 
 export interface ToolExecutionContext {
   plugin: CodianPlugin;
   /** Returns true if the user approved the action. */
   requestApproval: (toolName: string, description: string, input: Record<string, unknown>) => Promise<boolean>;
   transactionLog: TransactionLog;
+  mcpManager?: McpServerManager;
+  abortSignal?: AbortSignal;
 }
 
 /**
@@ -41,7 +45,11 @@ export async function executeDeepSeekToolCall(
     case 'Undo':
       return executeUndo(toolCall.arguments, context);
     default:
-      return `Error: Unknown tool '${toolCall.name}'. Available tools: Skill, Read, Grep, Write, Edit, Undo.`;
+      // MCP bridge: mcp__<serverName>__<toolName>
+      if (toolCall.name.startsWith('mcp__')) {
+        return executeMcpCall(toolCall, context);
+      }
+      return `Error: Unknown tool '${toolCall.name}'. Available tools: Skill, Read, Grep, Write, Edit, Undo, and MCP tools.`;
   }
 }
 
@@ -386,4 +394,20 @@ async function executeUndo(
   } catch (error) {
     return `Undo 失败: ${error instanceof Error ? error.message : String(error)}`;
   }
+}
+
+// ── MCP bridge (read-only) ──
+
+async function executeMcpCall(
+  toolCall: { id: string; name: string; arguments: Record<string, unknown> },
+  context: ToolExecutionContext,
+): Promise<string> {
+  if (!context.mcpManager) {
+    return 'Error: MCP manager not available. MCP tools require an active MCP configuration.';
+  }
+  if (!context.abortSignal) {
+    return 'Error: No abort signal available for MCP call.';
+  }
+
+  return callMcpTool(toolCall.name, toolCall.arguments, context.mcpManager, context.abortSignal);
 }

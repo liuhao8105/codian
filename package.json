@@ -1,6 +1,6 @@
 {
   "name": "codian",
-  "version": "1.3.74-deepseek-write-edit",
+  "version": "1.3.75-deepseek-mcp",
   "description": "Codian - Codex embedded in the Obsidian sidebar",
   "main": "main.js",
   "scripts": {

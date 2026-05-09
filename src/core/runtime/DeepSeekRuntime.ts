@@ -18,6 +18,7 @@ import {
 } from '../tools/toolSchemas';
 import { executeDeepSeekToolCall, type ToolExecutionContext } from '../tools/toolExecutor';
 import { TransactionLog } from '../tools/transactionLog';
+import { enumerateMcpToolsForDeepSeek } from '../tools/mcpBridge';
 import type { McpServerManager } from '../mcp';
 
 /** Maximum tool-calling rounds per user message (final safety net). */
@@ -157,6 +158,33 @@ async function* parseSSEStream(
   }
 }
 
+// ── DSML protocol stripping ──
+// DeepSeek models may emit internal DSML tokens in the content stream.
+// These must be stripped before rendering to the UI.
+
+/** Regex matching complete DSML tokens: <|TOKEN|...> */
+const DSML_COMPLETE = /<\|[^|>]+\|[^>]*>/g;
+
+/** Regex for partial DSML token at the end of a buffer (starts with <| but not closed) */
+const DSML_PARTIAL_END = /<\|[^>]*$/;
+
+/**
+ * Strip DSML protocol tokens from text content.
+ * Uses a carry-over buffer to handle tokens that span delta boundaries.
+ */
+function stripDSML(input: string, carryOver: string): { clean: string; carryOver: string } {
+  const combined = carryOver + input;
+  // Remove complete DSML tokens
+  const clean = combined.replace(DSML_COMPLETE, '');
+  // Check if there's a partial DSML token at the end
+  const partialMatch = clean.match(DSML_PARTIAL_END);
+  if (partialMatch && partialMatch.index !== undefined) {
+    const carry = clean.slice(partialMatch.index);
+    return { clean: clean.slice(0, partialMatch.index), carryOver: carry };
+  }
+  return { clean, carryOver: '' };
+}
+
 /**
  * Consume an SSE stream and accumulate deltas into a StreamResult.
  * Yields text chunks with buffering/throttling for natural reading speed.
@@ -177,6 +205,7 @@ async function* consumeSSEToResult(
   const CLAUSE_END = /[，；：,;:]/;    // clause break — flush if buffer is substantial (>40 chars)
   let textBuffer = '';
   let lastFlushTime = performance.now();
+  let dsmlCarryOver = '';       // handles DSML tokens that span delta boundaries
 
   try {
     for await (const choice of parseSSEStream(response, signal)) {
@@ -195,6 +224,7 @@ async function* consumeSSEToResult(
           yield { type: 'text', content: textBuffer };
           textBuffer = '';
         }
+        dsmlCarryOver = '';
 
         for (const tc of delta.tool_calls) {
           const existing = toolCallsByIndex.get(tc.index);
@@ -215,9 +245,11 @@ async function* consumeSSEToResult(
         continue;
       }
 
-      // Buffer text content
+      // Buffer text content (with DSML stripping)
       if (delta.content) {
-        textBuffer += delta.content;
+        const { clean, carryOver: newCarry } = stripDSML(delta.content, dsmlCarryOver);
+        dsmlCarryOver = newCarry;
+        textBuffer += clean;
 
         const now = performance.now();
         const timeSinceLastFlush = now - lastFlushTime;
@@ -260,13 +292,17 @@ async function* consumeSSEToResult(
 
 export class DeepSeekRuntime implements AgentRuntime {
   private readonly plugin: CodianPlugin;
+  private readonly mcpManager: McpServerManager | undefined;
   private activeAbortController: AbortController | null = null;
   private readonly readyStateListeners = new Set<(ready: boolean) => void>();
   private approvalCallback: ApprovalCallback | null = null;
   private transactionLog = new TransactionLog();
+  /** Cached MCP tools from last discovery. */
+  private cachedMcpTools: DeepSeekToolDefinition[] | null = null;
 
-  constructor(plugin: CodianPlugin, _mcpManager?: McpServerManager) {
+  constructor(plugin: CodianPlugin, mcpManager?: McpServerManager) {
     this.plugin = plugin;
+    this.mcpManager = mcpManager;
   }
 
   // ── AgentRuntime interface ──
@@ -286,7 +322,9 @@ export class DeepSeekRuntime implements AgentRuntime {
 
   setPendingResumeAt(_uuid: string | undefined): void {}
   applyForkState(): string | null { return null; }
-  async reloadMcpServers(): Promise<void> {}
+  async reloadMcpServers(): Promise<void> {
+    this.cachedMcpTools = null;
+  }
 
   async ensureReady(): Promise<boolean> {
     const ready = this.isReady();
@@ -323,15 +361,15 @@ export class DeepSeekRuntime implements AgentRuntime {
     baseUrl: string,
     config: { apiKey: string; model: string },
     messages: DeepSeekMessage[],
-    includeTools: boolean,
+    tools?: DeepSeekToolDefinition[],
   ): AsyncGenerator<StreamChunk, StreamResult> {
     const body: Record<string, unknown> = {
       model: config.model,
       messages,
       stream: true,
     };
-    if (includeTools) {
-      body.tools = DEEPSEEK_P1_TOOLS;
+    if (tools && tools.length > 0) {
+      body.tools = tools;
       body.tool_choice = 'auto';
     }
 
@@ -386,6 +424,28 @@ export class DeepSeekRuntime implements AgentRuntime {
     const baseUrl = config.baseUrl.replace(/\/+$/, '');
     const systemPrompt = this.buildSystemPromptContent();
 
+    // Enumerate MCP tools (read-only only) and merge with built-in tools
+    let mcpTools: DeepSeekToolDefinition[] = [];
+    console.debug('[Codian MCP] manager present:', !!this.mcpManager);
+    if (this.mcpManager) {
+      try {
+        const servers = this.mcpManager.getServers();
+        console.debug('[Codian MCP] servers count:', servers.length);
+        for (const s of servers) {
+          console.debug('[Codian MCP] server:', s.name, 'enabled:', s.enabled, 'type:', s.config.type ?? 'stdio');
+        }
+        mcpTools = await enumerateMcpToolsForDeepSeek(this.mcpManager);
+        console.debug('[Codian MCP] enumerated tools count:', mcpTools.length);
+        for (const t of mcpTools) {
+          console.debug('[Codian MCP] tool:', t.function.name);
+        }
+      } catch (err) {
+        console.debug('[Codian MCP] discovery error:', err instanceof Error ? err.message : String(err));
+      }
+    }
+    const allTools = [...DEEPSEEK_P1_TOOLS, ...mcpTools];
+    console.debug('[Codian MCP] allTools count:', allTools.length, '(built-in:', DEEPSEEK_P1_TOOLS.length, '+ mcp:', mcpTools.length, ')');
+
     const messages: DeepSeekMessage[] = [];
 
     // System prompt
@@ -434,7 +494,7 @@ export class DeepSeekRuntime implements AgentRuntime {
         // Streaming API call
         let result: StreamResult;
         try {
-          const gen = this.streamAPICall(baseUrl, config, messages, true);
+          const gen = this.streamAPICall(baseUrl, config, messages, allTools);
           result = yield* gen;
         } catch (error) {
           if (error instanceof DOMException && error.name === 'AbortError') {
@@ -522,6 +582,8 @@ export class DeepSeekRuntime implements AgentRuntime {
                 return decision === 'allow' || decision === 'allow-always';
               },
               transactionLog: this.transactionLog,
+              mcpManager: this.mcpManager,
+              abortSignal: this.activeAbortController.signal,
             };
             resultContent = await executeDeepSeekToolCall(
               { id: tc.id, name: tc.function.name, arguments: tcArgs },
@@ -583,7 +645,7 @@ export class DeepSeekRuntime implements AgentRuntime {
 
           // One final streaming call without tools
           try {
-            const finalGen = this.streamAPICall(baseUrl, config, messages, false);
+            const finalGen = this.streamAPICall(baseUrl, config, messages /* no tools */);
             const finalResult = yield* finalGen;
             // (text was already streamed incrementally by yield*)
             totalAccumulatedText += finalResult.accumulatedText;
