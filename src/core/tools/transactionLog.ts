@@ -26,42 +26,21 @@ function generateEntryId(): string {
 export class TransactionLog {
   private entries: ToolActionEntry[] = [];
   private snapshotDir: string;
+  /** Maximum entries before pruning. Oldest reverted entries are pruned first. */
+  private static readonly MAX_ENTRIES = 50;
 
   constructor() {
     this.snapshotDir = path.join(os.tmpdir(), 'codian-snapshots');
   }
 
-  private async ensureSnapshotDir(): Promise<void> {
-    await fs.mkdir(this.snapshotDir, { recursive: true });
-  }
-
-  /** Save pre-action content as a snapshot file. Returns the file path. */
-  async saveSnapshot(entryId: string, content: string | null): Promise<string | null> {
-    if (content === null) return null;
-    await this.ensureSnapshotDir();
-    const filePath = path.join(this.snapshotDir, `${entryId}.snap`);
-    await fs.writeFile(filePath, content, 'utf8');
-    return filePath;
-  }
-
-  /** Read a snapshot back from disk. */
-  async readSnapshot(snapshotPath: string | null): Promise<string | null> {
-    if (!snapshotPath) return null;
-    try {
-      return await fs.readFile(snapshotPath, 'utf8');
-    } catch {
-      return null;
-    }
-  }
-
-  /** Record a new action entry. Returns the entry. */
-  async record(
+  /** Record a new action entry. Auto-prunes oldest reverted entries if over limit. */
+  record(
     toolName: 'Write' | 'Edit',
     filePath: string,
     action: 'create' | 'overwrite' | 'modify',
     snapshotContent: string | null,
     newContent: string,
-  ): Promise<ToolActionEntry> {
+  ): ToolActionEntry {
     const entry: ToolActionEntry = {
       id: generateEntryId(),
       timestamp: Date.now(),
@@ -73,6 +52,17 @@ export class TransactionLog {
       reverted: false,
     };
     this.entries.push(entry);
+
+    // Prune if over max: remove oldest reverted first, then oldest non-reverted
+    while (this.entries.length > TransactionLog.MAX_ENTRIES) {
+      const oldestReverted = this.entries.findIndex((e) => e.reverted);
+      if (oldestReverted >= 0) {
+        this.entries.splice(oldestReverted, 1);
+      } else {
+        this.entries.shift(); // no reverted entries — drop oldest
+      }
+    }
+
     return entry;
   }
 

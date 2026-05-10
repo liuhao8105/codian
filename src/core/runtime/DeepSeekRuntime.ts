@@ -61,6 +61,21 @@ function buildDuplicateKey(name: string, args: Record<string, unknown>): string 
   }
 }
 
+/**
+ * Maps a tool name to a session-level approval category.
+ * Returns null for tools that should always require confirmation.
+ */
+function getApprovalCategory(toolName: string): string | null {
+  // Low-risk file modifications — can be auto-approved per session
+  if (toolName === 'Write') return 'write-file';
+  if (toolName === 'Edit') return 'edit-file';
+  if (toolName === 'Undo') return 'undo-file';
+  // Read-only MCP tools — auto-approve per session
+  if (toolName.startsWith('mcp__')) return 'read-mcp';
+  // Everything else (future: Bash, Delete, write-MCP) requires per-call confirmation
+  return null;
+}
+
 // ── SSE streaming types ──
 
 interface SSEDelta {
@@ -297,6 +312,8 @@ export class DeepSeekRuntime implements AgentRuntime {
   private readonly readyStateListeners = new Set<(ready: boolean) => void>();
   private approvalCallback: ApprovalCallback | null = null;
   private transactionLog = new TransactionLog();
+  /** Session-level approval memory: toolName/riskCategory → approved. Cleared on resetSession. */
+  private approvalMemory = new Map<string, boolean>();
   /** Cached MCP tools from last discovery. */
   private cachedMcpTools: DeepSeekToolDefinition[] | null = null;
 
@@ -373,6 +390,11 @@ export class DeepSeekRuntime implements AgentRuntime {
       body.tool_choice = 'auto';
     }
 
+    const signal = this.activeAbortController?.signal;
+    if (!signal) {
+      throw new Error('DeepSeek query cancelled — no active AbortController.');
+    }
+
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -380,7 +402,7 @@ export class DeepSeekRuntime implements AgentRuntime {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
-      signal: this.activeAbortController!.signal,
+      signal,
     });
 
     if (!response.ok) {
@@ -397,7 +419,7 @@ export class DeepSeekRuntime implements AgentRuntime {
       throw new Error(errorMsg);
     }
 
-    const result = yield* consumeSSEToResult(response, this.activeAbortController!.signal);
+    const result = yield* consumeSSEToResult(response, signal);
     return result;
   }
 
@@ -426,25 +448,17 @@ export class DeepSeekRuntime implements AgentRuntime {
 
     // Enumerate MCP tools (read-only only) and merge with built-in tools
     let mcpTools: DeepSeekToolDefinition[] = [];
-    console.debug('[Codian MCP] manager present:', !!this.mcpManager);
     if (this.mcpManager) {
       try {
         const servers = this.mcpManager.getServers();
-        console.debug('[Codian MCP] servers count:', servers.length);
-        for (const s of servers) {
-          console.debug('[Codian MCP] server:', s.name, 'enabled:', s.enabled, 'type:', s.config.type ?? 'stdio');
-        }
+        console.debug(`[Codian MCP] discovering tools from ${servers.length} servers`);
         mcpTools = await enumerateMcpToolsForDeepSeek(this.mcpManager);
-        console.debug('[Codian MCP] enumerated tools count:', mcpTools.length);
-        for (const t of mcpTools) {
-          console.debug('[Codian MCP] tool:', t.function.name);
-        }
+        console.debug(`[Codian MCP] discovery complete: ${mcpTools.length} read-only tools`);
       } catch (err) {
-        console.debug('[Codian MCP] discovery error:', err instanceof Error ? err.message : String(err));
+        console.warn('[Codian MCP] discovery failed:', err instanceof Error ? err.message : String(err));
       }
     }
     const allTools = [...DEEPSEEK_P1_TOOLS, ...mcpTools];
-    console.debug('[Codian MCP] allTools count:', allTools.length, '(built-in:', DEEPSEEK_P1_TOOLS.length, '+ mcp:', mcpTools.length, ')');
 
     const messages: DeepSeekMessage[] = [];
 
@@ -577,9 +591,24 @@ export class DeepSeekRuntime implements AgentRuntime {
             const execContext: ToolExecutionContext = {
               plugin: this.plugin,
               requestApproval: async (toolName, description, input) => {
-                if (!this.approvalCallback) return false;
+                // Session-level auto-approval for low-risk tools (Write, Edit, Undo, read-only MCP)
+                const category = getApprovalCategory(toolName);
+                if (category && this.approvalMemory.has(category)) {
+                  return this.approvalMemory.get(category)!;
+                }
+
+                if (!this.approvalCallback) {
+                  console.warn('[Codian] approval denied: no callback registered for', toolName);
+                  return false;
+                }
                 const decision = await this.approvalCallback(toolName, input, description);
-                return decision === 'allow' || decision === 'allow-always';
+                console.debug('[Codian] approval for', toolName, ':', decision);
+                const approved = decision === 'allow' || decision === 'allow-always';
+                // Remember for this session if approved and category is low-risk
+                if (approved && category) {
+                  this.approvalMemory.set(category, true);
+                }
+                return approved;
               },
               transactionLog: this.transactionLog,
               mcpManager: this.mcpManager,
@@ -680,6 +709,7 @@ export class DeepSeekRuntime implements AgentRuntime {
   }
 
   resetSession(): void {
+    this.approvalMemory.clear();
     this.transactionLog = new TransactionLog();
   }
   getSessionId(): string | null { return null; }

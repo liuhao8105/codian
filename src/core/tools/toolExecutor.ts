@@ -259,12 +259,15 @@ async function executeWrite(
     }
 
     // Record to transaction log
-    await context.transactionLog.record('Write', filePath, action, oldContent, content);
+    const entry = context.transactionLog.record('Write', filePath, action, oldContent, content);
+    console.debug('[Codian Txn] Write recorded id=%s action=%s path=%s total=%d',
+      entry.id, entry.action, entry.filePath, context.transactionLog.getAll().length);
 
     return existingFile
       ? `Write 已应用: \`${filePath}\` (${oldSize} → ${newSize} bytes)。可使用 Undo 撤销。`
       : `Write 已应用: 新建文件 \`${filePath}\` (${newSize} bytes)。可使用 Undo 撤销。`;
   } catch (error) {
+    console.error('[Codian Txn] Write FAILED:', error);
     return `Write 失败: ${error instanceof Error ? error.message : String(error)}`;
   }
 }
@@ -325,10 +328,13 @@ async function executeEdit(
     await plugin.app.vault.modify(file, newContent);
 
     // Record to transaction log
-    await context.transactionLog.record('Edit', filePath, 'modify', oldContent, newContent);
+    const entry = context.transactionLog.record('Edit', filePath, 'modify', oldContent, newContent);
+    console.debug('[Codian Txn] Edit recorded id=%s path=%s total=%d',
+      entry.id, entry.filePath, context.transactionLog.getAll().length);
 
     return `Edit 已应用: \`${filePath}\`。可使用 Undo 撤销。`;
   } catch (error) {
+    console.error('[Codian Txn] Edit FAILED:', error);
     return `Edit 失败: ${error instanceof Error ? error.message : String(error)}`;
   }
 }
@@ -337,9 +343,13 @@ async function executeUndo(
   _args: Record<string, unknown>,
   context: ToolExecutionContext,
 ): Promise<string> {
+  const allEntries = context.transactionLog.getAll();
+  console.debug('[Codian Txn] Undo: %d total entries, %d reverted',
+    allEntries.length, allEntries.filter(e => e.reverted).length);
+
   const entry = context.transactionLog.getLastNonReverted();
   if (!entry) {
-    return '没有可撤销的操作。当前 session 中没有 Write 或 Edit 记录。';
+    return `没有可撤销的操作。当前 session 中有 ${allEntries.length} 条记录（${allEntries.filter(e => e.reverted).length} 已撤销）。`;
   }
 
   const { plugin } = context;

@@ -32,6 +32,7 @@ interface McpTool {
 const READ_ONLY_PATTERNS = [
   /^(list|get|read|search|find|query|fetch|show|view|describe|check|count)/i,
   /^(export|download|lookup|inspect|browse|scan)/i,
+  /^(item_|tag_|folder_|collection_|asset_|file_|note_|vault_)/i,
 ];
 
 const BLOCKED_PATTERNS = [
@@ -46,20 +47,16 @@ function isReadOnlyMcpTool(toolName: string): boolean {
   // Block list takes priority
   for (const pattern of BLOCKED_PATTERNS) {
     if (pattern.test(toolName)) {
-      console.debug(`[Codian MCP Filter] BLOCKED: ${toolName}`);
       return false;
     }
   }
-
   // Allow list
   for (const pattern of READ_ONLY_PATTERNS) {
     if (pattern.test(toolName)) {
       return true;
     }
   }
-
   // Unknown tools default to blocked (conservative)
-  console.debug(`[Codian MCP Filter] BLOCKED (unknown): ${toolName}`);
   return false;
 }
 
@@ -138,57 +135,49 @@ export async function enumerateMcpToolsForDeepSeek(
   const servers: CodianMcpServer[] = mcpManager.getServers();
   const allTools: DeepSeekToolDefinition[] = [];
 
-  console.debug('[Codian MCP] enumerateMcpToolsForDeepSeek: servers total:', servers.length);
-
   for (const server of servers) {
-    console.debug('[Codian MCP] checking server:', server.name, 'enabled:', server.enabled, 'disabledTools:', server.disabledTools);
-    if (!server.enabled) {
-      console.debug('[Codian MCP] skipping disabled server:', server.name);
-      continue;
-    }
+    if (!server.enabled) continue;
 
     const serverType = getMcpServerType(server.config);
-    console.debug('[Codian MCP] connecting to', server.name, 'type:', serverType);
     let client: Client | null = null;
 
     try {
       const transport = createTransport(server.config, serverType);
       client = new Client({ name: 'codian-deepseek', version: '1.0.0' });
 
+      let connectTimedOut = false;
       const connectTimeout = setTimeout(() => {
+        connectTimedOut = true;
         client?.close().catch(() => {});
       }, 8000);
 
       await client.connect(transport);
       clearTimeout(connectTimeout);
-      console.debug('[Codian MCP] connected to', server.name);
+      if (connectTimedOut) continue; // skip if already timed out
 
       const result = await client.listTools(undefined, {
         signal: AbortSignal.timeout(8000),
       });
-      console.debug('[Codian MCP]', server.name, 'listed tools count:', result.tools.length);
 
       for (const tool of result.tools) {
-        console.debug('[Codian MCP]', server.name, 'tool:', tool.name);
-
         // Skip explicitly disabled tools
         if (server.disabledTools?.includes(tool.name)) {
-          console.debug('[Codian MCP Filter] SKIPPED (disabled):', server.name, tool.name);
+          console.debug(`[Codian MCP] ${server.name}: skip disabled tool "${tool.name}"`);
           continue;
         }
 
         // Apply read-only filter
         if (!isReadOnlyMcpTool(tool.name)) {
-          console.debug('[Codian MCP Filter] BLOCKED:', server.name, tool.name);
+          console.debug(`[Codian MCP] ${server.name}: BLOCKED tool "${tool.name}"`);
           continue;
         }
 
+        console.debug(`[Codian MCP] ${server.name}: ALLOWED tool "${tool.name}"`);
         allTools.push(mcpToolToOpenAI(server.name, tool));
-        console.debug('[Codian MCP Filter] ALLOWED:', server.name, tool.name);
       }
     } catch (error) {
-      console.debug(
-        '[Codian MCP] Failed to enumerate tools from', server.name, ':',
+      console.warn(
+        `[Codian MCP] failed to enumerate ${server.name}:`,
         error instanceof Error ? error.message : String(error),
       );
       // Continue with other servers
@@ -199,7 +188,6 @@ export async function enumerateMcpToolsForDeepSeek(
     }
   }
 
-  console.debug('[Codian MCP] enumeration complete. total tools:', allTools.length);
   return allTools;
 }
 
@@ -288,7 +276,10 @@ export async function callMcpTool(
     if (error instanceof DOMException && error.name === 'AbortError') {
       return `MCP tool "${actualToolName}" timed out or was cancelled.`;
     }
-    return `MCP error: ${error instanceof Error ? error.message : String(error)}`;
+    // Sanitize error message: strip potential file paths
+    const rawMsg = error instanceof Error ? error.message : String(error);
+    const sanitized = rawMsg.replace(/\/[^\s]*/g, '[path]');
+    return `MCP error: ${sanitized}`;
   } finally {
     if (client) {
       try { await client.close(); } catch { /* ignore */ }
