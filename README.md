@@ -21,7 +21,7 @@ and the original license notice is preserved in this repository.
 
 - Plugin identity, installation metadata, and key user-facing wording now target `Codex`.
 - Main chat, inline edit, title generation, and instruction refinement now run through a `Codex CLI` adapter.
-- **v1.3.75**: DeepSeek provider with SSE streaming, tool loop (Skill/Read/Grep/Write/Edit/Undo), read-only MCP bridge, user approval, transaction log, vault sandbox, and DSML protocol filtering.
+- **v1.3.76**: DeepSeek provider with SSE streaming, tool loop, read-only MCP bridge, session-level approval memory, transaction log, vault sandbox, and production stability polish.
 - Some legacy settings and docs from the upstream project are still being cleaned up.
 
 ## Providers
@@ -35,14 +35,15 @@ Codian supports two AI providers with independent runtime implementations:
 
 ### DeepSeek Provider
 
-**Current capabilities (v1.3.75):**
+**Current capabilities (v1.3.76):**
 
 - SSE streaming chat (natural paragraph-by-paragraph output, DSML protocol filtering)
 - Multi-turn tool loop with duplicate/no-progress detection and auto-summarization
 - **Read-only tools**: Skill (load skill instructions), Read (read vault files), Grep (search vault files)
-- **File modification tools** (with mandatory user confirmation): Write (create/overwrite files), Edit (targeted string replacement), Undo (revert last Write/Edit)
+- **File modification tools**: Write (create/overwrite files), Edit (targeted string replacement), Undo (revert last Write/Edit)
 - **Read-only MCP bridge**: automatically discovers and calls read-only MCP tools from configured servers (e.g., Eagle search, database queries)
-- **TransactionLog**: per-session action journal for undo support
+- **Session-level approval memory**: first Write/Edit/Undo/MCP call requires confirmation; subsequent calls in the same session are auto-approved
+- **TransactionLog**: per-session action journal with automatic pruning (max 50 entries)
 - **Vault sandbox**: path validation blocks `.git/`, `node_modules/`, `.obsidian/plugins/`, hidden directories
 - Reasoning content preservation (DeepSeek thinking models)
 - Esc interruption
