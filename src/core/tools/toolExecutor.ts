@@ -7,8 +7,6 @@
 import { exec } from 'child_process';
 import * as path from 'path';
 
-import type { TFile } from 'obsidian';
-
 import type CodianPlugin from '../../main';
 import type { McpServerManager } from '../mcp';
 import { getVaultPath, isPathWithinVault } from '../../utils/path';

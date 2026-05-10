@@ -4,10 +4,6 @@
  * In-memory only (not persisted across sessions).
  */
 
-import * as os from 'os';
-import * as path from 'path';
-import { promises as fs } from 'fs';
-
 export interface ToolActionEntry {
   id: string;
   timestamp: number;
@@ -25,13 +21,8 @@ function generateEntryId(): string {
 
 export class TransactionLog {
   private entries: ToolActionEntry[] = [];
-  private snapshotDir: string;
   /** Maximum entries before pruning. Oldest reverted entries are pruned first. */
   private static readonly MAX_ENTRIES = 50;
-
-  constructor() {
-    this.snapshotDir = path.join(os.tmpdir(), 'codian-snapshots');
-  }
 
   /** Record a new action entry. Auto-prunes oldest reverted entries if over limit. */
   record(
@@ -85,16 +76,4 @@ export class TransactionLog {
     return this.entries;
   }
 
-  /** Clear all entries and snapshots. */
-  async clear(): Promise<void> {
-    for (const entry of this.entries) {
-      try {
-        const snapPath = path.join(this.snapshotDir, `${entry.id}.snap`);
-        await fs.unlink(snapPath);
-      } catch {
-        // ignore
-      }
-    }
-    this.entries = [];
-  }
 }

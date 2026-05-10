@@ -45,10 +45,6 @@ interface DeepSeekMessage {
   tool_call_id?: string;
 }
 
-function generateToolCallId(): string {
-  return `deepseek-tc-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
 /** Build a dedup key for detecting repeated tool calls. Returns null for non-tracking tools. */
 function buildDuplicateKey(name: string, args: Record<string, unknown>): string | null {
   switch (name) {
@@ -314,9 +310,6 @@ export class DeepSeekRuntime implements AgentRuntime {
   private transactionLog = new TransactionLog();
   /** Session-level approval memory: toolName/riskCategory → approved. Cleared on resetSession. */
   private approvalMemory = new Map<string, boolean>();
-  /** Cached MCP tools from last discovery. */
-  private cachedMcpTools: DeepSeekToolDefinition[] | null = null;
-
   constructor(plugin: CodianPlugin, mcpManager?: McpServerManager) {
     this.plugin = plugin;
     this.mcpManager = mcpManager;
@@ -339,9 +332,7 @@ export class DeepSeekRuntime implements AgentRuntime {
 
   setPendingResumeAt(_uuid: string | undefined): void {}
   applyForkState(): string | null { return null; }
-  async reloadMcpServers(): Promise<void> {
-    this.cachedMcpTools = null;
-  }
+  async reloadMcpServers(): Promise<void> {}
 
   async ensureReady(): Promise<boolean> {
     const ready = this.isReady();
