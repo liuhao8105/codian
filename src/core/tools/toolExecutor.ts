@@ -11,7 +11,7 @@ import type CodianPlugin from '../../main';
 import type { McpServerManager } from '../mcp';
 import { getVaultPath, isPathWithinVault } from '../../utils/path';
 import type { TransactionLog } from './transactionLog';
-import { callMcpTool } from './mcpBridge';
+import { callMcpTool, classifyMcpToolRisk } from './mcpBridge';
 
 export interface ToolExecutionContext {
   plugin: CodianPlugin;
@@ -404,17 +404,59 @@ async function executeUndo(
   }
 }
 
-// ── MCP bridge (read-only) ──
+// ── MCP bridge (risk-classified) ──
+
+function parseMcpToolName(toolName: string): { server: string; tool: string } | null {
+  const parts = toolName.split('__');
+  if (parts.length < 3 || parts[0] !== 'mcp') return null;
+  return { server: parts[1], tool: parts.slice(2).join('__') };
+}
 
 async function executeMcpCall(
   toolCall: { id: string; name: string; arguments: Record<string, unknown> },
   context: ToolExecutionContext,
 ): Promise<string> {
   if (!context.mcpManager) {
-    return 'Error: MCP manager not available. MCP tools require an active MCP configuration.';
+    return 'Error: MCP manager not available.';
   }
   if (!context.abortSignal) {
     return 'Error: No abort signal available for MCP call.';
+  }
+
+  const parsed = parseMcpToolName(toolCall.name);
+  const actualToolName = parsed?.tool || toolCall.name;
+
+  // Classify risk
+  const classification = classifyMcpToolRisk(actualToolName);
+
+  // Diagnostic: log tool call with arguments
+  const argSummary = JSON.stringify(toolCall.arguments);
+  console.debug(
+    `[Codian MCP] call: ${actualToolName} [${classification.level}] args=${argSummary.slice(0, 300)}`,
+  );
+
+  // Blocked tools rejected before execution
+  if (classification.level === 'blocked') {
+    return `Error: MCP tool "${actualToolName}" is blocked (${classification.reason}).`;
+  }
+
+  // Non-read-only tools require user confirmation
+  if (classification.level !== 'read-only') {
+    const riskLabel =
+      classification.level === 'low-risk-action' ? '低风险操作' : '高风险操作（不可自动回退）';
+    const summary = [
+      `**MCP ${riskLabel}** — \`${actualToolName}\``,
+      `Server: ${parsed?.server || 'unknown'}`,
+      `Risk: ${classification.level} (${classification.reason})`,
+      '',
+      '该 MCP 操作将执行外部动作。',
+      classification.level === 'high-risk-action' ? '⚠️ 此操作不可自动回退，请确认。' : '',
+    ].filter(Boolean).join('\n');
+
+    const approved = await context.requestApproval(toolCall.name, summary, toolCall.arguments);
+    if (!approved) {
+      return `MCP 操作已被用户拒绝: ${actualToolName}`;
+    }
   }
 
   return callMcpTool(toolCall.name, toolCall.arguments, context.mcpManager, context.abortSignal);

@@ -18,7 +18,7 @@ import {
 } from '../tools/toolSchemas';
 import { executeDeepSeekToolCall, type ToolExecutionContext } from '../tools/toolExecutor';
 import { TransactionLog } from '../tools/transactionLog';
-import { enumerateMcpToolsForDeepSeek } from '../tools/mcpBridge';
+import { enumerateMcpToolsForDeepSeek, classifyMcpToolRisk } from '../tools/mcpBridge';
 import type { McpServerManager } from '../mcp';
 
 /** Maximum tool-calling rounds per user message (final safety net). */
@@ -66,9 +66,20 @@ function getApprovalCategory(toolName: string): string | null {
   if (toolName === 'Write') return 'write-file';
   if (toolName === 'Edit') return 'edit-file';
   if (toolName === 'Undo') return 'undo-file';
-  // Read-only MCP tools — auto-approve per session
-  if (toolName.startsWith('mcp__')) return 'read-mcp';
-  // Everything else (future: Bash, Delete, write-MCP) requires per-call confirmation
+
+  // MCP tools: classify by risk level
+  if (toolName.startsWith('mcp__')) {
+    const parts = toolName.split('__');
+    const actualToolName = parts.length >= 3 ? parts.slice(2).join('__') : toolName;
+    const classification = classifyMcpToolRisk(actualToolName);
+    // read-only → approval is skipped entirely by executeMcpCall (no confirm)
+    // low-risk-action → session memory, first confirm then auto-allow
+    if (classification.level === 'low-risk-action') return 'mcp-action';
+    // high-risk-action and blocked → always confirm (null = no session memory)
+    return null;
+  }
+
+  // Everything else (future: Bash, Delete) requires per-call confirmation
   return null;
 }
 
