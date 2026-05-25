@@ -537,6 +537,12 @@ describe('BashPathValidator', () => {
       expect(result).toEqual({ type: 'outside_vault', path: '/etc/error.log' });
     });
 
+    it('allows redirecting stderr to /dev/null', () => {
+      const context = createMockPathContext({});
+      const result = findBashPathViolationInSegment(['cmd', '2>/dev/null'], context);
+      expect(result).toBeNull();
+    });
+
     it('detects violation in &> combined redirect', () => {
       const context = createMockPathContext({});
       const result = findBashPathViolationInSegment(['cmd', '&>/etc/all.log'], context);

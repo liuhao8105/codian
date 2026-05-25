@@ -184,6 +184,11 @@ export function isPathLikeToken(token: string): boolean {
   );
 }
 
+function isNullDevicePath(candidate: string): boolean {
+  const normalized = candidate.replace(/\\/g, '/').toLowerCase();
+  return normalized === '/dev/null' || normalized === 'nul';
+}
+
 /**
  * Check if a path has valid access permissions.
  * Returns a violation if the path is outside vault and not an allowed export/context path.
@@ -195,6 +200,7 @@ export function checkBashPathAccess(
 ): PathViolation | null {
   const cleaned = cleanPathToken(candidate);
   if (!cleaned) return null;
+  if (isNullDevicePath(cleaned)) return null;
 
   const accessType = context.getPathAccessType(cleaned);
 
@@ -404,4 +410,3 @@ export function findBashCommandPathViolation(
 
   return null;
 }
-

@@ -23,6 +23,95 @@ import { renderStoredWriteEdit } from './WriteEditRenderer';
 
 export type RenderContentFn = (el: HTMLElement, markdown: string) => Promise<void>;
 
+function normalizeSplitTableRows(markdown: string): string {
+  const lines = markdown.split('\n');
+  const out: string[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    out.push(lines[i]);
+
+    const current = lines[i].trim();
+    const next = lines[i + 1]?.trim() || '';
+    const isThreeColumnHeader = /^\|[^|\n]+\|[^|\n]+\|[^|\n]+\|$/.test(current);
+    const isThreeColumnSeparator = /^\|[-: ]+\|[-: ]+\|[-: ]+\|$/.test(next);
+
+    if (!isThreeColumnHeader || !isThreeColumnSeparator) {
+      i++;
+      continue;
+    }
+
+    out.push(lines[i + 1]);
+    i += 2;
+
+    while (
+      lines[i]?.trim() === '|' &&
+      lines[i + 1] !== undefined &&
+      /^\|[^|\n]+\|$/.test(lines[i + 2]?.trim() || '') &&
+      lines[i + 3] !== undefined &&
+      lines[i + 4]?.trim() === '|'
+    ) {
+      const col1 = lines[i + 1].trim();
+      const col2 = (lines[i + 2].trim().match(/^\|([^|\n]+)\|$/)?.[1] || '').trim();
+      const col3 = lines[i + 3].trim();
+      out.push(`|${col1}|${col2}|${col3}|`);
+      i += 5;
+    }
+  }
+
+  return out.join('\n');
+}
+
+function normalizeCompressedEnglishStatus(markdown: string): string {
+  return markdown.replace(
+    /NowI'llupdatethe(.+?)sectionwithcurrentdirectorycountsandadd(.+?)asanewentry\./g,
+    "Now I'll update the $1 section with current directory counts and add $2 as a new entry.",
+  );
+}
+
+function normalizeCompactBulletChains(markdown: string): string {
+  return markdown
+    .replace(/([：:])\s*-(?=[^\s-])/g, '$1\n\n- ')
+    .replace(/([✔✅])-(?=[^\s-])/g, '$1\n- ')
+    .replace(/(^|\n)-(?=[^\s-])/g, '$1- ')
+    .replace(/(^|\n)(\d+\.)(?=[^\s\d])/g, '$1$2 ');
+}
+
+export function normalizeAssistantMarkdownForRender(markdown: string): string {
+  return normalizeCompactBulletChains(normalizeSplitTableRows(normalizeCompressedEnglishStatus(markdown)))
+    .replace(/([^\n])---(?=#{1,6})/g, '$1\n\n---\n\n')
+    .replace(/([^\n#`{])(?=#{2,6}\s*[\p{L}\p{N}✅❌✔✖⚠])/gu, '$1\n\n')
+    .replace(/(^|\n)(#{1,6})(?=[^\s#])/g, '$1$2 ')
+    .replace(/(^|\n)(#{1,6}\s*[✅❌][^\n：:。！？]*?)(?=(?:所有|以下|需要|已|未|当前)[\p{L}\p{N}])/gu, '$1$2\n')
+    .replace(/(^|\n)(#{1,6}\s*⚠[^：:。！？\n]*[：:])(?=[^\n])/gu, '$1$2\n')
+    .replace(/(^|\n)(#{1,6}\s+[^\n|]+?)(?=\|[^|\n]+\|[^|\n]+\|)/g, '$1$2\n\n')
+    .replace(/\|\|(?=(?:[-: ]+\|)+)/g, '|\n|')
+    .replace(/\|\|(?=[^\n|][^|\n]*\|)/g, '|\n|')
+    .replace(/\n{3,}/g, '\n\n')
+    .trimEnd();
+}
+
+export function normalizeBoldInAssistantMessage(container: HTMLElement): void {
+  if (!container.closest('.codian-message-assistant .codian-message-content')) {
+    return;
+  }
+
+  container.querySelectorAll('strong, b').forEach((node) => {
+    if (node.closest('h1, h2, h3, h4, h5, h6')) {
+      return;
+    }
+
+    const span = node.ownerDocument.createElement('span');
+    Array.from(node.attributes).forEach((attribute) => {
+      span.setAttribute(attribute.name, attribute.value);
+    });
+    while (node.firstChild) {
+      span.appendChild(node.firstChild);
+    }
+    node.replaceWith(span);
+  });
+}
+
 export class MessageRenderer {
   private app: App;
   private plugin: CodianPlugin;
@@ -483,11 +572,12 @@ export class MessageRenderer {
     try {
       // Replace image embeds with HTML img tags before rendering
       const processedMarkdown = replaceImageEmbedsWithHtml(
-        markdown,
+        normalizeAssistantMarkdownForRender(markdown),
         this.app,
         this.plugin.settings.mediaFolder
       );
       await MarkdownRenderer.renderMarkdown(processedMarkdown, el, '', this.component);
+      normalizeBoldInAssistantMessage(el);
 
       // Wrap pre elements and move buttons outside scroll area
       el.querySelectorAll('pre').forEach((pre) => {

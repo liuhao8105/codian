@@ -187,8 +187,122 @@ async function* parseSSEStream(
 /** Regex matching complete DSML tokens: <|TOKEN|...> */
 const DSML_COMPLETE = /<\|[^|>]+\|[^>]*>/g;
 
-/** Regex for partial DSML token at the end of a buffer (starts with <| but not closed) */
-const DSML_PARTIAL_END = /<\|[^>]*$/;
+/** Regex for partial DSML token at the end of a buffer (starts with <| or compact < | | DSML but not closed) */
+const DSML_PARTIAL_END = /(?:<\|[^>]*|<\s*(?:\|\s*){0,2}(?:D(?:S(?:M(?:L)?)?)?)?[^<>]*)$/;
+const DEEPSEEK_DSML_TOOL_CALLS_START = '<||DSML||tool_calls>';
+const DEEPSEEK_DSML_TOOL_CALLS_END = '</||DSML||tool_calls>';
+
+function decodeDSMLText(value: string): string {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
+function normalizeDeepSeekDSML(text: string): string {
+  return text
+    .replace(/｜/g, '|')
+    .replace(/<\s*\|\s*\|\s*DSML\s*\|\s*\|/g, '<||DSML||')
+    .replace(/<\/\s*\|\s*\|\s*DSML\s*\|\s*\|/g, '</||DSML||')
+    .replace(/<\|\|DSML\|\|\s+/g, '<||DSML||')
+    .replace(/<\/\|\|DSML\|\|\s+/g, '</||DSML||')
+    .replace(/<\|\|DSML\|\|(invoke|parameter)(?=name=)/g, '<||DSML||$1 ')
+    .replace(/<\|\|DSML\|\|parameter([^>]*?)(name|s|string)=/g, '<||DSML||parameter$1 $2=')
+    .replace(/\s+string=/g, ' string=');
+}
+
+export function parseDeepSeekDSMLToolCalls(text: string): AccumulatedToolCall[] {
+  const normalized = normalizeDeepSeekDSML(text);
+  const calls: AccumulatedToolCall[] = [];
+  const invokeRegex = /<\|\|DSML\|\|invoke\s+name=(["'])(.*?)\1\s*>([\s\S]*?)<\/\|\|DSML\|\|invoke>/g;
+  let invokeMatch: RegExpExecArray | null;
+
+  while ((invokeMatch = invokeRegex.exec(normalized)) !== null) {
+    const toolName = decodeDSMLText(invokeMatch[2] || '').trim();
+    const body = invokeMatch[3] || '';
+    if (!toolName) continue;
+
+    const args: Record<string, string> = {};
+    const parameterRegex = /<\|\|DSML\|\|parameter\s+name=(["'])(.*?)\1[^>]*>([\s\S]*?)<\/\|\|DSML\|\|parameter>/g;
+    let parameterMatch: RegExpExecArray | null;
+    while ((parameterMatch = parameterRegex.exec(body)) !== null) {
+      const name = decodeDSMLText(parameterMatch[2] || '').trim();
+      if (!name) continue;
+      args[name] = decodeDSMLText(parameterMatch[3] || '').trim();
+    }
+
+    calls.push({
+      id: `dsml-${calls.length}`,
+      type: 'function',
+      function: {
+        name: toolName,
+        arguments: JSON.stringify(args),
+      },
+    });
+  }
+
+  return calls;
+}
+
+export function stripDeepSeekDSMLToolCallBlocks(text: string): string {
+  return normalizeDeepSeekDSML(text)
+    .replace(/<\|\|DSML\|\|tool_calls>[\s\S]*?<\/\|\|DSML\|\|tool_calls>/g, '')
+    .trim();
+}
+
+const EXPLICIT_ACTION_PROMPT_RE = /(?:更新|整理|执行|写入|修改|修复|刷新|继续|推进|开始|操作|update|organize|execute|write|edit|modify|fix|refresh|continue|proceed|start)/i;
+const PLAN_ONLY_RESPONSE_RE = /(?:更新计划|执行计划|现状分析|当前知识库状态|按这个计划推进|先挑重点|是否继续|需要我|要不要|还是你先|给你一份.*计划|现在开始更新|开始执行|开始整理|开始写入|确认后|你确认|确认一下|要我继续|是否要我|再继续写入|分析完了|现在要读|接下来读|准备读|确保更新准确|开始更新|继续写入|继续更新|确认再继续|需要你确认.*继续|再统一改|继续改)/i;
+const POST_WRITE_INCOMPLETE_RESPONSE_RE = /(?:确认再继续|需要你确认.*继续|再统一改|继续改|再继续改|主体更新|主要更新)/i;
+const WRITE_EDIT_TOOL_NAMES = new Set(['Write', 'Edit']);
+
+function isExplicitDeepSeekActionRequest(prompt: string): boolean {
+  return EXPLICIT_ACTION_PROMPT_RE.test(prompt);
+}
+
+export function shouldForceDeepSeekExecutionContinuation(input: {
+  originalPrompt: string;
+  responseText: string;
+  hasCompletedWriteEdit: boolean;
+  forcedContinuationCount: number;
+}): boolean {
+  if (input.hasCompletedWriteEdit) {
+    return input.forcedContinuationCount < 2 &&
+      isExplicitDeepSeekActionRequest(input.originalPrompt) &&
+      POST_WRITE_INCOMPLETE_RESPONSE_RE.test(input.responseText);
+  }
+  if (input.forcedContinuationCount >= 2) return false;
+  if (!isExplicitDeepSeekActionRequest(input.originalPrompt)) return false;
+  return PLAN_ONLY_RESPONSE_RE.test(input.responseText);
+}
+
+export function shouldForceDeepSeekWriteAfterToolRounds(input: {
+  originalPrompt: string;
+  hasCompletedWriteEdit: boolean;
+  forcedWriteAttemptCount: number;
+  round: number;
+  duplicateCount: number;
+  consecutiveNoProgress: number;
+}): boolean {
+  if (input.hasCompletedWriteEdit) return false;
+  if (input.forcedWriteAttemptCount >= 2) return false;
+  if (!isExplicitDeepSeekActionRequest(input.originalPrompt)) return false;
+  return (
+    input.round >= WARN_ROUND ||
+    input.duplicateCount >= MAX_DUPLICATE_TOOLS ||
+    input.consecutiveNoProgress >= MAX_NO_PROGRESS_ROUNDS
+  );
+}
+
+function isSuccessfulWriteOrEditResult(toolName: string, resultContent: string): boolean {
+  if (toolName !== 'Write' && toolName !== 'Edit') return false;
+  return /(?:Write|Edit) 已应用/.test(resultContent);
+}
+
+function getWriteEditTools(tools: DeepSeekToolDefinition[]): DeepSeekToolDefinition[] {
+  return tools.filter((tool) => WRITE_EDIT_TOOL_NAMES.has(tool.function.name));
+}
 
 /**
  * Strip DSML protocol tokens from text content.
@@ -228,6 +342,14 @@ async function* consumeSSEToResult(
   let textBuffer = '';
   let lastFlushTime = performance.now();
   let dsmlCarryOver = '';       // handles DSML tokens that span delta boundaries
+  let dsmlToolCallBuffer: string | null = null;
+
+  const appendDSMLFallbackToolCalls = (text: string): void => {
+    for (const call of parseDeepSeekDSMLToolCalls(text)) {
+      const index = toolCallsByIndex.size;
+      toolCallsByIndex.set(index, { ...call, id: `dsml-${index}` });
+    }
+  };
 
   try {
     for await (const choice of parseSSEStream(response, signal)) {
@@ -269,9 +391,47 @@ async function* consumeSSEToResult(
 
       // Buffer text content (with DSML stripping)
       if (delta.content) {
-        const { clean, carryOver: newCarry } = stripDSML(delta.content, dsmlCarryOver);
+        let visibleText = dsmlCarryOver + delta.content;
+        dsmlCarryOver = '';
+        if (dsmlToolCallBuffer !== null) {
+          dsmlToolCallBuffer += visibleText;
+          const endIndex = normalizeDeepSeekDSML(dsmlToolCallBuffer).indexOf(DEEPSEEK_DSML_TOOL_CALLS_END);
+          if (endIndex === -1) {
+            continue;
+          }
+          appendDSMLFallbackToolCalls(dsmlToolCallBuffer);
+          const normalizedBuffer = normalizeDeepSeekDSML(dsmlToolCallBuffer);
+          visibleText = normalizedBuffer.slice(endIndex + DEEPSEEK_DSML_TOOL_CALLS_END.length);
+          dsmlToolCallBuffer = null;
+        }
+
+        const normalizedVisibleText = normalizeDeepSeekDSML(visibleText);
+        const dsmlStartIndex = normalizedVisibleText.indexOf(DEEPSEEK_DSML_TOOL_CALLS_START);
+        if (dsmlStartIndex !== -1) {
+          const beforeDSML = normalizedVisibleText.slice(0, dsmlStartIndex);
+          const dsmlAndAfter = normalizedVisibleText.slice(dsmlStartIndex);
+          const dsmlEndIndex = dsmlAndAfter.indexOf(DEEPSEEK_DSML_TOOL_CALLS_END);
+
+          textBuffer += stripDeepSeekDSMLToolCallBlocks(beforeDSML);
+          if (textBuffer) {
+            accumulatedText += textBuffer;
+            yield { type: 'text', content: textBuffer };
+            textBuffer = '';
+          }
+
+          if (dsmlEndIndex === -1) {
+            dsmlToolCallBuffer = dsmlAndAfter;
+            continue;
+          }
+
+          const dsmlBlockEnd = dsmlEndIndex + DEEPSEEK_DSML_TOOL_CALLS_END.length;
+          appendDSMLFallbackToolCalls(dsmlAndAfter.slice(0, dsmlBlockEnd));
+          visibleText = dsmlAndAfter.slice(dsmlBlockEnd);
+        }
+
+        const { clean, carryOver: newCarry } = stripDSML(visibleText, dsmlCarryOver);
         dsmlCarryOver = newCarry;
-        textBuffer += clean;
+        textBuffer += stripDeepSeekDSMLToolCallBlocks(clean);
 
         const now = performance.now();
         const timeSinceLastFlush = now - lastFlushTime;
@@ -489,6 +649,10 @@ export class DeepSeekRuntime implements AgentRuntime {
     try {
       let round = 0;
       let totalAccumulatedText = '';
+      let hasCompletedWriteEdit = false;
+      let forcedExecutionContinuationCount = 0;
+      let forcedWriteAttemptCount = 0;
+      let toolsForNextRound = allTools;
 
       // Duplicate / no-progress tracking
       const readFiles = new Set<string>();
@@ -510,7 +674,9 @@ export class DeepSeekRuntime implements AgentRuntime {
         // Streaming API call
         let result: StreamResult;
         try {
-          const gen = this.streamAPICall(baseUrl, config, messages, allTools);
+          const toolsForThisRound = toolsForNextRound;
+          toolsForNextRound = allTools;
+          const gen = this.streamAPICall(baseUrl, config, messages, toolsForThisRound);
           result = yield* gen;
         } catch (error) {
           if (error instanceof DOMException && error.name === 'AbortError') {
@@ -536,6 +702,24 @@ export class DeepSeekRuntime implements AgentRuntime {
           if (!totalAccumulatedText) {
             yield { type: 'error', content: `DeepSeek 返回空回复 (finish_reason: ${result.finishReason || 'unknown'})。` };
             return;
+          }
+          if (shouldForceDeepSeekExecutionContinuation({
+            originalPrompt: prompt,
+            responseText: result.accumulatedText,
+            hasCompletedWriteEdit,
+            forcedContinuationCount: forcedExecutionContinuationCount,
+          })) {
+            forcedExecutionContinuationCount++;
+            messages.push({
+              role: 'assistant',
+              content: result.accumulatedText || null,
+            });
+            messages.push({
+              role: 'user',
+              content:
+                '[System: The user already asked you to execute this task. Do not ask for confirmation, do not end with a plan, and do not summarize next steps. If you have enough information, call Write or Edit now in this response. If exact file content is missing, call Read first, then Write or Edit. Only state missing information if the task is impossible.]',
+            });
+            continue;
           }
           break;
         }
@@ -624,6 +808,10 @@ export class DeepSeekRuntime implements AgentRuntime {
             resultContent = `Tool execution error: ${error instanceof Error ? error.message : String(error)}`;
           }
 
+          if (isSuccessfulWriteOrEditResult(tc.function.name, resultContent)) {
+            hasCompletedWriteEdit = true;
+          }
+
           // No-progress detection
           const resultSummary = `${tc.function.name}:${resultContent.slice(0, 200)}`;
           if (resultSummary !== lastToolResultSummary) {
@@ -660,6 +848,24 @@ export class DeepSeekRuntime implements AgentRuntime {
           round >= WARN_ROUND;
 
         if (shouldForceStop) {
+          if (shouldForceDeepSeekWriteAfterToolRounds({
+            originalPrompt: prompt,
+            hasCompletedWriteEdit,
+            forcedWriteAttemptCount,
+            round,
+            duplicateCount,
+            consecutiveNoProgress,
+          })) {
+            forcedWriteAttemptCount++;
+            toolsForNextRound = getWriteEditTools(allTools);
+            messages.push({
+              role: 'user',
+              content:
+                '[System: You have gathered enough context for this explicit update/write task. Do not call Read, Grep, Bash, Skill, or any read-only tool now. Do not answer with a status sentence. You must call Write or Edit in the next response. If you cannot safely edit because an exact old_string is missing, call Write with the full updated file content instead.]',
+            });
+            continue;
+          }
+
           const reason =
             duplicateCount >= MAX_DUPLICATE_TOOLS
               ? 'You have repeatedly called the same tools. '

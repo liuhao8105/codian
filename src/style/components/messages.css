@@ -165,6 +165,31 @@
   margin-top: 4px;
 }
 
+/* Normalize font weight in AI responses — all text at 400, headings preserved */
+.codian-message-assistant .codian-message-content,
+.codian-message-assistant .codian-message-content p,
+.codian-message-assistant .codian-message-content li,
+.codian-message-assistant .codian-message-content div,
+.codian-message-assistant .codian-message-content span,
+.codian-message-assistant .codian-message-content strong,
+.codian-message-assistant .codian-message-content b {
+  font-weight: 400 !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Headings keep their own weight */
+.codian-message-assistant .codian-message-content h1,
+.codian-message-assistant .codian-message-content h2,
+.codian-message-assistant .codian-message-content h3,
+.codian-message-assistant .codian-message-content h4,
+.codian-message-assistant .codian-message-content h5,
+.codian-message-assistant .codian-message-content h6 {
+  font-weight: 600 !important;
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
+}
+
 /* Full-width tables */
 .codian-message-content table {
   width: 100%;

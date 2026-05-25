@@ -2,7 +2,7 @@ import { createMockEl } from '@test/helpers/mockElement';
 
 import { TOOL_AGENT_OUTPUT, TOOL_TASK } from '@/core/tools/toolNames';
 import type { ChatMessage, ImageAttachment } from '@/core/types';
-import { MessageRenderer } from '@/features/chat/rendering/MessageRenderer';
+import { MessageRenderer, normalizeBoldInAssistantMessage } from '@/features/chat/rendering/MessageRenderer';
 import { renderStoredCommandBlock, renderStoredPlanBlock } from '@/features/chat/rendering/ProcessBlockRenderer';
 import { renderStoredAsyncSubagent, renderStoredSubagent } from '@/features/chat/rendering/SubagentRenderer';
 import { renderStoredThinkingBlock } from '@/features/chat/rendering/ThinkingBlockRenderer';
@@ -52,6 +52,32 @@ function createRenderer(messagesEl?: any) {
     settings: { mediaFolder: '' },
   };
   return { renderer: new MessageRenderer(plugin as any, comp as any, el), messagesEl: el };
+}
+
+function createBoldNode(tagName: string, text: string, insideHeading = false) {
+  const textNode = { textContent: text };
+  const attributes = [{ name: 'class', value: 'emphasis' }, { name: 'data-kind', value: 'markdown' }];
+  const replacement: any = {
+    tagName: 'SPAN',
+    attributes: new Map<string, string>(),
+    children: [] as any[],
+    setAttribute(name: string, value: string) {
+      this.attributes.set(name, value);
+    },
+    appendChild(child: any) {
+      this.children.push(child);
+      node.firstChild = null;
+    },
+  };
+  const node: any = {
+    tagName,
+    attributes,
+    firstChild: textNode,
+    closest: jest.fn().mockReturnValue(insideHeading ? {} : null),
+    ownerDocument: { createElement: jest.fn().mockReturnValue(replacement) },
+    replaceWith: jest.fn(),
+  };
+  return { node, replacement };
 }
 
 describe('MessageRenderer', () => {
@@ -979,6 +1005,71 @@ describe('MessageRenderer', () => {
 
     // After render, old content should be gone (empty() was called before rendering)
     expect(el.children.length).toBe(0);
+  });
+
+  it('removes strong and b elements only from assistant-rendered content while preserving contents and attributes', () => {
+    const strong = createBoldNode('STRONG', '加粗测试');
+    const bold = createBoldNode('B', '另一种加粗');
+    const boldNodes = [strong.node, bold.node];
+    strong.node.replaceWith.mockImplementation(() => boldNodes.splice(boldNodes.indexOf(strong.node), 1));
+    bold.node.replaceWith.mockImplementation(() => boldNodes.splice(boldNodes.indexOf(bold.node), 1));
+    const container = {
+      closest: jest.fn().mockReturnValue({}),
+      querySelectorAll: jest.fn().mockImplementation(() => [...boldNodes]),
+    } as any;
+
+    normalizeBoldInAssistantMessage(container);
+
+    expect(container.querySelectorAll).toHaveBeenCalledWith('strong, b');
+    expect(strong.node.replaceWith).toHaveBeenCalledWith(strong.replacement);
+    expect(bold.node.replaceWith).toHaveBeenCalledWith(bold.replacement);
+    expect(strong.replacement.children[0].textContent).toBe('加粗测试');
+    expect(strong.replacement.attributes.get('class')).toBe('emphasis');
+    expect(strong.replacement.attributes.get('data-kind')).toBe('markdown');
+    expect(container.querySelectorAll('strong, b')).toHaveLength(0);
+  });
+
+  it('preserves bold nodes nested in assistant headings', () => {
+    const headingBold = createBoldNode('STRONG', '标题', true);
+    const container = {
+      closest: jest.fn().mockReturnValue({}),
+      querySelectorAll: jest.fn().mockReturnValue([headingBold.node]),
+    } as any;
+
+    normalizeBoldInAssistantMessage(container);
+
+    expect(headingBold.node.replaceWith).not.toHaveBeenCalled();
+  });
+
+  it('does not remove bold nodes outside assistant message content', () => {
+    const userBold = createBoldNode('STRONG', '用户输入');
+    const container = {
+      closest: jest.fn().mockReturnValue(null),
+      querySelectorAll: jest.fn(),
+    } as any;
+
+    normalizeBoldInAssistantMessage(container);
+
+    expect(container.querySelectorAll).not.toHaveBeenCalled();
+    expect(userBold.node.replaceWith).not.toHaveBeenCalled();
+  });
+
+  it('normalizes assistant bold nodes after markdown rendering without changing markdown input', async () => {
+    const { MarkdownRenderer } = await import('obsidian');
+    const { renderer } = createRenderer();
+    const strong = createBoldNode('STRONG', '加粗测试');
+    const el = {
+      empty: jest.fn(),
+      closest: jest.fn().mockReturnValue({}),
+      querySelectorAll: jest.fn((selector: string) => selector === 'strong, b' ? [strong.node] : []),
+    } as any;
+    const markdown = '这是 **加粗测试**，这是 __另一种加粗__。\n\n1. 编号仍正常';
+
+    await renderer.renderContent(el, markdown);
+
+    expect(MarkdownRenderer.renderMarkdown).toHaveBeenCalledWith(markdown, el, '', expect.anything());
+    expect(strong.node.replaceWith).toHaveBeenCalledWith(strong.replacement);
+    expect(strong.replacement.children[0].textContent).toBe('加粗测试');
   });
 
   // ============================================
