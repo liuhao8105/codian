@@ -165,29 +165,36 @@
   margin-top: 4px;
 }
 
-/* Normalize font weight in AI responses — all text at 400, headings preserved */
+/* Keep AI responses visually consistent with plain conversation text. */
 .codian-message-assistant .codian-message-content,
 .codian-message-assistant .codian-message-content p,
 .codian-message-assistant .codian-message-content li,
 .codian-message-assistant .codian-message-content div,
 .codian-message-assistant .codian-message-content span,
+.codian-message-assistant .codian-message-content a,
 .codian-message-assistant .codian-message-content strong,
-.codian-message-assistant .codian-message-content b {
+.codian-message-assistant .codian-message-content b,
+.codian-message-assistant .codian-message-content th,
+.codian-message-assistant .codian-message-content td {
   font-weight: 400 !important;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Headings keep their own weight */
+/* Markdown headings retain spacing only; they do not change chat typography. */
 .codian-message-assistant .codian-message-content h1,
 .codian-message-assistant .codian-message-content h2,
 .codian-message-assistant .codian-message-content h3,
 .codian-message-assistant .codian-message-content h4,
 .codian-message-assistant .codian-message-content h5,
 .codian-message-assistant .codian-message-content h6 {
-  font-weight: 600 !important;
-  -webkit-font-smoothing: auto;
-  -moz-osx-font-smoothing: auto;
+  font-size: inherit !important;
+  font-weight: 400 !important;
+  line-height: inherit !important;
+  letter-spacing: 0;
+  margin: 12px 0 8px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Full-width tables */

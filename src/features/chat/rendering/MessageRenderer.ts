@@ -97,10 +97,6 @@ export function normalizeBoldInAssistantMessage(container: HTMLElement): void {
   }
 
   container.querySelectorAll('strong, b').forEach((node) => {
-    if (node.closest('h1, h2, h3, h4, h5, h6')) {
-      return;
-    }
-
     const span = node.ownerDocument.createElement('span');
     Array.from(node.attributes).forEach((attribute) => {
       span.setAttribute(attribute.name, attribute.value);

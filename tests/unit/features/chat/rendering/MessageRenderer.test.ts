@@ -1029,7 +1029,7 @@ describe('MessageRenderer', () => {
     expect(container.querySelectorAll('strong, b')).toHaveLength(0);
   });
 
-  it('preserves bold nodes nested in assistant headings', () => {
+  it('removes bold nodes nested in assistant headings', () => {
     const headingBold = createBoldNode('STRONG', '标题', true);
     const container = {
       closest: jest.fn().mockReturnValue({}),
@@ -1038,7 +1038,8 @@ describe('MessageRenderer', () => {
 
     normalizeBoldInAssistantMessage(container);
 
-    expect(headingBold.node.replaceWith).not.toHaveBeenCalled();
+    expect(headingBold.node.replaceWith).toHaveBeenCalledWith(headingBold.replacement);
+    expect(headingBold.replacement.children[0].textContent).toBe('标题');
   });
 
   it('does not remove bold nodes outside assistant message content', () => {
