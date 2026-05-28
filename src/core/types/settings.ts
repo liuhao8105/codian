@@ -270,8 +270,10 @@ export interface CodianSettings {
   titleGenerationModel: string;  // Model for auto title generation (empty = auto)
   show1MModel: boolean;  // Legacy Anthropic option, hidden in Codian UI
   allowExternalAccess: boolean;  // Allow tools to access files outside the vault
+  temporaryExternalAccess?: boolean;  // Transient per-turn external access; never a persisted user setting
   enableChrome: boolean;  // Enable Chrome extension support (passes --chrome flag)
   enableBangBash: boolean;  // Enable ! bash mode for direct command execution
+  enableDeepSeekBash: boolean;  // Allow DeepSeek tool loop to execute local Bash commands
 
   // Content settings
   excludedTags: string[];
@@ -358,6 +360,7 @@ export const DEFAULT_SETTINGS: CodianSettings = {
   allowExternalAccess: false,  // Keep vault restriction enabled by default
   enableChrome: false,  // Disabled by default
   enableBangBash: false,  // Disabled by default
+  enableDeepSeekBash: false,  // Disabled by default
 
   // Content settings
   excludedTags: [],

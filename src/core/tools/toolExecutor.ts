@@ -8,19 +8,33 @@ import { exec } from 'child_process';
 import * as path from 'path';
 
 import type CodianPlugin from '../../main';
+import { getEnhancedPath } from '../../utils/env';
+import { getPathAccessType, getVaultPath, isPathWithinVault } from '../../utils/path';
+import type { ApprovalCallbackOptions } from '../agent';
 import type { McpServerManager } from '../mcp';
-import { getVaultPath, isPathWithinVault } from '../../utils/path';
-import type { TransactionLog } from './transactionLog';
+import { findBashCommandPathViolation } from '../security/BashPathValidator';
+import { isCommandBlocked } from '../security/BlocklistChecker';
+import { getBashToolBlockedCommands } from '../types';
 import { callMcpTool, classifyMcpToolRisk } from './mcpBridge';
+import type { TransactionLog } from './transactionLog';
 
 export interface ToolExecutionContext {
   plugin: CodianPlugin;
   /** Returns true if the user approved the action. */
-  requestApproval: (toolName: string, description: string, input: Record<string, unknown>) => Promise<boolean>;
+  requestApproval: (
+    toolName: string,
+    description: string,
+    input: Record<string, unknown>,
+    options?: ApprovalCallbackOptions,
+  ) => Promise<boolean>;
   transactionLog: TransactionLog;
   mcpManager?: McpServerManager;
   abortSignal?: AbortSignal;
 }
+
+const DEEPSEEK_BASH_DEFAULT_TIMEOUT_MS = 120_000;
+const DEEPSEEK_BASH_MAX_TIMEOUT_MS = 600_000;
+const DEEPSEEK_BASH_MAX_BUFFER = 10 * 1024 * 1024;
 
 /**
  * Execute a single tool call and return the result string to feed back to the LLM.
@@ -42,12 +56,14 @@ export async function executeDeepSeekToolCall(
       return executeEdit(toolCall.arguments, context);
     case 'Undo':
       return executeUndo(toolCall.arguments, context);
+    case 'Bash':
+      return executeBash(toolCall.arguments, context);
     default:
       // MCP bridge: mcp__<serverName>__<toolName>
       if (toolCall.name.startsWith('mcp__')) {
         return executeMcpCall(toolCall, context);
       }
-      return `Error: Unknown tool '${toolCall.name}'. Available tools: Skill, Read, Grep, Write, Edit, Undo, and MCP tools.`;
+      return `Error: Unknown tool '${toolCall.name}'. Available tools: Skill, Read, Grep, Write, Edit, Undo, Bash when enabled, and MCP tools.`;
   }
 }
 
@@ -145,6 +161,106 @@ async function executeGrep(
         }
       },
     );
+  });
+}
+
+async function executeBash(
+  args: Record<string, unknown>,
+  context: ToolExecutionContext,
+): Promise<string> {
+  const command = String(args.command || '').trim();
+  if (!command) return 'Error: No command provided.';
+
+  const { plugin } = context;
+  if (!plugin.settings.enableDeepSeekBash) {
+    return 'Error: DeepSeek Bash execution is disabled in Codian settings.';
+  }
+
+  const vaultPath = getVaultPath(plugin.app);
+  if (!vaultPath) return 'Error: Cannot determine vault path.';
+
+  const blockedCommands = getBashToolBlockedCommands(plugin.settings.blockedCommands);
+  if (isCommandBlocked(command, blockedCommands, plugin.settings.enableBlocklist)) {
+    return `Error: Command blocked by blocklist: ${command}`;
+  }
+
+  if (!plugin.settings.allowExternalAccess && !plugin.settings.temporaryExternalAccess) {
+    const deepSeekBashContextPaths = [
+      '~/.codex/skills',
+      '~/.agents/skills',
+    ];
+    const violation = findBashCommandPathViolation(command, {
+      getPathAccessType: (p) => getPathAccessType(
+        p,
+        deepSeekBashContextPaths,
+        plugin.settings.allowedExportPaths,
+        vaultPath,
+      ),
+    });
+    if (violation) {
+      const reason = violation.type === 'export_path_read'
+        ? `Command path "${violation.path}" is in an allowed export directory, but export paths are write-only.`
+        : `Command path "${violation.path}" is outside the vault.`;
+      const approved = await context.requestApproval(
+        'Bash',
+        `Allow this command to use an external path for this turn?\n${command}`,
+        {
+          ...args,
+          temporaryExternalAccess: true,
+          blockedPath: violation.path,
+        },
+        {
+          decisionReason: reason,
+          blockedPath: violation.path,
+          approvalKind: 'temporaryExternalAccess',
+        },
+      );
+
+      if (!approved) {
+        return `Error: User denied external path access. ${reason}`;
+      }
+
+      plugin.settings.temporaryExternalAccess = true;
+    }
+  }
+
+  const requestedTimeout = Number(args.timeout_ms);
+  const timeout = Number.isFinite(requestedTimeout) && requestedTimeout > 0
+    ? Math.min(requestedTimeout, DEEPSEEK_BASH_MAX_TIMEOUT_MS)
+    : DEEPSEEK_BASH_DEFAULT_TIMEOUT_MS;
+
+  return new Promise<string>((resolve) => {
+    const child = exec(command, {
+      cwd: vaultPath,
+      env: { ...process.env, PATH: getEnhancedPath() },
+      timeout,
+      maxBuffer: DEEPSEEK_BASH_MAX_BUFFER,
+      shell: process.platform === 'win32' ? 'cmd.exe' : '/bin/bash',
+    }, (error, stdout, stderr) => {
+      const exitCode = typeof error?.code === 'number' ? error.code : error ? 1 : 0;
+      const errorMessage = error
+        ? `\nError: ${error.killed ? `Command timed out after ${timeout}ms` : error.message}`
+        : '';
+      resolve([
+        `Command: ${command}`,
+        `Working directory: ${vaultPath}`,
+        `Exit code: ${exitCode}`,
+        stdout ? `\nstdout:\n${stdout.trim()}` : '',
+        stderr ? `\nstderr:\n${stderr.trim()}` : '',
+        errorMessage,
+      ].filter(Boolean).join('\n'));
+    });
+
+    if (context.abortSignal) {
+      const abortHandler = () => {
+        child.kill();
+        resolve(`Command cancelled: ${command}`);
+      };
+      context.abortSignal.addEventListener('abort', abortHandler, { once: true });
+      child.on('exit', () => {
+        context.abortSignal?.removeEventListener('abort', abortHandler);
+      });
+    }
   });
 }
 

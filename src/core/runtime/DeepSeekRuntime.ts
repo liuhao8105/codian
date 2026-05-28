@@ -1,25 +1,26 @@
 import type { RewindFilesResult } from '@anthropic-ai/claude-agent-sdk';
 
 import type CodianPlugin from '../../main';
+import { isProviderConfigured } from '../../utils/env';
+import { getVaultPath } from '../../utils/path';
 import type { ApprovalCallback, QueryOptions } from '../agent';
+import type { McpServerManager } from '../mcp';
+import { buildSystemPrompt } from '../prompts/mainAgent';
+import { classifyMcpToolRisk, enumerateMcpToolsForDeepSeek } from '../tools/mcpBridge';
+import { executeDeepSeekToolCall, type ToolExecutionContext } from '../tools/toolExecutor';
+import {
+  DEEPSEEK_BASH_TOOL,
+  DEEPSEEK_P1_TOOLS,
+  type DeepSeekToolDefinition,
+  getDeepSeekToolsSystemPromptSection,
+} from '../tools/toolSchemas';
+import { TransactionLog } from '../tools/transactionLog';
 import type {
   ChatMessage,
   ImageAttachment,
   StreamChunk,
 } from '../types';
 import type { AgentRuntime } from './index';
-import { isProviderConfigured } from '../../utils/env';
-import { getVaultPath } from '../../utils/path';
-import { buildSystemPrompt } from '../prompts/mainAgent';
-import {
-  DEEPSEEK_P1_TOOLS,
-  DEEPSEEK_TOOLS_SYSTEM_PROMPT_SECTION,
-  type DeepSeekToolDefinition,
-} from '../tools/toolSchemas';
-import { executeDeepSeekToolCall, type ToolExecutionContext } from '../tools/toolExecutor';
-import { TransactionLog } from '../tools/transactionLog';
-import { enumerateMcpToolsForDeepSeek, classifyMcpToolRisk } from '../tools/mcpBridge';
-import type { McpServerManager } from '../mcp';
 
 /** Maximum tool-calling rounds per user message (final safety net). */
 const MAX_TOOL_ROUNDS = 10;
@@ -526,7 +527,7 @@ export class DeepSeekRuntime implements AgentRuntime {
       userName: this.plugin.settings.userName,
     });
 
-    return base.trim() + '\n\n' + DEEPSEEK_TOOLS_SYSTEM_PROMPT_SECTION;
+    return base.trim() + '\n\n' + getDeepSeekToolsSystemPromptSection(this.plugin.settings.enableDeepSeekBash);
   }
 
   // ── Streaming API call (one round of the tool loop) ──
@@ -620,7 +621,11 @@ export class DeepSeekRuntime implements AgentRuntime {
         console.warn('[Codian MCP] discovery failed:', err instanceof Error ? err.message : String(err));
       }
     }
-    const allTools = [...DEEPSEEK_P1_TOOLS, ...mcpTools];
+    const allTools = [
+      ...DEEPSEEK_P1_TOOLS,
+      ...(this.plugin.settings.enableDeepSeekBash ? [DEEPSEEK_BASH_TOOL] : []),
+      ...mcpTools,
+    ];
 
     const messages: DeepSeekMessage[] = [];
 
@@ -776,7 +781,7 @@ export class DeepSeekRuntime implements AgentRuntime {
           try {
             const execContext: ToolExecutionContext = {
               plugin: this.plugin,
-              requestApproval: async (toolName, description, input) => {
+              requestApproval: async (toolName, description, input, options) => {
                 // Session-level auto-approval for low-risk tools (Write, Edit, Undo, read-only MCP)
                 const category = getApprovalCategory(toolName);
                 if (category && this.approvalMemory.has(category)) {
@@ -787,7 +792,7 @@ export class DeepSeekRuntime implements AgentRuntime {
                   console.warn('[Codian] approval denied: no callback registered for', toolName);
                   return false;
                 }
-                const decision = await this.approvalCallback(toolName, input, description);
+                const decision = await this.approvalCallback(toolName, input, description, options);
                 console.debug('[Codian] approval for', toolName, ':', decision);
                 const approved = decision === 'allow' || decision === 'allow-always';
                 // Remember for this session if approved and category is low-risk

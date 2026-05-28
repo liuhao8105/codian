@@ -1,12 +1,12 @@
 import { Notice } from 'obsidian';
 
+import { detectBuiltInCommand } from '../../../core/commands';
 import type {
   AgentRuntime,
   ApprovalCallbackOptions,
   InstructionRuntime,
   TitleRuntime,
 } from '../../../core/runtime';
-import { detectBuiltInCommand } from '../../../core/commands';
 import { TOOL_EXIT_PLAN_MODE } from '../../../core/tools/toolNames';
 import type { ApprovalDecision, ChatMessage, ExitPlanModeDecision } from '../../../core/types';
 import type CodianPlugin from '../../../main';
@@ -41,6 +41,8 @@ const APPROVAL_OPTION_MAP: Record<string, ApprovalDecision> = {
   'Deny': 'deny',
   'Allow once': 'allow',
   'Always allow': 'allow-always',
+  '拒绝': 'deny',
+  '允许本次': 'allow',
 };
 
 function mergeImages(existing: ChatMessage['images'], incoming: ChatMessage['images']): ChatMessage['images'] {
@@ -73,6 +75,17 @@ const VISUAL_REQUEST_PATTERN = /(?:图片|图像|照片|截图|配图|封面|海
 const MAX_AUTO_ATTACHED_NOTE_IMAGES = 4;
 /** Skip auto-attached images larger than 500KB raw to avoid input overflow. */
 const MAX_AUTO_ATTACHED_IMAGE_BYTES = 500_000;
+
+function shouldEnableTemporaryExternalAccess(rawContent: string): boolean {
+  const text = rawContent.trim().toLowerCase();
+  if (!text) return false;
+
+  const hasExplicitAllow = /允许|同意|放开|開放|allow|enable|permit/.test(text);
+  const hasTemporaryScope = /本次|这次|當次|临时|臨時|暂时|暫時|temporary|this turn|this task|for this task/.test(text);
+  const hasExternalPath = /外部(?:绝对)?路径|外部绝对路径|绝对路径|絕對路徑|external path|absolute path|outside (?:the )?vault/.test(text);
+
+  return hasExplicitAllow && hasTemporaryScope && hasExternalPath;
+}
 
 function shouldAttachCurrentNoteEmbeddedImages(rawContent: string): boolean {
   return VISUAL_REQUEST_PATTERN.test(rawContent);
@@ -682,6 +695,15 @@ export class InputController {
       return;
     }
 
+    const hadTemporaryExternalAccessSetting = Object.prototype.hasOwnProperty.call(
+      plugin.settings,
+      'temporaryExternalAccess'
+    );
+    const previousTemporaryExternalAccess = plugin.settings.temporaryExternalAccess;
+    if (shouldEnableTemporaryExternalAccess(effectiveContent)) {
+      plugin.settings.temporaryExternalAccess = true;
+    }
+
     // Restore pendingResumeAt from persisted conversation state (survives plugin reload)
     const conversationIdForSend = state.currentConversationId;
     if (conversationIdForSend) {
@@ -729,6 +751,12 @@ export class InputController {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       await streamController.appendText(`\n\n**Error:** ${errorMsg}`);
     } finally {
+      if (hadTemporaryExternalAccessSetting) {
+        plugin.settings.temporaryExternalAccess = previousTemporaryExternalAccess;
+      } else {
+        delete plugin.settings.temporaryExternalAccess;
+      }
+
       // ALWAYS clear the timer interval, even on stream invalidation (prevents memory leaks)
       state.clearFlavorTimerInterval();
 
@@ -1153,8 +1181,9 @@ export class InputController {
 
     headerEl.createDiv({ text: description, cls: 'codian-ask-approval-desc' });
 
-    // Always include "Always allow" — SDK callback has no toggle
-    const questionOptions = Object.keys(APPROVAL_OPTION_MAP);
+    const questionOptions = approvalOptions?.approvalKind === 'temporaryExternalAccess'
+      ? ['拒绝', '允许本次']
+      : ['Deny', 'Allow once', 'Always allow'];
     const input = { questions: [{ question: 'Allow this action?', options: questionOptions }] };
 
     const result = await this.showInlineQuestion(

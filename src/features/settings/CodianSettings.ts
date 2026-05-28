@@ -671,6 +671,18 @@ export class CodianSettingTab extends PluginSettingTab {
     bangBashValidationEl.style.marginBottom = '0.5em';
     bangBashValidationEl.style.display = 'none';
 
+    new Setting(containerEl)
+      .setName('允许 DeepSeek 执行本地命令')
+      .setDesc('开启后，DeepSeek 可以在工具循环中直接运行 Bash 命令以执行 Skill 里的 Python、yt-dlp、ffmpeg 等步骤。不会弹出确认，但仍受命令黑名单和 vault 工作目录限制。')
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.enableDeepSeekBash ?? false)
+          .onChange(async (value) => {
+            this.plugin.settings.enableDeepSeekBash = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
     const maxTabsSetting = new Setting(containerEl)
       .setName(t('settings.maxTabs.name'))
       .setDesc(t('settings.maxTabs.desc'));

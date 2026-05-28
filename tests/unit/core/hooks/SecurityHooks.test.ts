@@ -197,6 +197,23 @@ describe('SecurityHooks', () => {
         });
       });
 
+      it('allows Bash commands with outside paths when external access is temporarily enabled', async () => {
+        const context = {
+          getPathAccessType: (): PathAccessType => 'none',
+          isExternalAccessAllowed: () => true,
+        } as VaultRestrictionContext & { isExternalAccessAllowed: () => boolean };
+
+        const hook = createVaultRestrictionHook(context);
+
+        const result = await hook.hooks[0](
+          createHookInput('Bash', { command: 'echo ok /etc/passwd' }),
+          'tool-1',
+          { signal: new AbortController().signal }
+        );
+
+        expect(result).toEqual({ continue: true });
+      });
+
       it('blocks read from export paths in Bash commands', async () => {
         const context: VaultRestrictionContext = {
           getPathAccessType: (path: string): PathAccessType => {

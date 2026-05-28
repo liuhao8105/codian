@@ -1426,6 +1426,65 @@ describe('InputController - Message Queue', () => {
       const queryOptions = queryCall[3];
       expect(queryOptions.externalContextPaths).toEqual(externalPaths);
     });
+
+    it('should enable temporary external access for the current send and restore it afterward', async () => {
+      deps = createSendableDeps();
+      deps.plugin.settings.temporaryExternalAccess = false;
+      let observedDuringQuery = false;
+
+      ((deps as any).mockAgentService.query as jest.Mock).mockImplementation(async function* () {
+        observedDuringQuery = deps.plugin.settings.temporaryExternalAccess === true;
+        yield { type: 'done' };
+      });
+
+      inputEl = deps.getInputEl() as ReturnType<typeof createMockInputEl>;
+      inputEl.value = '允许本次任务临时使用外部绝对路径，结束后关闭。运行一个需要外部工具的 skill';
+      controller = new InputController(deps);
+
+      await controller.sendMessage();
+
+      expect(observedDuringQuery).toBe(true);
+      expect(deps.plugin.settings.temporaryExternalAccess).toBe(false);
+    });
+
+    it('should restore temporary external access after a failed send', async () => {
+      deps = createSendableDeps();
+      deps.plugin.settings.temporaryExternalAccess = false;
+      let observedDuringQuery = false;
+
+      ((deps as any).mockAgentService.query as jest.Mock).mockImplementation(async function* () {
+        observedDuringQuery = deps.plugin.settings.temporaryExternalAccess === true;
+        yield { type: 'text', content: 'before failure' };
+        throw new Error('query failed');
+      });
+
+      inputEl = deps.getInputEl() as ReturnType<typeof createMockInputEl>;
+      inputEl.value = '允许本次任务临时使用外部绝对路径，结束后关闭。运行一个需要外部工具的 skill';
+      controller = new InputController(deps);
+
+      await controller.sendMessage();
+
+      expect(observedDuringQuery).toBe(true);
+      expect(deps.plugin.settings.temporaryExternalAccess).toBe(false);
+    });
+
+    it('should restore temporary external access when a tool enables it during execution', async () => {
+      deps = createSendableDeps();
+      deps.plugin.settings.temporaryExternalAccess = false;
+
+      ((deps as any).mockAgentService.query as jest.Mock).mockImplementation(async function* () {
+        deps.plugin.settings.temporaryExternalAccess = true;
+        yield { type: 'done' };
+      });
+
+      inputEl = deps.getInputEl() as ReturnType<typeof createMockInputEl>;
+      inputEl.value = '运行一个需要外部工具的 skill';
+      controller = new InputController(deps);
+
+      await controller.sendMessage();
+
+      expect(deps.plugin.settings.temporaryExternalAccess).toBe(false);
+    });
   });
 
   describe('Memory file context', () => {
@@ -1915,6 +1974,41 @@ Other content`);
 
       controller.dismissPendingApproval();
       await approvalPromise;
+    });
+
+    it('should show only deny and allow-once choices for temporary external access approval', async () => {
+      const parentEl = createMockEl();
+      const inputContainerEl = createMockEl();
+      (inputContainerEl as any).parentElement = parentEl;
+      deps.getInputContainerEl = () => inputContainerEl as any;
+
+      controller = new InputController(deps);
+
+      const approvalPromise = controller.handleApprovalRequest(
+        'Bash',
+        { command: 'echo ok /etc/passwd' },
+        'Allow this command to use an external path for this turn.',
+        {
+          approvalKind: 'temporaryExternalAccess',
+          decisionReason: 'Command path is outside the vault.',
+          blockedPath: '/etc/passwd',
+        },
+      );
+
+      const labels = parentEl
+        .querySelectorAll('codian-ask-item-label')
+        .map((item: any) => item.textContent);
+
+      expect(labels).toEqual(['拒绝', '允许本次']);
+
+      const allowThisTime = parentEl.querySelectorAll('codian-ask-item').find((item: any) => {
+        const label = item.querySelector('codian-ask-item-label');
+        return label?.textContent === '允许本次';
+      });
+      expect(allowThisTime).toBeDefined();
+      allowThisTime!.click();
+
+      await expect(approvalPromise).resolves.toBe('allow');
     });
 
     it('should restore input visibility after overlapping inline prompts are dismissed', async () => {

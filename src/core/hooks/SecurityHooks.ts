@@ -22,6 +22,7 @@ export interface BlocklistContext {
 
 export interface VaultRestrictionContext {
   getPathAccessType: (filePath: string) => PathAccessType;
+  isExternalAccessAllowed?: () => boolean;
 }
 
 /**
@@ -74,6 +75,9 @@ export function createVaultRestrictionHook(context: VaultRestrictionContext): Ho
 
         // Bash: inspect command for paths that escape the vault
         if (toolName === TOOL_BASH) {
+          if (context.isExternalAccessAllowed?.()) {
+            return { continue: true };
+          }
           const command = (input.tool_input?.command as string) || '';
           const pathCheckContext: PathCheckContext = {
             getPathAccessType: (p) => context.getPathAccessType(p),
@@ -103,6 +107,10 @@ export function createVaultRestrictionHook(context: VaultRestrictionContext): Ho
         const filePath = getPathFromToolInput(toolName, input.tool_input);
 
         if (filePath) {
+          if (context.isExternalAccessAllowed?.()) {
+            return { continue: true };
+          }
+
           const accessType = context.getPathAccessType(filePath);
 
           // Allow full access to vault, readwrite, and context paths

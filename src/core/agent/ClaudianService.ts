@@ -88,6 +88,7 @@ export interface ApprovalCallbackOptions {
   decisionReason?: string;
   blockedPath?: string;
   agentID?: string;
+  approvalKind?: 'temporaryExternalAccess';
 }
 
 export type ApprovalCallback = (
@@ -518,6 +519,7 @@ export class CodianService {
       hooks.PreToolUse = [blocklistHook];
     } else {
       const vaultRestrictionHook = createVaultRestrictionHook({
+        isExternalAccessAllowed: () => this.plugin.settings.temporaryExternalAccess === true,
         getPathAccessType: (p) => {
           if (!this.vaultPath) return 'vault';
           // For cold-start queries, use the passed externalContextPaths.
