@@ -32,6 +32,10 @@ import { normalizeCodexModelForRuntime, resolveCodexCliPath } from './codexExec'
 
 type Waiter = () => void;
 const CODIAN_RUNTIME_DIAGNOSTIC_LOG = path.join(os.tmpdir(), 'codian-runtime.log');
+const MAX_SUBAGENT_WAIT_TURNS = 3;
+const SUBAGENT_WAIT_PROMPT = `Background subagents are still running.
+
+You must retrieve their results before ending this turn. Use TaskOutput with block=true for each running task, then incorporate the results into the user-facing answer. Do not produce a final answer until no background subagents remain running.`;
 
 async function appendRuntimeDiagnosticLog(message: string): Promise<void> {
   try {
@@ -157,6 +161,7 @@ export class CodexAgentRuntime implements AgentRuntime {
     ((input: Record<string, unknown>, signal?: AbortSignal) => Promise<Record<string, string> | null>) | null = null;
   private exitPlanModeCallback: ExitPlanModeCallback | null = null;
   private permissionModeSyncCallback: ((sdkMode: string) => void) | null = null;
+  private subagentStateProvider: (() => SubagentHookState) | null = null;
 
   constructor(plugin: CodianPlugin, mcpManager: McpServerManager) {
     this.plugin = plugin;
@@ -425,6 +430,49 @@ ${prompt}
     const commandOutputByItemId = new Map<string, string>();
     let activeAgentMessageItemId: string | null = null;
     let hasStreamedAgentText = false;
+    let subagentWaitTurns = 0;
+
+    const hasRunningSubagents = (): boolean => {
+      if (!this.subagentStateProvider) return false;
+      try {
+        return this.subagentStateProvider().hasRunning;
+      } catch {
+        return true;
+      }
+    };
+
+    const startSubagentWaitTurn = async (): Promise<boolean> => {
+      if (!hasRunningSubagents()) return false;
+      if (subagentWaitTurns >= MAX_SUBAGENT_WAIT_TURNS) {
+        void appendRuntimeDiagnosticLog('subagent-wait-max-attempts-reached');
+        return false;
+      }
+      const client = this.activeClient;
+      if (!client || !this.threadId) {
+        void appendRuntimeDiagnosticLog('subagent-wait-missing-client-or-thread');
+        return false;
+      }
+      subagentWaitTurns += 1;
+      void appendRuntimeDiagnosticLog(`subagent-wait-turn-start attempt=${subagentWaitTurns}`);
+      try {
+        const started = await client.request('turn/start', {
+          threadId: this.threadId,
+          input: await this.buildInput(SUBAGENT_WAIT_PROMPT, []),
+          cwd: vaultPath,
+          approvalPolicy: this.getApprovalPolicy(),
+          sandboxPolicy: this.buildTurnSandboxPolicy(queryOptions),
+          model: requestedModel ?? null,
+        });
+        const turn = asRecord(started.turn);
+        this.activeTurnId = asString(turn?.id);
+        void appendRuntimeDiagnosticLog(`subagent-wait-turn-started ${this.activeTurnId ?? 'null'}`);
+        return true;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        void appendRuntimeDiagnosticLog(`subagent-wait-turn-failed ${message}`);
+        return false;
+      }
+    };
 
     const ensureAgentMessageSeparation = (itemId: string) => {
       if (!itemId) return;
@@ -646,6 +694,19 @@ ${prompt}
 
         case 'turn/completed': {
           void appendRuntimeDiagnosticLog('notification-turn-completed');
+          if (hasRunningSubagents()) {
+            void (async () => {
+              const started = await startSubagentWaitTurn();
+              if (started) return;
+              queue.push({
+                type: 'blocked',
+                content: 'Background subagents are still running, but Codian could not start a follow-up wait turn. Ask Codian to continue and wait for the task results.',
+              });
+              queue.push({ type: 'done' });
+              queue.finish();
+            })();
+            break;
+          }
           queue.push({ type: 'done' });
           queue.finish();
           break;
@@ -850,8 +911,8 @@ ${prompt}
     this.permissionModeSyncCallback = callback;
   }
 
-  setSubagentHookProvider(_getState: () => SubagentHookState): void {
-    // Codex runtime does not use Claude SDK hooks. Kept for runtime compatibility.
+  setSubagentHookProvider(getState: () => SubagentHookState): void {
+    this.subagentStateProvider = getState;
   }
 
   setAutoTurnCallback(_callback: ((chunks: StreamChunk[]) => void) | null): void {
