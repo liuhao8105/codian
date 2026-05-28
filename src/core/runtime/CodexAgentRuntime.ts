@@ -1,23 +1,23 @@
+import type { RewindFilesResult } from '@anthropic-ai/claude-agent-sdk';
+import { createHash } from 'crypto';
 import { promises as fs } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { createHash } from 'crypto';
-import type { RewindFilesResult } from '@anthropic-ai/claude-agent-sdk';
 
 import type CodianPlugin from '../../main';
-import { TOOL_EDIT, TOOL_MCP } from '../tools/toolNames';
-import { buildSystemPrompt } from '../prompts/mainAgent';
 import { stripCurrentNoteContext } from '../../utils/context';
+import { isProviderConfigured } from '../../utils/env';
 import { getVaultPath } from '../../utils/path';
 import {
   buildContextFromHistory,
   buildPromptWithHistoryContext,
   getLastUserMessage,
 } from '../../utils/session';
-import { isProviderConfigured } from '../../utils/env';
 import type { ApprovalCallback, QueryOptions } from '../agent';
 import type { SubagentHookState } from '../hooks';
 import type { McpServerManager } from '../mcp';
+import { buildSystemPrompt } from '../prompts/mainAgent';
+import { TOOL_EDIT, TOOL_MCP } from '../tools/toolNames';
 import type {
   ChatMessage,
   Conversation,
@@ -26,9 +26,9 @@ import type {
   SlashCommand,
   StreamChunk,
 } from '../types';
-import type { AgentRuntime } from './index';
-import { CodexAppServerClient, type AppServerNotification } from './CodexAppServerClient';
+import { type AppServerNotification,CodexAppServerClient } from './CodexAppServerClient';
 import { normalizeCodexModelForRuntime, resolveCodexCliPath } from './codexExec';
+import type { AgentRuntime } from './index';
 
 type Waiter = () => void;
 const CODIAN_RUNTIME_DIAGNOSTIC_LOG = path.join(os.tmpdir(), 'codian-runtime.log');
@@ -118,6 +118,18 @@ function extractReadableErrorMessage(rawMessage: string): string {
 function isInputTooLongError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error ?? '');
   return /Input exceeds the maximum length of \d+ characters/i.test(message);
+}
+
+function isRetryableAppServerError(params: Record<string, unknown>): boolean {
+  return params.willRetry === true;
+}
+
+function getAppServerErrorMessage(params: Record<string, unknown>): string {
+  const direct = asString(params.message);
+  if (direct) return direct;
+
+  const nested = asRecord(params.error);
+  return asString(nested?.message) || 'Codex App Server 执行失败。';
 }
 
 function mapPlanStepStatus(value: unknown): 'pending' | 'in_progress' | 'completed' {
@@ -684,8 +696,12 @@ ${prompt}
         }
 
         case 'error': {
-          const rawMessage = asString(notification.params.message) || 'Codex App Server 执行失败。';
+          const rawMessage = getAppServerErrorMessage(notification.params);
           void appendRuntimeDiagnosticLog(`notification-error raw=${rawMessage} fullParams=${JSON.stringify(notification.params)}`);
+          if (isRetryableAppServerError(notification.params)) {
+            void appendRuntimeDiagnosticLog('notification-error-retryable-ignored');
+            break;
+          }
           const message = extractReadableErrorMessage(rawMessage);
           queue.push({ type: 'error', content: message });
           queue.finish();

@@ -75,6 +75,9 @@ const VISUAL_REQUEST_PATTERN = /(?:图片|图像|照片|截图|配图|封面|海
 const MAX_AUTO_ATTACHED_NOTE_IMAGES = 4;
 /** Skip auto-attached images larger than 500KB raw to avoid input overflow. */
 const MAX_AUTO_ATTACHED_IMAGE_BYTES = 500_000;
+const LONG_RUNNING_FEEDBACK_DELAY_MS = 15_000;
+const LONG_RUNNING_FEEDBACK_TEXT = '仍在执行，等待 Codex 返回结果...';
+const LONG_RUNNING_FEEDBACK_CLASS = 'codian-thinking--waiting';
 
 function shouldEnableTemporaryExternalAccess(rawContent: string): boolean {
   const text = rawContent.trim().toLowerCase();
@@ -703,6 +706,23 @@ export class InputController {
     if (shouldEnableTemporaryExternalAccess(effectiveContent)) {
       plugin.settings.temporaryExternalAccess = true;
     }
+    let longRunningFeedbackTimeout: ReturnType<typeof setTimeout> | null = null;
+    const clearLongRunningFeedback = () => {
+      if (longRunningFeedbackTimeout) {
+        clearTimeout(longRunningFeedbackTimeout);
+        longRunningFeedbackTimeout = null;
+      }
+    };
+    const scheduleLongRunningFeedback = () => {
+      clearLongRunningFeedback();
+      longRunningFeedbackTimeout = setTimeout(() => {
+        longRunningFeedbackTimeout = null;
+        if (!state.isStreaming || state.streamGeneration !== streamGeneration || state.cancelRequested) {
+          return;
+        }
+        streamController.showThinkingIndicator(LONG_RUNNING_FEEDBACK_TEXT, LONG_RUNNING_FEEDBACK_CLASS);
+      }, LONG_RUNNING_FEEDBACK_DELAY_MS);
+    };
 
     // Restore pendingResumeAt from persisted conversation state (survives plugin reload)
     const conversationIdForSend = state.currentConversationId;
@@ -725,14 +745,18 @@ export class InputController {
       // Pass history WITHOUT current turn (userMsg + assistantMsg we just added)
       // This prevents duplication when rebuilding context for new sessions
       const previousMessages = state.messages.slice(0, -2);
+      scheduleLongRunningFeedback();
       for await (const chunk of agentService.query(promptToSend, imagesForMessage, previousMessages, queryOptions)) {
+        clearLongRunningFeedback();
         if (chunk.type === 'sdk_user_uuid') {
           userMsg.sdkUserUuid = chunk.uuid;
+          scheduleLongRunningFeedback();
           continue;
         }
 
         if (chunk.type === 'sdk_user_sent') {
           didEnqueueToSdk = true;
+          scheduleLongRunningFeedback();
           continue;
         }
 
@@ -746,11 +770,16 @@ export class InputController {
         }
 
         await streamController.handleStreamChunk(chunk, assistantMsg);
+        if (chunk.type !== 'done' && chunk.type !== 'error' && chunk.type !== 'blocked') {
+          scheduleLongRunningFeedback();
+        }
       }
     } catch (error) {
+      clearLongRunningFeedback();
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       await streamController.appendText(`\n\n**Error:** ${errorMsg}`);
     } finally {
+      clearLongRunningFeedback();
       if (hadTemporaryExternalAccessSetting) {
         plugin.settings.temporaryExternalAccess = previousTemporaryExternalAccess;
       } else {

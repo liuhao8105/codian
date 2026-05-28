@@ -13,7 +13,7 @@ import {
   TOOL_TODO_WRITE,
   TOOL_WRITE,
 } from '../../../core/tools/toolNames';
-import type { ChatMessage, StreamChunk, SubagentInfo, ToolCallInfo, ContentBlock } from '../../../core/types';
+import type { ChatMessage, ContentBlock,StreamChunk, SubagentInfo, ToolCallInfo } from '../../../core/types';
 import type { SDKToolUseResult } from '../../../core/types/diff';
 import type CodianPlugin from '../../../main';
 import { formatDurationMmSs } from '../../../utils/date';
@@ -24,14 +24,14 @@ import { FLAVOR_TEXTS } from '../constants';
 import {
   appendThinkingContent,
   createThinkingBlock,
-  renderOrUpdateCommandBlock,
-  renderOrUpdatePlanBlock,
   createWriteEditBlock,
   finalizeThinkingBlock,
   finalizeWriteEditBlock,
   getToolName,
   getToolSummary,
   isBlockedToolResult,
+  renderOrUpdateCommandBlock,
+  renderOrUpdatePlanBlock,
   renderToolCall,
   updateToolCallResult,
   updateWriteEditWithDiff,
@@ -1037,6 +1037,14 @@ export class StreamController {
 
     // If indicator already exists, just re-append it to the bottom
     if (state.thinkingEl) {
+      if (overrideText) {
+        state.thinkingEl.className = overrideCls
+          ? `codian-thinking ${overrideCls}`
+          : 'codian-thinking';
+        state.thinkingEl.empty();
+        state.thinkingEl.createSpan({ text: overrideText });
+        state.queueIndicatorEl = state.thinkingEl.createDiv({ cls: 'codian-queue-indicator' });
+      }
       state.currentContentEl.appendChild(state.thinkingEl);
       this.deps.updateQueueIndicator();
       return;

@@ -1289,6 +1289,49 @@ describe('InputController - Message Queue', () => {
     });
   });
 
+  describe('Long-running stream feedback', () => {
+    it('should show a waiting status when no visible output arrives for a while', async () => {
+      jest.useFakeTimers();
+      try {
+        deps = createSendableDeps();
+
+        const streamRelease: { current: (() => void) | null } = { current: null };
+        ((deps as any).mockAgentService.query as jest.Mock).mockImplementation(() => {
+          return (async function* () {
+            await new Promise<void>((resolve) => {
+              streamRelease.current = resolve;
+            });
+            yield { type: 'done' };
+          })();
+        });
+
+        inputEl = deps.getInputEl() as ReturnType<typeof createMockInputEl>;
+        inputEl.value = 'test message';
+        controller = new InputController(deps);
+
+        const sendPromise = controller.sendMessage();
+        for (let i = 0; i < 5; i++) {
+          await Promise.resolve();
+        }
+
+        expect((deps as any).mockAgentService.query).toHaveBeenCalled();
+
+        jest.advanceTimersByTime(15_000);
+        await Promise.resolve();
+
+        expect(deps.streamController.showThinkingIndicator).toHaveBeenCalledWith(
+          '仍在执行，等待 Codex 返回结果...',
+          'codian-thinking--waiting',
+        );
+
+        streamRelease.current?.();
+        await sendPromise;
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
+
   describe('Stream interruption', () => {
     it('should append interrupted text when cancelRequested is true', async () => {
       deps = createSendableDeps();
