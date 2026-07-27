@@ -28,6 +28,7 @@ export {
   hydrateSensitiveSettings,
   sanitizeSensitiveSettings,
   type SecretStorageBackend,
+  type SecretStorageStatus,
   SecureSecretStorage,
   type SensitiveSettingsPayload,
 } from './SecureSecretStorage';

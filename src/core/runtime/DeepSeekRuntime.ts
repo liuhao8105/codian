@@ -802,6 +802,7 @@ export class DeepSeekRuntime implements AgentRuntime {
                 return approved;
               },
               transactionLog: this.transactionLog,
+              recoveryJournal: this.plugin.storage.recovery,
               mcpManager: this.mcpManager,
               abortSignal: this.activeAbortController.signal,
             };

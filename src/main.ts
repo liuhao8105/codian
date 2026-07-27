@@ -9,6 +9,7 @@ import type { Editor, MarkdownView } from 'obsidian';
 import { Notice, Plugin } from 'obsidian';
 
 import { AgentManager } from './core/agents';
+import { CodianDiagnostics } from './core/diagnostics';
 import { McpServerManager } from './core/mcp';
 import { PluginManager } from './core/plugins';
 import { createAgentRuntime } from './core/runtime';
@@ -246,6 +247,20 @@ export default class CodianPlugin extends Plugin {
       name: 'Open chat view',
       callback: () => {
         this.activateView();
+      },
+    });
+
+    this.addCommand({
+      id: 'copy-local-diagnostics',
+      name: 'Copy local diagnostics (secret-free)',
+      callback: async () => {
+        try {
+          const snapshot = await new CodianDiagnostics(this).buildSnapshot();
+          await navigator.clipboard.writeText(JSON.stringify(snapshot, null, 2));
+          new Notice('Codian 本地诊断已复制；不包含密钥、用户名或文件路径。');
+        } catch (error) {
+          new Notice(`Codian 诊断生成失败：${error instanceof Error ? error.message : String(error)}`);
+        }
       },
     });
 

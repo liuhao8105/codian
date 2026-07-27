@@ -16,6 +16,15 @@ export {
   type LocalMemoryType,
 } from './LocalMemoryStorage';
 export { MCP_CONFIG_PATH, McpStorage } from './McpStorage';
+export {
+  MAX_RECOVERY_ENTRIES,
+  MAX_RECOVERY_JOURNAL_BYTES,
+  MAX_RECOVERY_SNAPSHOT_BYTES,
+  RECOVERY_JOURNAL_PATH,
+  RecoveryJournal,
+  type RecoveryJournalEntry,
+  type RecoveryState,
+} from './RecoveryJournal';
 export { SESSIONS_PATH, SessionStorage } from './SessionStorage';
 export { SKILLS_PATH, SkillStorage } from './SkillStorage';
 export { COMMANDS_PATH, SlashCommandStorage } from './SlashCommandStorage';

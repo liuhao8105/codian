@@ -24,6 +24,7 @@ import {
   hasSensitiveSettings,
   hydrateSensitiveSettings,
   sanitizeSensitiveSettings,
+  type SecretStorageStatus,
   SecureSecretStorage,
 } from '../security';
 import type {
@@ -55,6 +56,7 @@ import {
   convertEnvObjectToString,
   mergeEnvironmentVariables,
 } from './migrationConstants';
+import { RecoveryJournal } from './RecoveryJournal';
 import { SESSIONS_PATH, SessionStorage } from './SessionStorage';
 import { SKILLS_PATH, SkillStorage } from './SkillStorage';
 import { COMMANDS_PATH, SlashCommandStorage } from './SlashCommandStorage';
@@ -78,6 +80,10 @@ export interface CombinedSettings {
   cc: CCSettings;
   /** Claudian-specific settings */
   claudian: StoredCodianSettings;
+}
+
+export interface CodianSecretStorageStatus extends SecretStorageStatus {
+  retainedLegacyPlaintext: boolean;
 }
 
 /** Legacy data format (pre-split migration). */
@@ -138,6 +144,7 @@ export class StorageService {
   readonly mcp: McpStorage;
   readonly agents: AgentVaultStorage;
   readonly localMemory: LocalMemoryStorage;
+  readonly recovery: RecoveryJournal;
 
   private adapter: VaultFileAdapter;
   private plugin: Plugin;
@@ -158,6 +165,7 @@ export class StorageService {
     this.mcp = new McpStorage(this.adapter);
     this.agents = new AgentVaultStorage(this.adapter);
     this.localMemory = new LocalMemoryStorage(this.adapter);
+    this.recovery = new RecoveryJournal(this.adapter);
   }
 
   async initialize(): Promise<CombinedSettings> {
@@ -172,6 +180,13 @@ export class StorageService {
     claudian = await this.hydrateAndMigrateSecrets(claudian);
 
     return { cc, claudian };
+  }
+
+  async getSecretStorageStatus(): Promise<CodianSecretStorageStatus> {
+    return {
+      ...(await this.secretStorage.getStatus()),
+      retainedLegacyPlaintext: this.retainedLegacyPlaintext,
+    };
   }
 
   private async hydrateAndMigrateSecrets(

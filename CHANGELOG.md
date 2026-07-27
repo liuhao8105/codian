@@ -25,6 +25,23 @@
 - Fixed image input for the `Codex App Server` adapter by sending the correct `localImage` item type.
 - Added automatic stale-thread recovery: when an old conversation thread cannot continue, `Codian` now rebuilds the request history into a fresh thread and retries once.
 
+## 1.3.84-long-run-completion
+
+### What changed
+
+- Added secret redaction, a hard per-entry size limit, and three-generation rotation for local diagnostic logs.
+- Replaced repeated Codex session-tree searches with a deterministic index capped at 20,000 visited entries per rebuild.
+- Added a persistent, atomic DeepSeek Write/Edit recovery journal that remains available after restart and requires explicit user approval for Undo.
+- Refuses recovery when the target changed after the recorded operation, preventing an old snapshot from overwriting newer edits.
+- Added a local diagnostics command that copies only bounded aggregate health data and never includes secrets, usernames, absolute paths, file content, telemetry, or network submission.
+- Added deterministic install and rollback archives, exact archive-content validation, cross-file version checks, and SHA-256 verification.
+
+### Compatibility and limits
+
+- No new runtime dependency, API key, database, server, Docker service, paid account, or telemetry.
+- Persistent recovery covers Codian-owned DeepSeek Write/Edit operations. Codex App Server, Bash, and external MCP actions cannot be universally rolled back because complete pre-action state is not available.
+- Obsidian minimum version remains `1.4.5`.
+
 ## 1.3.67
 
 Initial public Codian release.
