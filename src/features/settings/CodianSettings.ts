@@ -80,6 +80,7 @@ function addHotkeySettingRow(
 export class CodianSettingTab extends PluginSettingTab {
   plugin: CodianPlugin;
   private contextLimitsContainer: HTMLElement | null = null;
+  private mcpSettingsManager: McpSettingsManager | null = null;
 
   constructor(app: App, plugin: CodianPlugin) {
     super(app, plugin);
@@ -88,6 +89,8 @@ export class CodianSettingTab extends PluginSettingTab {
 
   display(): void {
     const { containerEl } = this;
+    this.mcpSettingsManager?.destroy();
+    this.mcpSettingsManager = null;
     containerEl.empty();
     containerEl.addClass('codian-settings');
 
@@ -566,7 +569,7 @@ export class CodianSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('DeepSeek API Key')
-      .setDesc('用于访问 DeepSeek 的密钥。仅保存在当前仓库设置中。')
+      .setDesc('使用系统安全存储加密，仅在当前设备解密；不会写入或同步到仓库设置文件。')
       .addText((text) => {
         text
           .setPlaceholder('sk-...')
@@ -583,7 +586,7 @@ export class CodianSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('DeepSeek Base URL')
-      .setDesc('不要直接填 `https://api.deepseek.com/v1`。当前 Codex App Server 需要支持 `/v1/responses` 的 OpenAI 兼容网关。')
+      .setDesc('默认使用 DeepSeek 官方地址；也可填写兼容 OpenAI Chat Completions 的代理地址。')
       .addText((text) => {
         text
           .setPlaceholder('https://your-gateway.example.com/v1')
@@ -617,7 +620,7 @@ export class CodianSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName(t('settings.customVariables.name'))
-      .setDesc('高级覆盖区：用于兼容特殊场景或手动覆盖 Provider 生成的环境变量。')
+      .setDesc('高级覆盖区：内容会使用系统安全存储加密，不会写入或同步到仓库设置文件。')
       .addTextArea((text) => {
         text
           .setPlaceholder('OPENAI_API_KEY=your-key\nOPENAI_BASE_URL=https://api.example.com/v1\nCODEX_MODEL=gpt-5')
@@ -889,7 +892,12 @@ export class CodianSettingTab extends PluginSettingTab {
     });
 
     const mcpContainer = details.createDiv({ cls: 'codian-mcp-container' });
-    new McpSettingsManager(mcpContainer, this.plugin);
+    this.mcpSettingsManager = new McpSettingsManager(mcpContainer, this.plugin);
+  }
+
+  hide(): void {
+    this.mcpSettingsManager?.destroy();
+    this.mcpSettingsManager = null;
   }
 
   private renderContextLimitsSection(): void {

@@ -15,11 +15,11 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp';
 
-import { parseCommand } from '../../utils/mcp';
-import { createNodeFetch } from '../mcp/McpTester';
 import { getEnhancedPath } from '../../utils/env';
-import type { McpServerConfig, CodianMcpServer } from '../types/mcp';
+import { parseCommand } from '../../utils/mcp';
 import type { McpServerManager } from '../mcp';
+import { createNodeFetch } from '../mcp/McpTester';
+import type { CodianMcpServer,McpServerConfig } from '../types/mcp';
 import type { DeepSeekToolDefinition } from './toolSchemas';
 
 interface McpTool {

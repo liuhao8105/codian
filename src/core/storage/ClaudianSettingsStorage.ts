@@ -15,12 +15,13 @@
  * - State (merged from data.json)
  */
 
+import * as os from 'os';
+import * as path from 'path';
+
+import { appendBoundedLogSync } from '../../utils/boundedLog';
 import type { ClaudeModel, CodianSettings, PlatformBlockedCommands } from '../types';
 import { DEFAULT_SETTINGS, getDefaultBlockedCommands } from '../types';
 import type { VaultFileAdapter } from './VaultFileAdapter';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
 
 /** Codian isolated settings file path relative to vault root. */
 export const CODIAN_SETTINGS_PATH = '.claude/codian-settings.json';
@@ -37,7 +38,10 @@ const SETTINGS_SAVE_DIAGNOSTIC_LOG = path.join(os.tmpdir(), 'codian-settings-sav
 
 function appendSettingsDiagnosticLog(message: string): void {
   try {
-    fs.appendFileSync(SETTINGS_SAVE_DIAGNOSTIC_LOG, `[${new Date().toISOString()}] ${message}\n`, 'utf8');
+    appendBoundedLogSync(
+      SETTINGS_SAVE_DIAGNOSTIC_LOG,
+      `[${new Date().toISOString()}] ${message}\n`
+    );
   } catch {
     // Ignore logging failures.
   }
@@ -104,8 +108,7 @@ export class CodianSettingsStorage {
       return this.getDefaults();
     }
 
-    const content = await this.adapter.read(activePath);
-    const stored = JSON.parse(content) as Record<string, unknown>;
+    const stored = await this.readStoredSettings(activePath);
     const { activeConversationId: _activeConversationId, ...storedWithoutLegacy } = stored;
 
     const blockedCommands = normalizeBlockedCommands(stored.blockedCommands);
@@ -213,6 +216,24 @@ export class CodianSettingsStorage {
       return CLAUDIAN_SETTINGS_PATH;
     }
     return null;
+  }
+
+  private async readStoredSettings(activePath: string): Promise<Record<string, unknown>> {
+    const content = await this.adapter.read(activePath);
+    try {
+      return JSON.parse(content) as Record<string, unknown>;
+    } catch (primaryError) {
+      const backupPath = `${activePath}.bak`;
+      if (!(await this.adapter.exists(backupPath))) {
+        throw primaryError;
+      }
+
+      const backupContent = await this.adapter.read(backupPath);
+      const recovered = JSON.parse(backupContent) as Record<string, unknown>;
+      await this.adapter.restoreFromBackup(activePath, backupContent);
+      appendSettingsDiagnosticLog(`recovered settings from ${backupPath}`);
+      return recovered;
+    }
   }
 }
 

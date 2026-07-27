@@ -39,6 +39,10 @@ describe('types.ts', () => {
       expect(DEFAULT_SETTINGS.enableBlocklist).toBe(true);
     });
 
+    it('should ask for approval by default on new installations', () => {
+      expect(DEFAULT_SETTINGS.permissionMode).toBe('normal');
+    });
+
     it('should have default blocked commands as platform-keyed object', () => {
       expect(DEFAULT_SETTINGS.blockedCommands).toHaveProperty('unix');
       expect(DEFAULT_SETTINGS.blockedCommands).toHaveProperty('windows');
@@ -94,8 +98,8 @@ describe('types.ts', () => {
       expect(DEFAULT_SETTINGS.envSnippets).toEqual([]);
     });
 
-    it('should have lastClaudeModel set to haiku by default', () => {
-      expect(DEFAULT_SETTINGS.lastClaudeModel).toBe('gpt-5');
+    it('should remember the current default Codex model', () => {
+      expect(DEFAULT_SETTINGS.lastClaudeModel).toBe('gpt-5.6-sol');
     });
 
     it('should have lastCustomModel as empty string by default', () => {

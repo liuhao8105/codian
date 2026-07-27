@@ -123,7 +123,7 @@ export interface ProviderConfigBase {
   enabled: boolean;
 }
 
-export interface CodexProviderConfig extends ProviderConfigBase {}
+export type CodexProviderConfig = ProviderConfigBase;
 
 export interface DeepSeekProviderConfig extends ProviderConfigBase {
   apiKey: string;
@@ -337,7 +337,7 @@ export const DEFAULT_SETTINGS: CodianSettings = {
   // Security
   enableBlocklist: true,
   blockedCommands: getDefaultBlockedCommands(),
-  permissionMode: 'yolo',
+  permissionMode: 'normal',
 
   // Model & thinking
   currentProvider: 'codex',
@@ -352,10 +352,10 @@ export const DEFAULT_SETTINGS: CodianSettings = {
       model: 'deepseek-chat',
     },
   },
-  model: 'gpt-5.5',
-  thinkingBudget: 'off',
+  model: 'gpt-5.6-sol',
+  thinkingBudget: 'low',
   enableAutoTitleGeneration: true,
-  titleGenerationModel: '',  // Empty = auto (OPENAI_MODEL / CODEX_MODEL / gpt-5.5)
+  titleGenerationModel: '',  // Empty = auto (OPENAI_MODEL / CODEX_MODEL / gpt-5.6-sol)
   show1MModel: false,  // Hidden legacy setting
   allowExternalAccess: false,  // Keep vault restriction enabled by default
   enableChrome: false,  // Disabled by default
@@ -394,7 +394,7 @@ export const DEFAULT_SETTINGS: CodianSettings = {
   claudeCliPathsByHost: {},  // Per-device paths keyed by hostname
   loadUserClaudeSettings: true,  // Default on for compatibility
 
-  lastClaudeModel: 'gpt-5.5',
+  lastClaudeModel: 'gpt-5.6-sol',
   lastCustomModel: '',
   lastEnvHash: '',
 

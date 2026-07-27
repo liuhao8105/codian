@@ -3,20 +3,34 @@ import type { AppServerNotification } from '@/core/runtime/CodexAppServerClient'
 import type { StreamChunk } from '@/core/types';
 
 let latestNotificationHandler: ((notification: AppServerNotification) => void) | null = null;
+let latestRequestHandler: ((
+  method: string,
+  params: Record<string, unknown>,
+) => Promise<Record<string, unknown> | null>) | null = null;
+const notificationHandlers: Array<(notification: AppServerNotification) => void> = [];
+const initializeMock = jest.fn();
 const requestMock = jest.fn();
 const killMock = jest.fn();
 
 jest.mock('@/core/runtime/codexExec', () => ({
+  buildCodexMcpDisableOverrideArgs: (available: string[], requested: string[]) => available
+    .filter((name) => !requested.includes(name))
+    .flatMap((name) => ['-c', `mcp_servers.${name}.enabled=false`]),
+  discoverConfiguredCodexMcpServerNames: jest.fn().mockResolvedValue(['blender', 'github']),
+  extractExplicitCodexMcpNames: (prompt: string, available: string[]) => available
+    .filter((name) => prompt.toLocaleLowerCase().includes(`@${name.toLocaleLowerCase()}`)),
   normalizeCodexModelForRuntime: (model?: string | null) => model ?? null,
   resolveCodexCliPath: jest.fn(() => '/mock/codex'),
 }));
 
 jest.mock('@/core/runtime/CodexAppServerClient', () => ({
-  CodexAppServerClient: jest.fn().mockImplementation((_plugin, notificationHandler) => {
+  CodexAppServerClient: jest.fn().mockImplementation((_plugin, notificationHandler, _signal, options) => {
     latestNotificationHandler = notificationHandler;
+    latestRequestHandler = options?.requestHandler ?? null;
+    const clientIndex = notificationHandlers.push(notificationHandler) - 1;
     return {
-      initialize: jest.fn().mockResolvedValue(undefined),
-      request: requestMock,
+      initialize: () => initializeMock(clientIndex),
+      request: (method: string, params?: Record<string, unknown>) => requestMock(method, params, clientIndex),
       kill: killMock,
     };
   }),
@@ -47,6 +61,7 @@ function createPlugin() {
         },
       },
     },
+    getActiveEnvironmentVariables: jest.fn(() => ''),
   } as any;
 }
 
@@ -62,6 +77,9 @@ describe('CodexAgentRuntime retryable App Server errors', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     latestNotificationHandler = null;
+    latestRequestHandler = null;
+    notificationHandlers.length = 0;
+    initializeMock.mockReset().mockResolvedValue(undefined);
     requestMock.mockImplementation(async (method: string) => {
       if (method === 'thread/start') {
         return { thread: { id: 'thread-1' } };
@@ -125,6 +143,123 @@ describe('CodexAgentRuntime retryable App Server errors', () => {
     expect(chunks).toContainEqual({ type: 'done' });
   });
 
+  it('keeps the no-activity watchdog active when a retryable disconnect never recovers', async () => {
+    jest.useFakeTimers();
+    const clientConstructor = jest.requireMock('@/core/runtime/CodexAppServerClient').CodexAppServerClient as jest.Mock;
+    requestMock.mockImplementation(async (method: string, _params: unknown, clientIndex: number) => {
+      if (method === 'thread/start') return { thread: { id: `thread-${clientIndex + 1}` } };
+      if (method === 'turn/start') {
+        setTimeout(() => {
+          if (clientIndex === 0) {
+            notificationHandlers[0]?.({
+              method: 'error',
+              params: { error: { message: 'Reconnecting... 1/5' }, willRetry: true },
+            });
+          } else {
+            notificationHandlers[1]?.({
+              method: 'item/agentMessage/delta',
+              params: { itemId: 'msg-recovered', delta: 'Recovered after reconnect stall.' },
+            });
+            notificationHandlers[1]?.({ method: 'turn/completed', params: { turnId: 'turn-2' } });
+          }
+        }, 0);
+        return { turn: { id: `turn-${clientIndex + 1}` } };
+      }
+      return {};
+    });
+
+    const runtime = new CodexAgentRuntime(createPlugin(), { getActiveServers: jest.fn(() => ({})) } as any);
+    const chunksPromise = collectChunks(runtime.query('hello'));
+
+    await jest.advanceTimersByTimeAsync(91_000);
+    notificationHandlers[0]?.({
+      method: 'error',
+      params: { error: { message: 'Old reconnect attempt closed.' }, willRetry: false },
+    });
+    await jest.runOnlyPendingTimersAsync();
+    const chunks = await chunksPromise;
+
+    expect(clientConstructor).toHaveBeenCalledTimes(2);
+    expect(chunks).toContainEqual({ type: 'text', content: 'Recovered after reconnect stall.' });
+    expect(chunks).not.toContainEqual({ type: 'error', content: 'Reconnecting... 1/5' });
+    jest.useRealTimers();
+  });
+
+  it('starts ordinary chat with every discovered global MCP disabled', async () => {
+    const clientConstructor = jest.requireMock('@/core/runtime/CodexAppServerClient').CodexAppServerClient as jest.Mock;
+    const runtime = new CodexAgentRuntime(createPlugin(), { getActiveServers: jest.fn(() => ({})) } as any);
+
+    await collectChunks(runtime.query('hello'));
+
+    expect(clientConstructor.mock.calls[0][3]).toEqual(expect.objectContaining({
+      disabledMcpServers: ['blender', 'github'],
+    }));
+  });
+
+  it.each([
+    ['normal', 'on-request'],
+    ['plan', 'on-request'],
+    ['yolo', 'never'],
+  ] as const)('maps %s mode to the App Server %s approval policy', async (permissionMode, approvalPolicy) => {
+    const plugin = createPlugin();
+    plugin.settings.permissionMode = permissionMode;
+    const runtime = new CodexAgentRuntime(plugin, { getActiveServers: jest.fn(() => ({})) } as any);
+
+    await collectChunks(runtime.query('hello'));
+
+    const turnStart = requestMock.mock.calls.find(([method]) => method === 'turn/start');
+    expect(turnStart?.[1]).toEqual(expect.objectContaining({ approvalPolicy }));
+  });
+
+  it('routes App Server user-input requests through the existing inline callback', async () => {
+    const runtime = new CodexAgentRuntime(createPlugin(), { getActiveServers: jest.fn(() => ({})) } as any);
+    const ask = jest.fn().mockResolvedValue({ deploy: 'Production' });
+    runtime.setAskUserQuestionCallback(ask);
+    await collectChunks(runtime.query('hello'));
+
+    const result = await latestRequestHandler?.('item/tool/requestUserInput', {
+      questions: [{
+        id: 'deploy',
+        header: 'Target',
+        question: 'Where should this run?',
+        options: [{ label: 'Production', description: 'Live environment' }],
+      }],
+    });
+
+    expect(ask).toHaveBeenCalled();
+    expect(result).toEqual({
+      answers: {
+        deploy: { answers: ['Production'] },
+      },
+    });
+  });
+
+  it('routes dynamic permission grants through approval and declines MCP elicitation safely', async () => {
+    const runtime = new CodexAgentRuntime(createPlugin(), { getActiveServers: jest.fn(() => ({})) } as any);
+    const approve = jest.fn().mockResolvedValue('allow-always');
+    runtime.setApprovalCallback(approve);
+    await collectChunks(runtime.query('hello'));
+
+    const permissions = { network: { enabled: true } };
+    await expect(latestRequestHandler?.('item/permissions/requestApproval', {
+      permissions,
+      reason: 'Needs network access',
+    })).resolves.toEqual({ permissions, scope: 'session' });
+    await expect(latestRequestHandler?.('mcpServer/elicitation/request', {}))
+      .resolves.toEqual({ action: 'decline' });
+  });
+
+  it('keeps an explicitly requested global MCP enabled for that turn only', async () => {
+    const clientConstructor = jest.requireMock('@/core/runtime/CodexAppServerClient').CodexAppServerClient as jest.Mock;
+    const runtime = new CodexAgentRuntime(createPlugin(), { getActiveServers: jest.fn(() => ({})) } as any);
+
+    await collectChunks(runtime.query('请使用 @github 检查仓库'));
+
+    expect(clientConstructor.mock.calls[0][3]).toEqual(expect.objectContaining({
+      disabledMcpServers: ['blender'],
+    }));
+  });
+
   it('ends the stream when App Server reports a final error', async () => {
     requestMock.mockImplementation(async (method: string) => {
       if (method === 'thread/start') {
@@ -154,5 +289,164 @@ describe('CodexAgentRuntime retryable App Server errors', () => {
 
     expect(chunks).toContainEqual({ type: 'error', content: 'Permanent failure' });
     expect(chunks).not.toContainEqual({ type: 'done' });
+  });
+
+  it('explains a final ChatGPT transport disconnect in actionable Chinese', async () => {
+    requestMock.mockImplementation(async (method: string) => {
+      if (method === 'thread/start') {
+        return { thread: { id: 'thread-1' } };
+      }
+      if (method === 'turn/start') {
+        setTimeout(() => {
+          latestNotificationHandler?.({
+            method: 'error',
+            params: {
+              error: {
+                message: 'stream disconnected before completion: error sending request for url (https://chatgpt.com/backend-api/codex/responses)',
+                codexErrorInfo: 'other',
+                additionalDetails: null,
+              },
+              willRetry: false,
+              threadId: 'thread-1',
+              turnId: 'turn-1',
+            },
+          });
+        }, 0);
+        return { turn: { id: 'turn-1' } };
+      }
+      return {};
+    });
+
+    const runtime = new CodexAgentRuntime(createPlugin(), { getActiveServers: jest.fn(() => ({})) } as any);
+
+    const chunks = await collectChunks(runtime.query('hello'));
+
+    expect(chunks).toContainEqual({
+      type: 'error',
+      content: 'Codex 与 ChatGPT 的连接已中断，自动重试后仍未恢复。请检查网络或代理设置，然后重新发送消息。',
+    });
+    expect(chunks).not.toContainEqual({
+      type: 'error',
+      content: expect.stringContaining('backend-api/codex/responses'),
+    });
+  });
+
+  it('rebuilds once with a stalled MCP server disabled before any turn output', async () => {
+    jest.useFakeTimers();
+    const clientConstructor = jest.requireMock('@/core/runtime/CodexAppServerClient').CodexAppServerClient as jest.Mock;
+
+    requestMock.mockImplementation(async (method: string, _params: unknown, clientIndex: number) => {
+      if (method === 'thread/start') {
+        return { thread: { id: `thread-${clientIndex + 1}` } };
+      }
+      if (method === 'turn/start') {
+        if (clientIndex === 0) {
+          setTimeout(() => {
+            notificationHandlers[0]?.({
+              method: 'mcpServer/startupStatus/updated',
+              params: { name: 'blender', status: 'starting' },
+            });
+          }, 0);
+        } else {
+          setTimeout(() => {
+            notificationHandlers[1]?.({
+              method: 'item/agentMessage/delta',
+              params: { itemId: 'msg-recovered', delta: 'Recovered without Blender.' },
+            });
+            notificationHandlers[1]?.({ method: 'turn/completed', params: { turnId: 'turn-2' } });
+          }, 0);
+        }
+        return { turn: { id: `turn-${clientIndex + 1}` } };
+      }
+      return {};
+    });
+
+    const runtime = new CodexAgentRuntime(createPlugin(), { getActiveServers: jest.fn(() => ({})) } as any);
+    const chunksPromise = collectChunks(runtime.query('请使用 @blender 回答'));
+
+    await jest.advanceTimersByTimeAsync(21_000);
+    notificationHandlers[0]?.({
+      method: 'error',
+      params: { error: { message: 'Old stalled attempt closed.' }, willRetry: false },
+    });
+    await jest.runOnlyPendingTimersAsync();
+    const chunks = await chunksPromise;
+
+    expect(clientConstructor).toHaveBeenCalledTimes(2);
+    expect(clientConstructor.mock.calls[1][3]).toEqual(expect.objectContaining({
+      disabledMcpServers: ['blender', 'github'],
+    }));
+    expect(chunks).toContainEqual({ type: 'text', content: 'Recovered without Blender.' });
+    expect(chunks).not.toContainEqual({ type: 'error', content: 'Old stalled attempt closed.' });
+    jest.useRealTimers();
+  });
+
+  it('rebuilds when App Server initialization itself never returns', async () => {
+    jest.useFakeTimers();
+    const clientConstructor = jest.requireMock('@/core/runtime/CodexAppServerClient').CodexAppServerClient as jest.Mock;
+    initializeMock.mockImplementation((clientIndex: number) => (
+      clientIndex === 0 ? new Promise<void>(() => {}) : Promise.resolve()
+    ));
+    requestMock.mockImplementation(async (method: string, _params: unknown, clientIndex: number) => {
+      if (method === 'thread/start') return { thread: { id: `thread-${clientIndex + 1}` } };
+      if (method === 'turn/start') {
+        setTimeout(() => {
+          notificationHandlers[1]?.({
+            method: 'item/agentMessage/delta',
+            params: { itemId: 'msg-recovered', delta: 'Recovered after startup stall.' },
+          });
+          notificationHandlers[1]?.({ method: 'turn/completed', params: { turnId: 'turn-2' } });
+        }, 0);
+        return { turn: { id: `turn-${clientIndex + 1}` } };
+      }
+      return {};
+    });
+
+    const runtime = new CodexAgentRuntime(createPlugin(), { getActiveServers: jest.fn(() => ({})) } as any);
+    const chunksPromise = collectChunks(runtime.query('hello'));
+
+    await jest.advanceTimersByTimeAsync(31_000);
+    notificationHandlers[0]?.({
+      method: 'error',
+      params: { error: { message: 'Old startup attempt closed.' }, willRetry: false },
+    });
+    await jest.runOnlyPendingTimersAsync();
+    const chunks = await chunksPromise;
+
+    expect(clientConstructor).toHaveBeenCalledTimes(2);
+    expect(chunks).toContainEqual({ type: 'text', content: 'Recovered after startup stall.' });
+    expect(chunks).not.toContainEqual({ type: 'error', content: 'Old startup attempt closed.' });
+    jest.useRealTimers();
+  });
+
+  it('ends with an actionable error when the rebuilt attempt also has no turn activity', async () => {
+    jest.useFakeTimers();
+    requestMock.mockImplementation(async (method: string, _params: unknown, clientIndex: number) => {
+      if (method === 'thread/start') {
+        return { thread: { id: `thread-${clientIndex + 1}` } };
+      }
+      if (method === 'turn/start') {
+        return { turn: { id: `turn-${clientIndex + 1}` } };
+      }
+      return {};
+    });
+
+    const runtime = new CodexAgentRuntime(createPlugin(), { getActiveServers: jest.fn(() => ({})) } as any);
+    const chunksPromise = collectChunks(runtime.query('hello'));
+
+    await jest.advanceTimersByTimeAsync(91_000);
+    await jest.advanceTimersByTimeAsync(91_000);
+    notificationHandlers[0]?.({
+      method: 'error',
+      params: { error: { message: 'Old stalled attempt closed.' }, willRetry: false },
+    });
+    await jest.runOnlyPendingTimersAsync();
+    const chunks = await chunksPromise;
+
+    expect(chunks).toContainEqual({
+      type: 'error',
+      content: 'Codex 长时间没有返回任何结果，自动重建后仍未恢复。请检查 MCP、网络或代理设置，然后重新发送消息。',
+    });
+    jest.useRealTimers();
   });
 });

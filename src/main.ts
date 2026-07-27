@@ -11,6 +11,10 @@ import { Notice, Plugin } from 'obsidian';
 import { AgentManager } from './core/agents';
 import { McpServerManager } from './core/mcp';
 import { PluginManager } from './core/plugins';
+import { createAgentRuntime } from './core/runtime';
+import { CodexAppServerClient } from './core/runtime/CodexAppServerClient';
+// CODIAN_ICON_SVG kept in shared/icons.ts for reference
+import { normalizeCodexModelForRuntime } from './core/runtime/codexExec';
 import { StorageService } from './core/storage';
 import { isSubagentToolName, TOOL_TASK } from './core/tools/toolNames';
 import type {
@@ -27,24 +31,26 @@ import type {
 import {
   DEFAULT_CODEX_MODELS,
   DEFAULT_SETTINGS,
+  DEFAULT_THINKING_BUDGET,
   getCliPlatformKey,
   getHostnameKey,
+  type ThinkingBudget,
   VIEW_TYPE_CLAUDIAN,
 } from './core/types';
+import {
+  fetchCodexModelCatalog,
+  reconcileCodexModelSelection,
+} from './core/types/models';
 import { CodianView } from './features/chat/CodianView';
+import { setupServiceCallbacks } from './features/chat/tabs/Tab';
 import { type InlineEditContext, InlineEditModal } from './features/inline-edit/ui/InlineEditModal';
 import { CodianSettingTab } from './features/settings/CodianSettings';
 import { setLocale } from './i18n';
-// CODIAN_ICON_SVG kept in shared/icons.ts for reference
-import { normalizeCodexModelForRuntime } from './core/runtime/codexExec';
-import { createAgentRuntime } from './core/runtime';
-import { setupServiceCallbacks } from './features/chat/tabs/Tab';
 import { ClaudeCliResolver } from './utils/claudeCli';
 import { buildCursorContext } from './utils/editor';
 import {
   buildProviderEnvironmentText,
   getCurrentModelFromEnvironment,
-  getModelsFromEnvironment,
   getProviderModels,
   isProviderConfigured,
   parseEnvironmentVariables,
@@ -203,6 +209,10 @@ export default class CodianPlugin extends Plugin {
   cliResolver: ClaudeCliResolver;
   private conversations: Conversation[] = [];
   private runtimeEnvironmentVariables = '';
+  private codexModels = [...DEFAULT_CODEX_MODELS];
+  private codexThinkingBudgets: Record<string, ThinkingBudget> = {
+    ...DEFAULT_THINKING_BUDGET,
+  };
 
   async onload() {
     await this.loadSettings();
@@ -343,6 +353,9 @@ export default class CodianPlugin extends Plugin {
     });
 
     this.addSettingTab(new CodianSettingTab(this.app, this));
+
+    // Refresh asynchronously so a slow or unavailable CLI never blocks plugin loading.
+    void this.refreshCodexModelCatalog();
   }
 
   async onunload() {
@@ -594,7 +607,55 @@ export default class CodianPlugin extends Plugin {
   getAvailableModelsForCurrentProvider(): { value: string; label: string; description: string }[] {
     const envVars = parseEnvironmentVariables(this.getActiveEnvironmentVariables());
     const providerModels = getProviderModels(this.settings.currentProvider, envVars);
-    return providerModels.length > 0 ? providerModels : [...DEFAULT_CODEX_MODELS];
+    if (providerModels.length > 0) return providerModels;
+    return this.settings.currentProvider === 'codex'
+      ? [...this.codexModels]
+      : [...DEFAULT_CODEX_MODELS];
+  }
+
+  getDefaultThinkingBudgetForModel(model: string): ThinkingBudget | null {
+    if (!this.codexModels.some((candidate) => candidate.value === model)) return null;
+    return this.codexThinkingBudgets[model] ?? 'off';
+  }
+
+  async refreshCodexModelCatalog(): Promise<boolean> {
+    const envVars = parseEnvironmentVariables(this.getActiveEnvironmentVariables());
+    if (getProviderModels('codex', envVars).length > 0) {
+      return false;
+    }
+
+    try {
+      const catalog = await fetchCodexModelCatalog(
+        (signal) => new CodexAppServerClient(this, () => undefined, signal),
+      );
+      if (catalog.models.length === 0) {
+        return false;
+      }
+
+      this.codexModels = catalog.models;
+      this.codexThinkingBudgets = {
+        ...DEFAULT_THINKING_BUDGET,
+        ...catalog.thinkingBudgets,
+      };
+
+      const selection = reconcileCodexModelSelection(
+        this.settings.model,
+        catalog.models.map((model) => model.value),
+        catalog.defaultModel,
+      );
+      if (selection.migrated) {
+        this.settings.model = selection.model;
+        this.settings.thinkingBudget = this.getDefaultThinkingBudgetForModel(selection.model) ?? 'off';
+        this.settings.lastClaudeModel = selection.model;
+        await this.saveSettings();
+        new Notice(`原模型已不可用，已切换到 ${catalog.models.find((model) => model.value === selection.model)?.label ?? selection.model}。`);
+      }
+
+      this.getView()?.refreshToolbarState();
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   getEnabledProviders(): ProviderId[] {
@@ -624,6 +685,40 @@ export default class CodianPlugin extends Plugin {
       `已切换到 ${provider === 'deepseek' ? 'DeepSeek' : 'Codex'}。`,
       `已切换到 ${provider === 'deepseek' ? 'DeepSeek' : 'Codex'}，后续消息会重建会话。`
     );
+  }
+
+  async setCurrentModel(model: string): Promise<void> {
+    if (model === this.settings.model) {
+      return;
+    }
+
+    this.settings.model = model;
+    const defaultThinkingBudget = this.getDefaultThinkingBudgetForModel(model);
+    if (defaultThinkingBudget) {
+      this.settings.thinkingBudget = defaultThinkingBudget;
+      this.settings.lastClaudeModel = model;
+    } else {
+      this.settings.lastCustomModel = model;
+    }
+
+    const invalidatedConversations: Conversation[] = [];
+    for (const conv of this.conversations) {
+      if (conv.sessionId) {
+        conv.sessionId = null;
+        invalidatedConversations.push(conv);
+      }
+    }
+
+    await this.saveSettings();
+    await this.persistInvalidatedConversations(invalidatedConversations);
+
+    const failedTabs = await this.restartTabsAfterEnvironmentChange(true);
+    if (failedTabs > 0) {
+      new Notice(`模型已切换，但有 ${failedTabs} 个标签页重启失败。`);
+      return;
+    }
+
+    new Notice('模型已切换；聊天记录已保留，后续消息会建立新会话。');
   }
 
   async refreshRuntimeEnvironmentFromSettings(baseNotice = 'Provider 配置已更新。', changedNotice = 'Provider 配置已更新，后续消息会重建会话。'): Promise<void> {

@@ -9,6 +9,7 @@ import type { App } from 'obsidian';
 
 export class VaultFileAdapter {
   private writeQueue: Promise<void> = Promise.resolve();
+  private writeSequence = 0;
 
   constructor(private app: App) {}
 
@@ -21,23 +22,53 @@ export class VaultFileAdapter {
   }
 
   async write(path: string, content: string): Promise<void> {
-    await this.ensureParentFolder(path);
-    await this.app.vault.adapter.write(path, content);
+    return this.enqueueWrite(() => this.writeAtomically(path, content));
+  }
+
+  /**
+   * Restore a validated backup without replacing that backup with the corrupt
+   * primary file. The caller is responsible for validating `content`.
+   */
+  async restoreFromBackup(path: string, content: string): Promise<void> {
+    return this.enqueueWrite(async () => {
+      await this.ensureParentFolder(path);
+      const sequence = this.writeSequence++;
+      const temporaryPath = `${path}.restore-${Date.now()}-${sequence}`;
+
+      try {
+        await this.app.vault.adapter.write(temporaryPath, content);
+        const staged = await this.app.vault.adapter.read(temporaryPath);
+        if (staged !== content) {
+          throw new Error(`Failed to verify restored content for ${path}`);
+        }
+
+        if (await this.exists(path)) {
+          await this.app.vault.adapter.remove(path);
+        }
+        await this.app.vault.adapter.rename(temporaryPath, path);
+
+        const persisted = await this.app.vault.adapter.read(path);
+        if (persisted !== content) {
+          throw new Error(`Failed to verify restored file for ${path}`);
+        }
+      } finally {
+        if (await this.exists(temporaryPath)) {
+          await this.app.vault.adapter.remove(temporaryPath);
+        }
+      }
+    });
   }
 
   async append(path: string, content: string): Promise<void> {
     await this.ensureParentFolder(path);
-    this.writeQueue = this.writeQueue.then(async () => {
+    await this.enqueueWrite(async () => {
       if (await this.exists(path)) {
         const existing = await this.read(path);
-        await this.app.vault.adapter.write(path, existing + content);
+        await this.writeAtomically(path, existing + content);
       } else {
-        await this.app.vault.adapter.write(path, content);
+        await this.writeAtomically(path, content);
       }
-    }).catch(() => {
-      // prevent queue from getting stuck
     });
-    await this.writeQueue;
   }
 
   async delete(path: string): Promise<void> {
@@ -127,6 +158,57 @@ export class VaultFileAdapter {
       return { mtime: stat.mtime, size: stat.size };
     } catch {
       return null;
+    }
+  }
+
+  private enqueueWrite(operation: () => Promise<void>): Promise<void> {
+    const result = this.writeQueue.then(operation);
+    this.writeQueue = result.catch(() => {
+      // Keep later writes usable while preserving this operation's rejection.
+    });
+    return result;
+  }
+
+  private async writeAtomically(path: string, content: string): Promise<void> {
+    await this.ensureParentFolder(path);
+    const sequence = this.writeSequence++;
+    const temporaryPath = `${path}.tmp-${Date.now()}-${sequence}`;
+    const backupPath = `${path}.bak`;
+    const hadTarget = await this.exists(path);
+
+    try {
+      await this.app.vault.adapter.write(temporaryPath, content);
+      const staged = await this.app.vault.adapter.read(temporaryPath);
+      if (staged !== content) {
+        throw new Error(`Failed to verify staged write for ${path}`);
+      }
+
+      if (hadTarget) {
+        if (await this.exists(backupPath)) {
+          await this.app.vault.adapter.remove(backupPath);
+        }
+        await this.app.vault.adapter.rename(path, backupPath);
+      }
+
+      try {
+        await this.app.vault.adapter.rename(temporaryPath, path);
+        const persisted = await this.app.vault.adapter.read(path);
+        if (persisted !== content) {
+          throw new Error(`Failed to verify persisted write for ${path}`);
+        }
+      } catch (error) {
+        if (await this.exists(path)) {
+          await this.app.vault.adapter.remove(path);
+        }
+        if (hadTarget && await this.exists(backupPath)) {
+          await this.app.vault.adapter.rename(backupPath, path);
+        }
+        throw error;
+      }
+    } finally {
+      if (await this.exists(temporaryPath)) {
+        await this.app.vault.adapter.remove(temporaryPath);
+      }
     }
   }
 }

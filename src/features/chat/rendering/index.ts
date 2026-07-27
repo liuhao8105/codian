@@ -1,5 +1,11 @@
 export { MessageRenderer } from './MessageRenderer';
 export {
+  renderOrUpdateCommandBlock,
+  renderOrUpdatePlanBlock,
+  renderStoredCommandBlock,
+  renderStoredPlanBlock,
+} from './ProcessBlockRenderer';
+export {
   addSubagentToolCall,
   type AsyncSubagentState,
   createAsyncSubagentBlock,
@@ -37,12 +43,6 @@ export {
   setToolIcon,
   updateToolCallResult,
 } from './ToolCallRenderer';
-export {
-  renderOrUpdateCommandBlock,
-  renderOrUpdatePlanBlock,
-  renderStoredCommandBlock,
-  renderStoredPlanBlock,
-} from './ProcessBlockRenderer';
 export {
   createWriteEditBlock,
   finalizeWriteEditBlock,

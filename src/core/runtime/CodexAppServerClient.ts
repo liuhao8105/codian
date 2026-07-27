@@ -1,19 +1,20 @@
-import { spawn, type ChildProcess } from 'child_process';
-import * as fs from 'fs';
+import { type ChildProcess,spawn } from 'child_process';
 import * as os from 'os';
 import * as path from 'path';
 import * as readline from 'readline';
 
 import type CodianPlugin from '../../main';
+import { appendBoundedLogSync } from '../../utils/boundedLog';
 import { getEnhancedPath, parseEnvironmentVariables } from '../../utils/env';
 import {
   buildCodexConfigOverrideArgs,
+  buildCodexMcpDisableOverrideArgs,
   extractReadableCodexErrorMessage,
   normalizeCodexModelForRuntime,
   resolveCodexCliPath,
 } from './codexExec';
 
-type JsonRpcId = string;
+type JsonRpcId = string | number;
 
 type JsonRpcMessage = {
   id?: JsonRpcId;
@@ -36,11 +37,22 @@ export interface AppServerNotification {
   params: Record<string, unknown>;
 }
 
+export interface CodexAppServerClientOptions {
+  disabledMcpServers?: string[];
+  requestHandler?: (
+    method: string,
+    params: Record<string, unknown>,
+  ) => Promise<Record<string, unknown> | null>;
+}
+
 const CODIAN_DIAGNOSTIC_LOG = path.join(os.tmpdir(), 'codian-app-server.log');
 
 function appendDiagnosticLog(message: string): void {
   try {
-    fs.appendFileSync(CODIAN_DIAGNOSTIC_LOG, `[${new Date().toISOString()}] ${message}\n`, 'utf8');
+    appendBoundedLogSync(
+      CODIAN_DIAGNOSTIC_LOG,
+      `[${new Date().toISOString()}] ${message}\n`
+    );
   } catch {
     // Ignore logging failures.
   }
@@ -64,13 +76,16 @@ export class CodexAppServerClient {
   private readonly pending = new Map<JsonRpcId, PendingRequest>();
   private readonly readlineInterface: readline.Interface;
   private readonly notificationHandler: (notification: AppServerNotification) => void;
+  private readonly requestHandler?: CodexAppServerClientOptions['requestHandler'];
   private readonly stderrLines: string[] = [];
+  private readonly clientVersion: string;
   private closed = false;
 
   constructor(
     plugin: CodianPlugin,
     notificationHandler: (notification: AppServerNotification) => void,
-    abortSignal?: AbortSignal
+    abortSignal?: AbortSignal,
+    options: CodexAppServerClientOptions = {},
   ) {
     const codexPath = resolveCodexCliPath(plugin);
     if (!codexPath) {
@@ -78,15 +93,21 @@ export class CodexAppServerClient {
     }
 
     this.notificationHandler = notificationHandler;
+    this.requestHandler = options.requestHandler;
+    this.clientVersion = plugin.manifest.version;
 
     const startupModel = normalizeCodexModelForRuntime(plugin.settings.model);
     const startupArgs = plugin.settings.currentProvider === 'codex'
-      ? buildCodexConfigOverrideArgs(startupModel)
+      ? [
+          ...buildCodexConfigOverrideArgs(startupModel),
+          ...buildCodexMcpDisableOverrideArgs(options.disabledMcpServers ?? [], []),
+        ]
       : [];
     const runtimeEnv = buildRuntimeEnv(plugin, codexPath);
     appendDiagnosticLog(
       `spawn provider=${plugin.settings.currentProvider} model=${plugin.settings.model} startupModel=${startupModel ?? 'null'} ` +
-      `baseUrl=${runtimeEnv.OPENAI_BASE_URL || 'none'} cli=${codexPath}`
+      `baseUrl=${runtimeEnv.OPENAI_BASE_URL || 'none'} cli=${codexPath} ` +
+      `disabledMcpServers=${(options.disabledMcpServers ?? []).join(',') || 'none'}`
     );
 
     this.child = spawn(codexPath, [...startupArgs, 'app-server', '--listen', 'stdio://'], {
@@ -151,7 +172,7 @@ export class CodexAppServerClient {
       clientInfo: {
         name: 'codian',
         title: 'Codian',
-        version: '0.1.0',
+        version: this.clientVersion,
       },
       capabilities: {
         experimentalApi: true,
@@ -210,7 +231,12 @@ export class CodexAppServerClient {
       return;
     }
 
-    if (message.id) {
+    if (message.id !== undefined && message.method) {
+      void this.handleServerRequest(message.id, message.method, message.params || {});
+      return;
+    }
+
+    if (message.id !== undefined) {
       const pending = this.pending.get(message.id);
       if (!pending) return;
       this.pending.delete(message.id);
@@ -231,6 +257,44 @@ export class CodexAppServerClient {
         params: message.params || {},
       });
     }
+  }
+
+  private async handleServerRequest(
+    id: JsonRpcId,
+    method: string,
+    params: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      const result = await this.requestHandler?.(method, params);
+      if (!result) {
+        this.writeResponse({
+          id,
+          error: {
+            code: -32601,
+            message: `Unsupported App Server request: ${method}`,
+          },
+        });
+        return;
+      }
+      this.writeResponse({ id, result });
+    } catch (error) {
+      this.writeResponse({
+        id,
+        error: {
+          code: -32000,
+          message: error instanceof Error ? error.message : 'App Server request failed.',
+        },
+      });
+    }
+  }
+
+  private writeResponse(message: JsonRpcMessage): void {
+    if (this.closed || !this.child.stdin?.writable) return;
+    this.child.stdin.write(`${JSON.stringify(message)}\n`, (error) => {
+      if (error) {
+        appendDiagnosticLog(`response-write-error ${error.message}`);
+      }
+    });
   }
 
   private rejectAll(error: Error): void {

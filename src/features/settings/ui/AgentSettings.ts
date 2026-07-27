@@ -1,8 +1,6 @@
 import type { App } from 'obsidian';
 import { Modal, Notice, setIcon, Setting } from 'obsidian';
 
-import { DEFAULT_CODEX_MODELS } from '../../../core/types';
-import type { AgentDefinition } from '../../../core/types';
 import {
   TOOL_BASH,
   TOOL_EDIT,
@@ -21,6 +19,8 @@ import {
   TOOL_WEB_SEARCH,
   TOOL_WRITE,
 } from '../../../core/tools/toolNames';
+import type { AgentDefinition } from '../../../core/types';
+import { DEFAULT_CODEX_MODELS } from '../../../core/types';
 import { t } from '../../../i18n';
 import type CodianPlugin from '../../../main';
 import { confirmDelete } from '../../../shared/modals/ConfirmModal';

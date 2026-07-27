@@ -36,7 +36,7 @@ function createMockCallbacks(overrides: Record<string, any> = {}) {
     onPermissionModeChange: jest.fn().mockResolvedValue(undefined),
     getSettings: jest.fn().mockReturnValue({
       provider: 'codex',
-      model: 'gpt-5',
+      model: 'gpt-5.6-sol',
       thinkingBudget: 'low',
       permissionMode: 'normal',
     }),
@@ -46,6 +46,17 @@ function createMockCallbacks(overrides: Record<string, any> = {}) {
 }
 
 describe('ProviderSelector', () => {
+  beforeEach(() => {
+    (global as any).document = {
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+    };
+  });
+
+  afterEach(() => {
+    delete (global as any).document;
+  });
+
   it('should display current provider label', () => {
     const parentEl = createMockEl();
     const callbacks = createMockCallbacks();
@@ -72,6 +83,18 @@ describe('ProviderSelector', () => {
     await deepseekOption?.dispatchEvent('click', { stopPropagation: () => {} });
     expect(callbacks.onProviderChange).toHaveBeenCalledWith('deepseek');
   });
+
+  it('removes its document listener when destroyed', () => {
+    const selector = new ProviderSelector(createMockEl(), createMockCallbacks());
+
+    selector.destroy();
+
+    expect(document.removeEventListener).toHaveBeenCalledWith(
+      'click',
+      expect.any(Function),
+      true
+    );
+  });
 });
 
 describe('ModelSelector', () => {
@@ -96,7 +119,7 @@ describe('ModelSelector', () => {
     expect(btn).not.toBeNull();
     const label = btn?.querySelector('.codian-model-label');
     expect(label).not.toBeNull();
-    expect(label?.textContent).toBe('GPT-5');
+    expect(label?.textContent).toBe('GPT-5.6-Sol');
   });
 
   it('should display first model when current model not found', () => {
@@ -108,30 +131,32 @@ describe('ModelSelector', () => {
     });
     selector.updateDisplay();
     const label = parentEl.querySelector('.codian-model-label');
-    expect(label?.textContent).toBe('GPT-5');
+    expect(label?.textContent).toBe('GPT-5.6-Sol');
   });
 
   it('should render default model option', () => {
     const dropdown = parentEl.querySelector('.codian-model-dropdown');
     expect(dropdown).not.toBeNull();
     const options = dropdown?.children || [];
-    expect(options.length).toBe(1);
-    expect(options[0]?.children[0]?.textContent).toBe('GPT-5');
+    expect(options.length).toBe(6);
+    expect(options.some((option: any) =>
+      option.children[0]?.textContent === 'GPT-5.6-Sol'
+    )).toBe(true);
   });
 
   it('should mark current model as selected', () => {
     const dropdown = parentEl.querySelector('.codian-model-dropdown');
     const options = dropdown?.children || [];
-    expect(options[0]?.hasClass('selected')).toBe(true);
+    expect(options.some((option: any) => option.hasClass('selected'))).toBe(true);
   });
 
   it('should call onModelChange when option clicked', async () => {
     const dropdown = parentEl.querySelector('.codian-model-dropdown');
     const options = dropdown?.children || [];
-    const modelOption = options.find((o: any) => o.children[0]?.textContent === 'GPT-5');
+    const modelOption = options.find((o: any) => o.children[0]?.textContent === 'GPT-5.6-Sol');
 
     await modelOption?.dispatchEvent('click', { stopPropagation: () => {} });
-    expect(callbacks.onModelChange).toHaveBeenCalledWith('gpt-5');
+    expect(callbacks.onModelChange).toHaveBeenCalledWith('gpt-5.6-sol');
   });
 
   it('should update display when setReady is called', () => {
@@ -153,7 +178,7 @@ describe('ModelSelector', () => {
     });
     selector.updateDisplay();
     const label = parentEl.querySelector('.codian-model-label');
-    expect(label?.textContent).toBe('GPT-5');
+    expect(label?.textContent).toBe('GPT-5.6-Sol');
   });
 
   it('should use custom models from environment variables', () => {
@@ -681,6 +706,17 @@ describe('McpServerSelector - toggle and badges', () => {
 });
 
 describe('createInputToolbar', () => {
+  beforeEach(() => {
+    (global as any).document = {
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+    };
+  });
+
+  afterEach(() => {
+    delete (global as any).document;
+  });
+
   it('should return all toolbar components', () => {
     const parentEl = createMockEl();
     const callbacks = createMockCallbacks();

@@ -1,6 +1,6 @@
 import {
-  CLAUDIAN_SETTINGS_PATH,
   ClaudianSettingsStorage,
+  CODIAN_SETTINGS_PATH,
   normalizeBlockedCommands,
 } from '@/core/storage/ClaudianSettingsStorage';
 import type { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
@@ -10,6 +10,7 @@ const mockAdapter = {
   exists: jest.fn(),
   read: jest.fn(),
   write: jest.fn(),
+  restoreFromBackup: jest.fn(),
 } as unknown as jest.Mocked<VaultFileAdapter>;
 
 describe('ClaudianSettingsStorage', () => {
@@ -21,6 +22,7 @@ describe('ClaudianSettingsStorage', () => {
     mockAdapter.exists.mockResolvedValue(false);
     mockAdapter.read.mockResolvedValue('{}');
     mockAdapter.write.mockResolvedValue(undefined);
+    mockAdapter.restoreFromBackup.mockResolvedValue(undefined);
     storage = new ClaudianSettingsStorage(mockAdapter);
   });
 
@@ -92,7 +94,27 @@ describe('ClaudianSettingsStorage', () => {
       expect(result.claudeCliPath).toBe('/legacy/path');
     });
 
-    it('should throw on JSON parse error', async () => {
+    it('should restore valid settings from backup when the primary JSON is corrupt', async () => {
+      mockAdapter.exists.mockImplementation(async (path: string) =>
+        path === CODIAN_SETTINGS_PATH || path === `${CODIAN_SETTINGS_PATH}.bak`
+      );
+      mockAdapter.read.mockImplementation(async (path: string) =>
+        path === CODIAN_SETTINGS_PATH
+          ? 'invalid json'
+          : JSON.stringify({ model: 'claude-opus-4-5', userName: 'Recovered' })
+      );
+
+      const result = await storage.load();
+
+      expect(result.model).toBe('claude-opus-4-5');
+      expect(result.userName).toBe('Recovered');
+      expect(mockAdapter.restoreFromBackup).toHaveBeenCalledWith(
+        CODIAN_SETTINGS_PATH,
+        expect.stringContaining('"Recovered"')
+      );
+    });
+
+    it('should throw when both primary and backup JSON are invalid', async () => {
       mockAdapter.exists.mockResolvedValue(true);
       mockAdapter.read.mockResolvedValue('invalid json');
 
@@ -119,7 +141,7 @@ describe('ClaudianSettingsStorage', () => {
       await storage.save(storedSettings);
 
       expect(mockAdapter.write).toHaveBeenCalledWith(
-        CLAUDIAN_SETTINGS_PATH,
+        CODIAN_SETTINGS_PATH,
         expect.any(String)
       );
       const writtenContent = JSON.parse(mockAdapter.write.mock.calls[0][1]);
@@ -145,7 +167,7 @@ describe('ClaudianSettingsStorage', () => {
       const result = await storage.exists();
 
       expect(result).toBe(true);
-      expect(mockAdapter.exists).toHaveBeenCalledWith(CLAUDIAN_SETTINGS_PATH);
+      expect(mockAdapter.exists).toHaveBeenCalledWith(CODIAN_SETTINGS_PATH);
     });
 
     it('should return false when file does not exist', async () => {
@@ -380,4 +402,3 @@ describe('normalizeBlockedCommands', () => {
     expect(normalizeBlockedCommands(true)).toEqual(defaults);
   });
 });
-

@@ -22,3 +22,12 @@ export {
 export {
   isCommandBlocked,
 } from './BlocklistChecker';
+export {
+  extractSensitiveSettings,
+  hasSensitiveSettings,
+  hydrateSensitiveSettings,
+  sanitizeSensitiveSettings,
+  type SecretStorageBackend,
+  SecureSecretStorage,
+  type SensitiveSettingsPayload,
+} from './SecureSecretStorage';

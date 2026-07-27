@@ -150,8 +150,8 @@ describe('provider environment helpers', () => {
     expect(invalid.ok).toBe(false);
   });
 
-  it('rejects the official DeepSeek endpoint because Codex App Server requires Responses API', () => {
-    const invalid = isProviderConfigured({
+  it('accepts the official DeepSeek endpoint for the native DeepSeek runtime', () => {
+    const configured = isProviderConfigured({
       providerConfigs: {
         codex: { enabled: true },
         deepseek: {
@@ -163,11 +163,7 @@ describe('provider environment helpers', () => {
       },
     }, 'deepseek');
 
-    expect(invalid.ok).toBe(false);
-    if (!invalid.ok) {
-      expect(invalid.error).toContain('不能直连 DeepSeek 官方 API');
-      expect(invalid.error).toContain('/v1/responses');
-    }
+    expect(configured).toEqual({ ok: true });
   });
 
   it('returns only configured deepseek model when OPENAI_MODEL is set', () => {

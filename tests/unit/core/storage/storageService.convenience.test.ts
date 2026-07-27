@@ -35,7 +35,12 @@ function createMockAdapter(initialFiles: Record<string, string> = {}) {
         }
         return { files: filesAtLevel, folders: Array.from(folderSet) };
       }),
-      rename: jest.fn(),
+      rename: jest.fn(async (oldPath: string, newPath: string) => {
+        const content = files.get(oldPath);
+        if (content === undefined) throw new Error(`Missing file: ${oldPath}`);
+        files.delete(oldPath);
+        files.set(newPath, content);
+      }),
       stat: jest.fn(async (path: string) => {
         if (!files.has(path)) return null;
         return { mtime: 1, size: files.get(path)!.length };

@@ -1,1 +1,1 @@
-export { CodianView, CodianView as ClaudianView } from './CodianView';
+export { CodianView as ClaudianView,CodianView } from './CodianView';

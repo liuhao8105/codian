@@ -3,13 +3,13 @@ import { Notice } from 'obsidian';
 
 import type { McpServerManager } from '../../../core/mcp';
 import {
+  type AgentRuntime,
   createAgentRuntime,
   createInstructionRuntime,
   createTitleRuntime,
-  type AgentRuntime,
 } from '../../../core/runtime';
 import type { ChatMessage, ClaudeModel, Conversation, PermissionMode, SlashCommand, StreamChunk, ThinkingBudget } from '../../../core/types';
-import { DEFAULT_CODEX_MODELS, DEFAULT_THINKING_BUDGET, getContextWindowSize } from '../../../core/types';
+import { getContextWindowSize } from '../../../core/types';
 import { t } from '../../../i18n';
 import type CodianPlugin from '../../../main';
 import { SlashCommandDropdown } from '../../../shared/components/SlashCommandDropdown';
@@ -458,15 +458,7 @@ function initializeInputToolbar(tab: TabData, plugin: CodianPlugin): void {
       }
     },
     onModelChange: async (model: ClaudeModel) => {
-      plugin.settings.model = model;
-      const isDefaultModel = DEFAULT_CODEX_MODELS.find((m) => m.value === model);
-      if (isDefaultModel) {
-        plugin.settings.thinkingBudget = DEFAULT_THINKING_BUDGET[model] ?? 'off';
-        plugin.settings.lastClaudeModel = model;
-      } else {
-        plugin.settings.lastCustomModel = model;
-      }
-      await plugin.saveSettings();
+      await plugin.setCurrentModel(model);
       tab.ui.thinkingBudgetSelector?.updateDisplay();
       tab.ui.modelSelector?.updateDisplay();
       tab.ui.modelSelector?.renderOptions();
@@ -1120,6 +1112,8 @@ export async function destroyTab(tab: TabData): Promise<void> {
   tab.ui.statusPanel = null;
   tab.ui.navigationSidebar?.destroy();
   tab.ui.navigationSidebar = null;
+  tab.ui.providerSelector?.destroy();
+  tab.ui.providerSelector = null;
 
   // Cleanup subagents
   tab.services.subagentManager.orphanAllActive();
