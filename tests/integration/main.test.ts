@@ -109,6 +109,16 @@ describe('ClaudianPlugin', () => {
       });
     });
 
+    it('should register a secret-free local diagnostics command', async () => {
+      await plugin.onload();
+
+      expect((plugin.addCommand as jest.Mock)).toHaveBeenCalledWith({
+        id: 'copy-local-diagnostics',
+        name: 'Copy local diagnostics (secret-free)',
+        callback: expect.any(Function),
+      });
+    });
+
     it('should migrate legacy cli path to hostname-based paths and clear old field', async () => {
       const legacyPath = '/legacy/claude';
       mockFiles.set(

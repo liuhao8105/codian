@@ -20,6 +20,12 @@ export interface SensitiveSettingsPayload {
   envSnippetValues: Record<string, string>;
 }
 
+export interface SecretStorageStatus {
+  available: boolean;
+  stored: boolean;
+  readable: boolean;
+}
+
 interface SensitiveSettingsShape {
   providerConfigs: ProviderConfigs;
   environmentVariables: string;
@@ -260,6 +266,31 @@ export class SecureSecretStorage {
       return isSensitiveSettingsPayload(parsed) ? parsed : null;
     } catch {
       return null;
+    }
+  }
+
+  async getStatus(): Promise<SecretStorageStatus> {
+    try {
+      const available = await this.backend.isEncryptionAvailable();
+      if (!available) return { available: false, stored: false, readable: false };
+
+      const data = asRecord(await this.plugin.loadData());
+      const stored = data[SECURE_SECRETS_KEY];
+      if (!isStoredSecureSecrets(stored)) {
+        return { available: true, stored: false, readable: false };
+      }
+
+      try {
+        const plaintext = await this.backend.decryptString(
+          Buffer.from(stored.ciphertext, 'base64'),
+        );
+        const readable = isSensitiveSettingsPayload(JSON.parse(plaintext) as unknown);
+        return { available: true, stored: true, readable };
+      } catch {
+        return { available: true, stored: true, readable: false };
+      }
+    } catch {
+      return { available: false, stored: false, readable: false };
     }
   }
 

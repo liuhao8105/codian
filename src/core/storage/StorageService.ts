@@ -24,6 +24,7 @@ import {
   hasSensitiveSettings,
   hydrateSensitiveSettings,
   sanitizeSensitiveSettings,
+  type SecretStorageStatus,
   SecureSecretStorage,
 } from '../security';
 import type {
@@ -79,6 +80,10 @@ export interface CombinedSettings {
   cc: CCSettings;
   /** Claudian-specific settings */
   claudian: StoredCodianSettings;
+}
+
+export interface CodianSecretStorageStatus extends SecretStorageStatus {
+  retainedLegacyPlaintext: boolean;
 }
 
 /** Legacy data format (pre-split migration). */
@@ -175,6 +180,13 @@ export class StorageService {
     claudian = await this.hydrateAndMigrateSecrets(claudian);
 
     return { cc, claudian };
+  }
+
+  async getSecretStorageStatus(): Promise<CodianSecretStorageStatus> {
+    return {
+      ...(await this.secretStorage.getStatus()),
+      retainedLegacyPlaintext: this.retainedLegacyPlaintext,
+    };
   }
 
   private async hydrateAndMigrateSecrets(

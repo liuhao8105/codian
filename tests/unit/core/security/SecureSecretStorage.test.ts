@@ -76,12 +76,29 @@ describe('SecureSecretStorage', () => {
     await expect(reader.load()).resolves.toEqual(payload);
   });
 
+  it('reports only availability and readability without exposing secret values', async () => {
+    const backend = createBackend();
+    const target = createPlugin();
+    const storage = new SecureSecretStorage(target.plugin, backend);
+    await storage.save(extractSensitiveSettings(createSettings()));
+
+    const status = await storage.getStatus();
+
+    expect(status).toEqual({ available: true, stored: true, readable: true });
+    expect(JSON.stringify(status)).not.toContain('secret');
+  });
+
   it('does not persist plaintext when OS encryption is unavailable', async () => {
     const { plugin } = createPlugin();
     const storage = new SecureSecretStorage(plugin, createBackend(false));
 
     await expect(storage.save(extractSensitiveSettings(createSettings()))).resolves.toBe(false);
     expect(plugin.saveData).not.toHaveBeenCalled();
+    await expect(storage.getStatus()).resolves.toEqual({
+      available: false,
+      stored: false,
+      readable: false,
+    });
   });
 
   it('degrades safely when plugin data cannot be read', async () => {
