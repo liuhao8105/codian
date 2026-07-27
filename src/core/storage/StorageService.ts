@@ -55,6 +55,7 @@ import {
   convertEnvObjectToString,
   mergeEnvironmentVariables,
 } from './migrationConstants';
+import { RecoveryJournal } from './RecoveryJournal';
 import { SESSIONS_PATH, SessionStorage } from './SessionStorage';
 import { SKILLS_PATH, SkillStorage } from './SkillStorage';
 import { COMMANDS_PATH, SlashCommandStorage } from './SlashCommandStorage';
@@ -138,6 +139,7 @@ export class StorageService {
   readonly mcp: McpStorage;
   readonly agents: AgentVaultStorage;
   readonly localMemory: LocalMemoryStorage;
+  readonly recovery: RecoveryJournal;
 
   private adapter: VaultFileAdapter;
   private plugin: Plugin;
@@ -158,6 +160,7 @@ export class StorageService {
     this.mcp = new McpStorage(this.adapter);
     this.agents = new AgentVaultStorage(this.adapter);
     this.localMemory = new LocalMemoryStorage(this.adapter);
+    this.recovery = new RecoveryJournal(this.adapter);
   }
 
   async initialize(): Promise<CombinedSettings> {

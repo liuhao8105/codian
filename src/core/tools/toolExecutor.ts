@@ -14,6 +14,11 @@ import type { ApprovalCallbackOptions } from '../agent';
 import type { McpServerManager } from '../mcp';
 import { findBashCommandPathViolation } from '../security/BashPathValidator';
 import { isCommandBlocked } from '../security/BlocklistChecker';
+import {
+  hashRecoveryContent,
+  type RecoveryJournal,
+  type RecoveryJournalEntry,
+} from '../storage/RecoveryJournal';
 import { getBashToolBlockedCommands } from '../types';
 import { callMcpTool, classifyMcpToolRisk } from './mcpBridge';
 import type { TransactionLog } from './transactionLog';
@@ -28,6 +33,7 @@ export interface ToolExecutionContext {
     options?: ApprovalCallbackOptions,
   ) => Promise<boolean>;
   transactionLog: TransactionLog;
+  recoveryJournal?: RecoveryJournal;
   mcpManager?: McpServerManager;
   abortSignal?: AbortSignal;
 }
@@ -356,6 +362,21 @@ async function executeWrite(
     return 'Write 操作已被用户拒绝。';
   }
 
+  let recoveryEntry: RecoveryJournalEntry | undefined;
+  if (context.recoveryJournal) {
+    try {
+      recoveryEntry = await context.recoveryJournal.prepare(
+        'Write',
+        filePath,
+        action,
+        oldContent,
+        content,
+      );
+    } catch (error) {
+      return `Write 已中止：无法建立持久恢复记录。${error instanceof Error ? error.message : String(error)}`;
+    }
+  }
+
   // Apply
   try {
     if (existingFile) {
@@ -377,10 +398,25 @@ async function executeWrite(
     console.debug('[Codian Txn] Write recorded id=%s action=%s path=%s total=%d',
       entry.id, entry.action, entry.filePath, context.transactionLog.getAll().length);
 
-    return existingFile
+    let result = existingFile
       ? `Write 已应用: \`${filePath}\` (${oldSize} → ${newSize} bytes)。可使用 Undo 撤销。`
       : `Write 已应用: 新建文件 \`${filePath}\` (${newSize} bytes)。可使用 Undo 撤销。`;
+    if (recoveryEntry) {
+      try {
+        await context.recoveryJournal!.markApplied(recoveryEntry.id);
+      } catch (error) {
+        result += ` 恢复记录仍保留为待确认状态：${error instanceof Error ? error.message : String(error)}`;
+      }
+    }
+    return result;
   } catch (error) {
+    if (recoveryEntry) {
+      try {
+        await context.recoveryJournal!.markFailed(recoveryEntry.id);
+      } catch {
+        // Keep the pending record when status persistence is unavailable.
+      }
+    }
     console.error('[Codian Txn] Write FAILED:', error);
     return `Write 失败: ${error instanceof Error ? error.message : String(error)}`;
   }
@@ -437,6 +473,21 @@ async function executeEdit(
     return 'Edit 操作已被用户拒绝。';
   }
 
+  let recoveryEntry: RecoveryJournalEntry | undefined;
+  if (context.recoveryJournal) {
+    try {
+      recoveryEntry = await context.recoveryJournal.prepare(
+        'Edit',
+        filePath,
+        'modify',
+        oldContent,
+        newContent,
+      );
+    } catch (error) {
+      return `Edit 已中止：无法建立持久恢复记录。${error instanceof Error ? error.message : String(error)}`;
+    }
+  }
+
   // Apply
   try {
     await plugin.app.vault.modify(file, newContent);
@@ -446,8 +497,23 @@ async function executeEdit(
     console.debug('[Codian Txn] Edit recorded id=%s path=%s total=%d',
       entry.id, entry.filePath, context.transactionLog.getAll().length);
 
-    return `Edit 已应用: \`${filePath}\`。可使用 Undo 撤销。`;
+    let result = `Edit 已应用: \`${filePath}\`。可使用 Undo 撤销。`;
+    if (recoveryEntry) {
+      try {
+        await context.recoveryJournal!.markApplied(recoveryEntry.id);
+      } catch (error) {
+        result += ` 恢复记录仍保留为待确认状态：${error instanceof Error ? error.message : String(error)}`;
+      }
+    }
+    return result;
   } catch (error) {
+    if (recoveryEntry) {
+      try {
+        await context.recoveryJournal!.markFailed(recoveryEntry.id);
+      } catch {
+        // Keep the pending record when status persistence is unavailable.
+      }
+    }
     console.error('[Codian Txn] Edit FAILED:', error);
     return `Edit 失败: ${error instanceof Error ? error.message : String(error)}`;
   }
@@ -461,7 +527,15 @@ async function executeUndo(
   console.debug('[Codian Txn] Undo: %d total entries, %d reverted',
     allEntries.length, allEntries.filter(e => e.reverted).length);
 
-  const entry = context.transactionLog.getLastNonReverted();
+  let persistentEntry: RecoveryJournalEntry | undefined;
+  if (context.recoveryJournal) {
+    try {
+      persistentEntry = await context.recoveryJournal.getLastRecoverable();
+    } catch (error) {
+      return `Undo 已中止：无法安全读取持久恢复记录。${error instanceof Error ? error.message : String(error)}`;
+    }
+  }
+  const entry = persistentEntry ?? context.transactionLog.getLastNonReverted();
   if (!entry) {
     return `没有可撤销的操作。当前 session 中有 ${allEntries.length} 条记录（${allEntries.filter(e => e.reverted).length} 已撤销）。`;
   }
@@ -469,6 +543,17 @@ async function executeUndo(
   const { plugin } = context;
   const vaultPath = getVaultPath(plugin.app);
   if (!vaultPath) return 'Error: Cannot determine vault path.';
+
+  const currentFile = plugin.app.vault.getFileByPath(entry.filePath);
+  if (currentFile) {
+    const currentContent = await plugin.app.vault.cachedRead(currentFile);
+    const expectedCurrentHash = 'newContentHash' in entry
+      ? entry.newContentHash
+      : hashRecoveryContent(entry.newContent);
+    if (hashRecoveryContent(currentContent) !== expectedCurrentHash) {
+      return `Undo 已中止：\`${entry.filePath}\` 在该操作后又发生了变化。为避免覆盖后续修改，请手动核对恢复日志。`;
+    }
+  }
 
   // Build undo summary
   const summary = `**Undo**: 撤销 ${entry.toolName} 操作\n\n文件: \`${entry.filePath}\`\n操作: ${entry.action}\n时间: ${new Date(entry.timestamp).toLocaleString()}\n\n将恢复到该操作之前的文件状态。`;
@@ -486,7 +571,10 @@ async function executeUndo(
       if (file) {
         await plugin.app.vault.trash(file, false);
       } else {
-        return `Undo 失败: 找不到文件 "${entry.filePath}"（可能已被外部删除）。`;
+        if (persistentEntry) {
+          await context.recoveryJournal!.markReverted(persistentEntry.id);
+        }
+        return `Undo 完成: \`${entry.filePath}\` 已不存在，无需再次删除。`;
       }
     } else {
       const file = plugin.app.vault.getFileByPath(entry.filePath);
@@ -503,9 +591,7 @@ async function executeUndo(
         }
         await plugin.app.vault.create(entry.filePath, entry.snapshotContent);
       } else if (file && entry.snapshotContent !== null) {
-        const fullPath = path.join(vaultPath, entry.filePath);
-        await plugin.app.vault.adapter.write(fullPath, entry.snapshotContent);
-        plugin.app.vault.trigger('modify', file);
+        await plugin.app.vault.modify(file, entry.snapshotContent);
       } else if (!file && entry.snapshotContent === null) {
         return `Undo 失败: 文件 "${entry.filePath}" 不存在且没有可恢复的快照。`;
       } else if (file && entry.snapshotContent === null) {
@@ -513,7 +599,15 @@ async function executeUndo(
       }
     }
 
-    context.transactionLog.markReverted(entry.id);
+    if (persistentEntry) {
+      await context.recoveryJournal!.markReverted(persistentEntry.id);
+      const memoryEntry = context.transactionLog.getLastNonReverted();
+      if (memoryEntry?.filePath === persistentEntry.filePath) {
+        context.transactionLog.markReverted(memoryEntry.id);
+      }
+    } else {
+      context.transactionLog.markReverted(entry.id);
+    }
     return `Undo 完成: 已撤销对 \`${entry.filePath}\` 的 ${entry.toolName} 操作。`;
   } catch (error) {
     return `Undo 失败: ${error instanceof Error ? error.message : String(error)}`;
