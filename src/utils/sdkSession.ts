@@ -8,11 +8,12 @@
  * for displaying conversation history from native sessions.
  */
 
-import { existsSync, readdirSync } from 'fs';
+import { existsSync } from 'fs';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 
+import { CodexSessionIndex } from '../core/runtime/CodexSessionIndex';
 import { extractToolResultContent } from '../core/sdk/toolResultContent';
 import { extractResolvedAnswers, extractResolvedAnswersFromResultText } from '../core/tools';
 import { isSubagentToolName, TOOL_ASK_USER_QUESTION } from '../core/tools/toolNames';
@@ -116,7 +117,17 @@ function getCodexSessionsPath(): string {
   return path.join(os.homedir(), '.codex', 'sessions');
 }
 
-const codexSessionPathCache = new Map<string, string>();
+let codexSessionIndex: CodexSessionIndex | null = null;
+let codexSessionIndexRoot: string | null = null;
+
+function getCodexSessionIndex(): CodexSessionIndex {
+  const root = getCodexSessionsPath();
+  if (!codexSessionIndex || codexSessionIndexRoot !== root) {
+    codexSessionIndex = new CodexSessionIndex(root);
+    codexSessionIndexRoot = root;
+  }
+  return codexSessionIndex;
+}
 
 function pathExistsSync(filePath: string): boolean {
   try {
@@ -127,71 +138,11 @@ function pathExistsSync(filePath: string): boolean {
 }
 
 function findCodexSessionPathSync(sessionId: string): string | null {
-  const cached = codexSessionPathCache.get(sessionId);
-  if (cached && pathExistsSync(cached)) return cached;
-  if (cached) codexSessionPathCache.delete(sessionId);
-
-  const root = getCodexSessionsPath();
-  if (!pathExistsSync(root)) return null;
-
-  const stack = [root];
-  while (stack.length > 0) {
-    const currentDir = stack.pop()!;
-    try {
-      const entries = readdirSync(currentDir, { withFileTypes: true });
-
-      for (const entry of entries) {
-        const entryName = String(entry.name);
-        const fullPath = path.join(currentDir, entryName);
-        if (entry.isDirectory()) {
-          stack.push(fullPath);
-          continue;
-        }
-        if (entry.isFile() && entryName.endsWith('.jsonl') && entryName.includes(sessionId)) {
-          codexSessionPathCache.set(sessionId, fullPath);
-          return fullPath;
-        }
-      }
-    } catch {
-      continue;
-    }
-  }
-
-  return null;
+  return getCodexSessionIndex().findSync(sessionId);
 }
 
 async function findCodexSessionPath(sessionId: string): Promise<string | null> {
-  const cached = codexSessionPathCache.get(sessionId);
-  if (cached && pathExistsSync(cached)) return cached;
-  if (cached) codexSessionPathCache.delete(sessionId);
-
-  const root = getCodexSessionsPath();
-  if (!pathExistsSync(root)) return null;
-
-  const stack = [root];
-  while (stack.length > 0) {
-    const currentDir = stack.pop()!;
-    try {
-      const entries = await fs.readdir(currentDir, { withFileTypes: true });
-
-      for (const entry of entries) {
-        const entryName = String(entry.name);
-        const fullPath = path.join(currentDir, entryName);
-        if (entry.isDirectory()) {
-          stack.push(fullPath);
-          continue;
-        }
-        if (entry.isFile() && entryName.endsWith('.jsonl') && entryName.includes(sessionId)) {
-          codexSessionPathCache.set(sessionId, fullPath);
-          return fullPath;
-        }
-      }
-    } catch {
-      continue;
-    }
-  }
-
-  return null;
+  return getCodexSessionIndex().find(sessionId);
 }
 
 /** Validates a subagent agent ID to prevent path traversal attacks. */
@@ -487,7 +438,7 @@ export async function deleteSDKSession(vaultPath: string, sessionId: string): Pr
     const codexSessionPath = await findCodexSessionPath(sessionId);
     if (codexSessionPath && pathExistsSync(codexSessionPath)) {
       await fs.unlink(codexSessionPath);
-      codexSessionPathCache.delete(sessionId);
+      getCodexSessionIndex().invalidate();
     }
   } catch {
     // Best-effort deletion
