@@ -5,6 +5,7 @@ styles.css
 *.js.map
 dist/
 build/
+/outputs/
 
 # Dependencies
 node_modules/

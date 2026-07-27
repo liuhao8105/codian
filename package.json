@@ -1,6 +1,6 @@
 {
   "name": "codian",
-  "version": "1.3.83-stability-hardening",
+  "version": "1.3.84-long-run-completion",
   "description": "Codian - Codex embedded in the Obsidian sidebar",
   "main": "main.js",
   "scripts": {
@@ -8,6 +8,8 @@
     "build:css": "node scripts/build-css.mjs",
     "dev": "npm run build:css && node esbuild.config.mjs",
     "build": "node scripts/build.mjs production",
+    "package:release": "node scripts/package-release.mjs",
+    "verify:release": "node scripts/verify-release.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"{src,tests}/**/*.ts\"",
     "lint:fix": "npm run lint -- --fix",

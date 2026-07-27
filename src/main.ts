@@ -9,7 +9,7 @@ import type { Editor, MarkdownView } from 'obsidian';
 import { Notice, Plugin } from 'obsidian';
 
 import { AgentManager } from './core/agents';
-import { CodianDiagnostics } from './core/diagnostics/CodianDiagnostics';
+import { CodianDiagnostics } from './core/diagnostics';
 import { McpServerManager } from './core/mcp';
 import { PluginManager } from './core/plugins';
 import { createAgentRuntime } from './core/runtime';
