@@ -5,11 +5,16 @@ const path = require('path');
 const jestPath = require.resolve('jest/bin/jest');
 const localStorageFile = path.join(os.tmpdir(), 'claudian-localstorage');
 const forwardedArgs = process.argv.slice(2);
+const localStorageArgs = process.allowedNodeEnvironmentFlags?.has(
+  '--localstorage-file'
+)
+  ? [`--localstorage-file=${localStorageFile}`]
+  : [];
 
 function runJest(args, stdio = 'inherit') {
   return spawnSync(
     process.execPath,
-    [`--localstorage-file=${localStorageFile}`, jestPath, ...args],
+    [...localStorageArgs, jestPath, ...args],
     { stdio, encoding: stdio === 'pipe' ? 'utf8' : undefined }
   );
 }
