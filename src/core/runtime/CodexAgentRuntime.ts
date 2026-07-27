@@ -5,8 +5,9 @@ import * as os from 'os';
 import * as path from 'path';
 
 import type CodianPlugin from '../../main';
+import { appendBoundedLog } from '../../utils/boundedLog';
 import { stripCurrentNoteContext } from '../../utils/context';
-import { isProviderConfigured } from '../../utils/env';
+import { isProviderConfigured, parseEnvironmentVariables } from '../../utils/env';
 import { getVaultPath } from '../../utils/path';
 import {
   buildContextFromHistory,
@@ -26,20 +27,37 @@ import type {
   SlashCommand,
   StreamChunk,
 } from '../types';
-import { type AppServerNotification,CodexAppServerClient } from './CodexAppServerClient';
-import { normalizeCodexModelForRuntime, resolveCodexCliPath } from './codexExec';
+import { type AppServerNotification, CodexAppServerClient } from './CodexAppServerClient';
+import {
+  discoverConfiguredCodexMcpServerNames,
+  extractExplicitCodexMcpNames,
+  normalizeCodexModelForRuntime,
+  resolveCodexCliPath,
+} from './codexExec';
 import type { AgentRuntime } from './index';
 
 type Waiter = () => void;
 const CODIAN_RUNTIME_DIAGNOSTIC_LOG = path.join(os.tmpdir(), 'codian-runtime.log');
 const MAX_SUBAGENT_WAIT_TURNS = 3;
+const APP_SERVER_STARTUP_TIMEOUT_MS = 30_000;
+const MCP_STARTUP_TIMEOUT_MS = 20_000;
+const FIRST_TURN_ACTIVITY_TIMEOUT_MS = 90_000;
+const MAX_STALL_RECOVERY_ATTEMPTS = 1;
+const TEMP_IMAGE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const CHATGPT_TRANSPORT_DISCONNECT_MESSAGE =
+  'Codex 与 ChatGPT 的连接已中断，自动重试后仍未恢复。请检查网络或代理设置，然后重新发送消息。';
+const CODEX_STALL_MESSAGE =
+  'Codex 长时间没有返回任何结果，自动重建后仍未恢复。请检查 MCP、网络或代理设置，然后重新发送消息。';
 const SUBAGENT_WAIT_PROMPT = `Background subagents are still running.
 
 You must retrieve their results before ending this turn. Use TaskOutput with block=true for each running task, then incorporate the results into the user-facing answer. Do not produce a final answer until no background subagents remain running.`;
 
 async function appendRuntimeDiagnosticLog(message: string): Promise<void> {
   try {
-    await fs.appendFile(CODIAN_RUNTIME_DIAGNOSTIC_LOG, `[${new Date().toISOString()}] ${message}\n`, 'utf8');
+    await appendBoundedLog(
+      CODIAN_RUNTIME_DIAGNOSTIC_LOG,
+      `[${new Date().toISOString()}] ${message}\n`
+    );
   } catch {
     // Ignore logging failures.
   }
@@ -115,6 +133,14 @@ function extractReadableErrorMessage(rawMessage: string): string {
   }
 }
 
+function formatAppServerErrorMessage(rawMessage: string): string {
+  const message = extractReadableErrorMessage(rawMessage);
+  const isFinalTransportDisconnect = /stream disconnected before completion/i.test(message)
+    && /(chatgpt\.com\/backend-api\/codex\/responses|tls handshake eof)/i.test(message);
+
+  return isFinalTransportDisconnect ? CHATGPT_TRANSPORT_DISCONNECT_MESSAGE : message;
+}
+
 function isInputTooLongError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error ?? '');
   return /Input exceeds the maximum length of \d+ characters/i.test(message);
@@ -164,8 +190,11 @@ export class CodexAgentRuntime implements AgentRuntime {
   private readonly readyStateListeners = new Set<(ready: boolean) => void>();
   private activeAbortController: AbortController | null = null;
   private activeClient: CodexAppServerClient | null = null;
+  private activeWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
   private activeTurnId: string | null = null;
   private threadId: string | null = null;
+  private globalMcpNamesPromise: Promise<string[]> | null = null;
+  private readonly temporaryImagePaths = new Set<string>();
   private pendingResumeAt?: string;
   private approvalCallback: ApprovalCallback | null = null;
   private approvalDismisser: (() => void) | null = null;
@@ -298,12 +327,109 @@ ${prompt}
     };
   }
 
-  private getApprovalPolicy(): 'never' {
-    return 'never';
+  private getApprovalPolicy(): 'on-request' | 'never' {
+    return this.plugin.settings.permissionMode === 'yolo' ? 'never' : 'on-request';
+  }
+
+  private async handleAppServerRequest(
+    method: string,
+    params: Record<string, unknown>,
+  ): Promise<Record<string, unknown> | null> {
+    if (method === 'item/tool/requestUserInput') {
+      if (!this.askUserQuestionCallback) {
+        return { answers: {} };
+      }
+      const answers = await this.askUserQuestionCallback(
+        { questions: Array.isArray(params.questions) ? params.questions : [] },
+        this.activeAbortController?.signal,
+      );
+      return {
+        answers: Object.fromEntries(
+          Object.entries(answers ?? {}).map(([id, answer]) => [
+            id,
+            { answers: [answer] },
+          ])
+        ),
+      };
+    }
+
+    if (method === 'mcpServer/elicitation/request') {
+      // Codian has no generic schema-form renderer yet. Explicitly decline
+      // instead of leaving the App Server request hanging.
+      return { action: 'decline' };
+    }
+
+    if (method === 'item/permissions/requestApproval') {
+      const permissions = asRecord(params.permissions) ?? {};
+      if (!this.approvalCallback) {
+        return { permissions: {}, scope: 'turn' };
+      }
+      const decision = await this.approvalCallback(
+        'Permissions',
+        {
+          permissions,
+          cwd: asString(params.cwd) || undefined,
+        },
+        asString(params.reason) || 'Grant additional runtime permissions',
+      );
+      if (decision === 'allow' || decision === 'allow-always') {
+        return {
+          permissions,
+          scope: decision === 'allow-always' ? 'session' : 'turn',
+        };
+      }
+      return { permissions: {}, scope: 'turn' };
+    }
+
+    if (
+      method !== 'item/commandExecution/requestApproval' &&
+      method !== 'item/fileChange/requestApproval'
+    ) {
+      return null;
+    }
+
+    if (!this.approvalCallback) {
+      return { decision: 'decline' };
+    }
+
+    const isCommand = method === 'item/commandExecution/requestApproval';
+    const command = asString(params.command) || '';
+    const reason = asString(params.reason);
+    const toolName = isCommand ? 'Bash' : TOOL_EDIT;
+    const input = isCommand
+      ? { command, cwd: asString(params.cwd) || undefined }
+      : { file_path: asString(params.grantRoot) || '(pending file change)' };
+    const description = reason || (isCommand
+      ? `Run command: ${command || '(unknown command)'}`
+      : 'Apply the requested file changes');
+    const decision = await this.approvalCallback(toolName, input, description);
+
+    switch (decision) {
+      case 'allow':
+        return { decision: 'accept' };
+      case 'allow-always':
+        return { decision: 'acceptForSession' };
+      case 'deny':
+        return { decision: 'decline' };
+      default:
+        return { decision: 'cancel' };
+    }
   }
 
   private getThreadSandboxMode(): 'workspace-write' {
     return 'workspace-write';
+  }
+
+  private async getGlobalMcpNames(): Promise<string[]> {
+    if (this.plugin.settings.currentProvider !== 'codex') return [];
+    if (!this.globalMcpNamesPromise) {
+      const customEnv = parseEnvironmentVariables(this.plugin.getActiveEnvironmentVariables());
+      this.globalMcpNamesPromise = discoverConfiguredCodexMcpServerNames({
+        ...process.env,
+        ...customEnv,
+      });
+    }
+    return await this.globalMcpNamesPromise;
   }
 
   private getRequestedMcpServers(queryOptions?: QueryOptions): Record<string, unknown> {
@@ -340,6 +466,7 @@ ${prompt}
 
     const tempDir = path.join(os.tmpdir(), 'codian-images');
     await fs.mkdir(tempDir, { recursive: true });
+    await this.cleanupExpiredImages(tempDir);
 
     return await Promise.all(images.map(async (image) => {
       const buffer = Buffer.from(image.data, 'base64');
@@ -352,7 +479,41 @@ ${prompt}
         await fs.writeFile(filePath, buffer);
       }
 
+      this.temporaryImagePaths.add(filePath);
       return filePath;
+    }));
+  }
+
+  private async cleanupExpiredImages(tempDir: string): Promise<void> {
+    try {
+      const entries = await fs.readdir(tempDir, { withFileTypes: true });
+      const now = Date.now();
+      await Promise.all(entries.map(async (entry) => {
+        if (!entry.isFile()) return;
+        const filePath = path.join(tempDir, entry.name);
+        try {
+          const stat = await fs.stat(filePath);
+          if (now - stat.mtimeMs > TEMP_IMAGE_MAX_AGE_MS) {
+            await fs.unlink(filePath);
+          }
+        } catch {
+          // Best-effort cleanup.
+        }
+      }));
+    } catch {
+      // Best-effort cleanup.
+    }
+  }
+
+  private async cleanupTemporaryImages(): Promise<void> {
+    const paths = Array.from(this.temporaryImagePaths);
+    this.temporaryImagePaths.clear();
+    await Promise.all(paths.map(async (filePath) => {
+      try {
+        await fs.unlink(filePath);
+      } catch {
+        // The file may already have been removed by the OS or another cleanup.
+      }
     }));
   }
 
@@ -412,10 +573,21 @@ ${prompt}
       return;
     }
 
-    if (!resolveCodexCliPath(this.plugin)) {
+    const codexPath = resolveCodexCliPath(this.plugin);
+    if (!codexPath) {
       yield { type: 'error', content: '找不到 Codex CLI。请在设置中填写 Codex CLI 路径，或安装 Codex 应用。' };
       return;
     }
+
+    const globalMcpNames = await this.getGlobalMcpNames();
+    const explicitlyRequestedMcpNames = new Set([
+      ...extractExplicitCodexMcpNames(prompt, globalMcpNames),
+      ...(queryOptions?.mcpMentions ?? []),
+      ...(queryOptions?.enabledMcpServers ?? []),
+    ].map((name) => name.toLocaleLowerCase()));
+    const disabledMcpServers = globalMcpNames.filter(
+      (name) => !explicitlyRequestedMcpNames.has(name.toLocaleLowerCase())
+    );
 
     const queue = createChunkQueue();
     const selectedModel = queryOptions?.model?.trim() || undefined;
@@ -443,6 +615,24 @@ ${prompt}
     let activeAgentMessageItemId: string | null = null;
     let hasStreamedAgentText = false;
     let subagentWaitTurns = 0;
+    let attemptGeneration = 0;
+    let stallRecoveryAttempts = 0;
+    let turnHasActivity = false;
+    const startingMcpServers = new Set<string>();
+    let armWatchdog: ((generation: number, timeoutOverrideMs?: number) => void) | null = null;
+
+    const clearWatchdog = () => {
+      if (this.activeWatchdogTimer) {
+        clearTimeout(this.activeWatchdogTimer);
+        this.activeWatchdogTimer = null;
+      }
+    };
+
+    const markTurnActivity = () => {
+      if (turnHasActivity) return;
+      turnHasActivity = true;
+      clearWatchdog();
+    };
 
     const hasRunningSubagents = (): boolean => {
       if (!this.subagentStateProvider) return false;
@@ -504,11 +694,28 @@ ${prompt}
       hasStreamedAgentText = true;
     };
 
-    const handleNotification = (notification: AppServerNotification) => {
+    const handleNotification = (notification: AppServerNotification, generation = attemptGeneration) => {
+      if (generation !== attemptGeneration) return;
       void appendRuntimeDiagnosticLog(`notification ${notification.method}`);
+
+      if (notification.method === 'mcpServer/startupStatus/updated') {
+        const name = asString(notification.params.name);
+        const status = asString(notification.params.status);
+        if (name) {
+          if (status === 'starting') startingMcpServers.add(name);
+          else startingMcpServers.delete(name);
+          if (this.activeTurnId && !turnHasActivity) {
+            armWatchdog?.(generation);
+          }
+        }
+      }
+
       switch (notification.method) {
         case 'item/started': {
           const item = asRecord(notification.params.item);
+          if (item?.type !== 'userMessage') {
+            markTurnActivity();
+          }
           if (item?.type === 'userMessage') {
             queue.push({ type: 'sdk_user_sent', uuid: asString(item.id) || '' });
           }
@@ -567,6 +774,7 @@ ${prompt}
         }
 
         case 'item/agentMessage/delta': {
+          markTurnActivity();
           const itemId = asString(notification.params.itemId);
           const delta = asString(notification.params.delta);
           if (itemId && delta) {
@@ -584,6 +792,7 @@ ${prompt}
         }
 
         case 'turn/plan/updated': {
+          markTurnActivity();
           const plan = Array.isArray(notification.params.plan) ? notification.params.plan : [];
           queue.push({
             type: 'plan_update',
@@ -607,6 +816,7 @@ ${prompt}
         }
 
         case 'item/commandExecution/outputDelta': {
+          markTurnActivity();
           const itemId = asString(notification.params.itemId);
           const delta = asString(notification.params.delta);
           if (itemId && delta) {
@@ -618,6 +828,7 @@ ${prompt}
         }
 
         case 'item/commandExecution/terminalInteraction': {
+          markTurnActivity();
           const itemId = asString(notification.params.itemId);
           const stdin = asString(notification.params.stdin);
           if (itemId && stdin) {
@@ -630,6 +841,7 @@ ${prompt}
         }
 
         case 'item/mcpToolCall/progress': {
+          markTurnActivity();
           const itemId = asString(notification.params.itemId);
           const message = asString(notification.params.message);
           if (itemId && message) {
@@ -640,6 +852,9 @@ ${prompt}
 
         case 'item/completed': {
           const item = asRecord(notification.params.item);
+          if (item?.type !== 'userMessage') {
+            markTurnActivity();
+          }
           if (item?.type === 'agentMessage') {
             const itemId = asString(item.id);
             const finalText = asString(item.text) || '';
@@ -702,13 +917,15 @@ ${prompt}
             void appendRuntimeDiagnosticLog('notification-error-retryable-ignored');
             break;
           }
-          const message = extractReadableErrorMessage(rawMessage);
+          clearWatchdog();
+          const message = formatAppServerErrorMessage(rawMessage);
           queue.push({ type: 'error', content: message });
           queue.finish();
           break;
         }
 
         case 'turn/completed': {
+          clearWatchdog();
           void appendRuntimeDiagnosticLog('notification-turn-completed');
           if (hasRunningSubagents()) {
             void (async () => {
@@ -739,12 +956,75 @@ ${prompt}
       }
     };
 
-    void (async () => {
+    // Assigned after the watchdog closure so both callbacks can safely reference each other.
+    // eslint-disable-next-line prefer-const
+    let runAttempt: (attemptDisabledMcpServers: string[], generation: number) => Promise<void>;
+
+    armWatchdog = (generation: number, timeoutOverrideMs?: number) => {
+      clearWatchdog();
+      if (turnHasActivity || generation !== attemptGeneration) return;
+
+      const timeoutMs = timeoutOverrideMs ?? (
+        startingMcpServers.size > 0
+          ? MCP_STARTUP_TIMEOUT_MS
+          : FIRST_TURN_ACTIVITY_TIMEOUT_MS
+      );
+      this.activeWatchdogTimer = setTimeout(() => {
+        if (
+          generation !== attemptGeneration ||
+          turnHasActivity ||
+          this.activeAbortController?.signal.aborted
+        ) {
+          return;
+        }
+
+        const stalledMcpServers = Array.from(startingMcpServers);
+        if (stallRecoveryAttempts < MAX_STALL_RECOVERY_ATTEMPTS) {
+          stallRecoveryAttempts += 1;
+          attemptGeneration += 1;
+          const nextGeneration = attemptGeneration;
+          const globallyKnownMcpNames = new Set(globalMcpNames);
+          const retryDisabledMcpServers = Array.from(new Set([
+            ...disabledMcpServers,
+            ...stalledMcpServers.filter((name) => globallyKnownMcpNames.has(name)),
+          ])).sort();
+
+          void appendRuntimeDiagnosticLog(
+            `stall-recovery attempt=${stallRecoveryAttempts} stalledMcpServers=${stalledMcpServers.join(',') || 'none'} ` +
+            `disabledMcpServers=${retryDisabledMcpServers.join(',') || 'none'}`
+          );
+          this.activeClient?.kill();
+          this.activeClient = null;
+          this.activeTurnId = null;
+          this.threadId = null;
+          request = this.buildHistoryRebuildRequest(prompt, images, conversationHistory);
+          startingMcpServers.clear();
+          turnHasActivity = false;
+          void runAttempt(retryDisabledMcpServers, nextGeneration);
+          return;
+        }
+
+        void appendRuntimeDiagnosticLog(
+          `stall-recovery-exhausted stalledMcpServers=${stalledMcpServers.join(',') || 'none'}`
+        );
+        this.activeClient?.kill();
+        this.activeClient = null;
+        queue.push({ type: 'error', content: CODEX_STALL_MESSAGE });
+        queue.finish();
+      }, timeoutMs);
+    };
+
+    runAttempt = async (attemptDisabledMcpServers: string[], generation: number) => {
+      armWatchdog?.(generation, APP_SERVER_STARTUP_TIMEOUT_MS);
       try {
         const client = new CodexAppServerClient(
           this.plugin,
-          handleNotification,
-          this.activeAbortController?.signal
+          (notification) => handleNotification(notification, generation),
+          this.activeAbortController?.signal,
+          {
+            disabledMcpServers: attemptDisabledMcpServers,
+            requestHandler: (method, params) => this.handleAppServerRequest(method, params),
+          },
         );
         void appendRuntimeDiagnosticLog('client-created');
         this.activeClient = client;
@@ -832,7 +1112,11 @@ ${prompt}
         this.activeTurnId = asString(turn?.id);
         void appendRuntimeDiagnosticLog(`turn-started ${this.activeTurnId ?? 'null'}`);
         queue.push({ type: 'sdk_user_sent', uuid: this.activeTurnId || '' });
+        armWatchdog?.(generation);
       } catch (error) {
+        if (generation !== attemptGeneration || this.activeAbortController?.signal.aborted) {
+          return;
+        }
         const message = error instanceof Error
           ? error.message || 'Codex App Server 执行失败。'
           : 'Codex App Server 执行失败。';
@@ -840,22 +1124,30 @@ ${prompt}
         queue.push({ type: 'error', content: message });
         queue.finish();
       }
-    })();
+    };
+
+    void runAttempt(disabledMcpServers, attemptGeneration);
 
     try {
       for await (const chunk of queue.drain()) {
         yield chunk;
       }
     } finally {
+      clearWatchdog();
       void appendRuntimeDiagnosticLog(`query-finally activeTurnId=${this.activeTurnId ?? 'null'} activeClient=${this.activeClient ? 'present' : 'null'} activeAbortController=${this.activeAbortController ? 'present' : 'null'}`);
       this.activeTurnId = null;
       this.activeClient?.kill();
       this.activeClient = null;
       this.activeAbortController = null;
+      await this.cleanupTemporaryImages();
     }
   }
 
   cancel(): void {
+    if (this.activeWatchdogTimer) {
+      clearTimeout(this.activeWatchdogTimer);
+      this.activeWatchdogTimer = null;
+    }
     if (!this.activeAbortController) {
       return;
     }
@@ -895,6 +1187,7 @@ ${prompt}
 
   cleanup(): void {
     this.cancel();
+    void this.cleanupTemporaryImages();
   }
 
   async rewindFiles(): Promise<RewindFilesResult> {

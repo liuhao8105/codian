@@ -1,6 +1,17 @@
 import type { RewindFilesResult } from '@anthropic-ai/claude-agent-sdk';
 
+import {
+  InstructionRefineService,
+  type RefineProgressCallback,
+} from '../../features/chat/services/InstructionRefineService';
+import {
+  type TitleGenerationCallback,
+  type TitleGenerationResult,
+  TitleGenerationService,
+} from '../../features/chat/services/TitleGenerationService';
+import type CodianPlugin from '../../main';
 import type { ApprovalCallback, ApprovalCallbackOptions, QueryOptions } from '../agent';
+import type { SubagentHookState } from '../hooks';
 import type { McpServerManager } from '../mcp';
 import type {
   ChatMessage,
@@ -10,17 +21,6 @@ import type {
   SlashCommand,
   StreamChunk,
 } from '../types';
-import type { SubagentHookState } from '../hooks';
-import type CodianPlugin from '../../main';
-import {
-  type RefineProgressCallback,
-  InstructionRefineService,
-} from '../../features/chat/services/InstructionRefineService';
-import {
-  type TitleGenerationCallback,
-  type TitleGenerationResult,
-  TitleGenerationService,
-} from '../../features/chat/services/TitleGenerationService';
 import type { InstructionRefineResult } from '../types/settings';
 import { CodexAgentRuntime } from './CodexAgentRuntime';
 import { DeepSeekRuntime } from './DeepSeekRuntime';

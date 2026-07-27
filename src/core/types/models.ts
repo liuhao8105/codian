@@ -8,14 +8,129 @@ import type { SdkBeta } from '@anthropic-ai/claude-agent-sdk';
 export type ClaudeModel = string;
 
 export const DEFAULT_CODEX_MODELS: { value: ClaudeModel; label: string; description: string }[] = [
-  { value: 'gpt-5.5', label: 'GPT-5.5', description: '当前环境下更稳的默认 Codex 模型' },
-  { value: 'gpt-5.4', label: 'GPT-5.4', description: '兼容性较好的 GPT-5.4 模型' },
-  { value: 'gpt-5.4-mini', label: 'GPT-5.4-Mini', description: '更轻量的 GPT-5.4-Mini 模型' },
-  { value: 'gpt-5.3-codex', label: 'GPT-5.3-Codex', description: '偏编码场景的 Codex 模型' },
-  { value: 'gpt-5.2', label: 'GPT-5.2', description: '较旧但兼容的 GPT-5.2 模型' },
+  { value: 'gpt-5.6-sol', label: 'GPT-5.6-Sol', description: '最新旗舰 Agent 编码模型' },
+  { value: 'gpt-5.6-terra', label: 'GPT-5.6-Terra', description: '适合日常工作的均衡 Agent 编码模型' },
+  { value: 'gpt-5.6-luna', label: 'GPT-5.6-Luna', description: '快速且经济的 Agent 编码模型' },
+  { value: 'gpt-5.5', label: 'GPT-5.5', description: '适合复杂编码、研究和实际工作的上一代模型' },
+  { value: 'gpt-5.4', label: 'GPT-5.4', description: '适合日常编码的稳定模型' },
+  { value: 'gpt-5.4-mini', label: 'GPT-5.4-Mini', description: '适合简单编码任务的轻量模型' },
 ];
 
 export const DEFAULT_CLAUDE_MODELS = DEFAULT_CODEX_MODELS;
+
+const RETIRED_CODEX_MODELS = new Set(['gpt-5.2', 'gpt-5.3-codex']);
+
+export interface CodexModelCatalog {
+  models: { value: ClaudeModel; label: string; description: string }[];
+  defaultModel: ClaudeModel;
+  thinkingBudgets: Record<string, ThinkingBudget>;
+}
+
+export interface CodexModelCatalogClient {
+  initialize(): Promise<void>;
+  request(method: string, params?: Record<string, unknown>): Promise<Record<string, unknown>>;
+  kill(): void;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : null;
+}
+
+function asNonEmptyString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function asThinkingBudget(value: unknown): ThinkingBudget | null {
+  switch (value) {
+    case 'off':
+    case 'low':
+    case 'medium':
+    case 'high':
+    case 'xhigh':
+      return value;
+    default:
+      return null;
+  }
+}
+
+/** Converts the Codex App Server model/list response into selector-ready data. */
+export function parseCodexModelCatalog(value: unknown): CodexModelCatalog {
+  const response = asRecord(value);
+  const entries = Array.isArray(response?.data) ? response.data : [];
+  const models: CodexModelCatalog['models'] = [];
+  const thinkingBudgets: Record<string, ThinkingBudget> = {};
+  let defaultModel = '';
+
+  for (const rawEntry of entries) {
+    const entry = asRecord(rawEntry);
+    if (!entry || entry.hidden === true) continue;
+
+    const model = asNonEmptyString(entry.model) ?? asNonEmptyString(entry.id);
+    if (!model) continue;
+
+    models.push({
+      value: model,
+      label: asNonEmptyString(entry.displayName) ?? model,
+      description: asNonEmptyString(entry.description) ?? '',
+    });
+
+    const thinkingBudget = asThinkingBudget(entry.defaultReasoningEffort);
+    if (thinkingBudget) {
+      thinkingBudgets[model] = thinkingBudget;
+    }
+    if (!defaultModel && entry.isDefault === true) {
+      defaultModel = model;
+    }
+  }
+
+  return {
+    models,
+    defaultModel: defaultModel || models[0]?.value || '',
+    thinkingBudgets,
+  };
+}
+
+/** Reads the current account's models from Codex App Server with a bounded wait. */
+export async function fetchCodexModelCatalog(
+  createClient: (signal: AbortSignal) => CodexModelCatalogClient,
+  timeoutMs = 5000,
+): Promise<CodexModelCatalog> {
+  const abortController = new AbortController();
+  const client = createClient(abortController.signal);
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const requestCatalog = async () => {
+    await client.initialize();
+    const response = await client.request('model/list', {});
+    return parseCodexModelCatalog(response);
+  };
+
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timeoutId = setTimeout(() => {
+      abortController.abort();
+      reject(new Error('读取 Codex 模型清单超时。'));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([requestCatalog(), timeout]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+    client.kill();
+  }
+}
+
+/** Migrates known retired built-ins without overwriting supported or custom choices. */
+export function reconcileCodexModelSelection(
+  currentModel: string,
+  availableModels: string[],
+  defaultModel: string,
+): { model: string; migrated: boolean } {
+  if (availableModels.includes(currentModel) || !RETIRED_CODEX_MODELS.has(currentModel) || !defaultModel) {
+    return { model: currentModel, migrated: false };
+  }
+  return { model: defaultModel, migrated: true };
+}
 
 export const BETA_1M_CONTEXT: SdkBeta = 'context-1m-2025-08-07';
 
@@ -58,11 +173,12 @@ export const THINKING_BUDGETS: { value: ThinkingBudget; label: string; tokens: n
 
 /** Default thinking budget per model tier. */
 export const DEFAULT_THINKING_BUDGET: Record<string, ThinkingBudget> = {
-  'gpt-5.5': 'off',
-  'gpt-5.4': 'off',
-  'gpt-5.4-mini': 'off',
-  'gpt-5.3-codex': 'off',
-  'gpt-5.2': 'off',
+  'gpt-5.6-sol': 'low',
+  'gpt-5.6-terra': 'medium',
+  'gpt-5.6-luna': 'medium',
+  'gpt-5.5': 'medium',
+  'gpt-5.4': 'medium',
+  'gpt-5.4-mini': 'medium',
 };
 
 export const CONTEXT_WINDOW_STANDARD = 200_000;

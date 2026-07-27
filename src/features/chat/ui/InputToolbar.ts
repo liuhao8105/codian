@@ -129,6 +129,10 @@ export class ProviderSelector {
     this.isOpen = false;
     this.syncOpenState();
   };
+
+  destroy(): void {
+    document.removeEventListener('click', this.handleDocumentClick, true);
+  }
 }
 
 export class ModelSelector {

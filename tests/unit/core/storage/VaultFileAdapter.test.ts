@@ -57,14 +57,77 @@ describe('VaultFileAdapter', () => {
   });
 
   describe('write', () => {
+    it('atomically replaces an existing file and keeps the previous version as backup', async () => {
+      const files = new Map<string, string>([['folder/file.md', 'old']]);
+      mockAdapter.exists.mockImplementation(async (path: string) =>
+        path === 'folder' || files.has(path)
+      );
+      mockAdapter.read.mockImplementation(async (path: string) => files.get(path));
+      mockAdapter.write.mockImplementation(async (path: string, content: string) => {
+        files.set(path, content);
+      });
+      mockAdapter.remove.mockImplementation(async (path: string) => {
+        files.delete(path);
+      });
+      mockAdapter.rename.mockImplementation(async (from: string, to: string) => {
+        const content = files.get(from);
+        if (content === undefined) throw new Error(`Missing ${from}`);
+        files.delete(from);
+        files.set(to, content);
+      });
+
+      await vaultAdapter.write('folder/file.md', 'new');
+
+      expect(files.get('folder/file.md')).toBe('new');
+      expect(files.get('folder/file.md.bak')).toBe('old');
+      expect(Array.from(files.keys()).some(path => path.includes('.tmp-'))).toBe(false);
+    });
+
+    it('restores the previous file when the final rename fails', async () => {
+      const files = new Map<string, string>([['folder/file.md', 'old']]);
+      mockAdapter.exists.mockImplementation(async (path: string) =>
+        path === 'folder' || files.has(path)
+      );
+      mockAdapter.read.mockImplementation(async (path: string) => files.get(path));
+      mockAdapter.write.mockImplementation(async (path: string, content: string) => {
+        files.set(path, content);
+      });
+      mockAdapter.remove.mockImplementation(async (path: string) => {
+        files.delete(path);
+      });
+      mockAdapter.rename.mockImplementation(async (from: string, to: string) => {
+        if (from.includes('.tmp-') && to === 'folder/file.md') {
+          throw new Error('rename failed');
+        }
+        const content = files.get(from);
+        if (content === undefined) throw new Error(`Missing ${from}`);
+        files.delete(from);
+        files.set(to, content);
+      });
+
+      await expect(vaultAdapter.write('folder/file.md', 'new')).rejects.toThrow('rename failed');
+
+      expect(files.get('folder/file.md')).toBe('old');
+      expect(Array.from(files.keys()).some(path => path.includes('.tmp-'))).toBe(false);
+    });
+
     it('writes file when folder exists', async () => {
       mockAdapter.exists.mockResolvedValue(true);
       mockAdapter.write.mockResolvedValue();
+      mockAdapter.read.mockResolvedValue('content');
+      mockAdapter.rename.mockResolvedValue();
 
       await vaultAdapter.write('folder/file.md', 'content');
 
       expect(mockAdapter.exists).toHaveBeenCalledWith('folder');
-      expect(mockAdapter.write).toHaveBeenCalledWith('folder/file.md', 'content');
+      expect(mockAdapter.write).toHaveBeenCalledWith(
+        expect.stringContaining('folder/file.md.tmp-'),
+        'content'
+      );
+      expect(mockAdapter.rename).toHaveBeenCalledWith(
+        expect.stringContaining('folder/file.md.tmp-'),
+        'folder/file.md'
+      );
       expect(mockAdapter.mkdir).not.toHaveBeenCalled();
     });
 
@@ -72,34 +135,79 @@ describe('VaultFileAdapter', () => {
       mockAdapter.exists.mockImplementation((path: string) => Promise.resolve(path !== 'folder'));
       mockAdapter.mkdir.mockResolvedValue();
       mockAdapter.write.mockResolvedValue();
+      mockAdapter.read.mockResolvedValue('content');
+      mockAdapter.rename.mockResolvedValue();
 
       await vaultAdapter.write('folder/file.md', 'content');
 
       expect(mockAdapter.mkdir).toHaveBeenCalledWith('folder');
-      expect(mockAdapter.write).toHaveBeenCalledWith('folder/file.md', 'content');
+      expect(mockAdapter.write).toHaveBeenCalledWith(
+        expect.stringContaining('folder/file.md.tmp-'),
+        'content'
+      );
     });
 
     it('handles file in root (no folder)', async () => {
       mockAdapter.write.mockResolvedValue();
+      mockAdapter.read.mockResolvedValue('content');
+      mockAdapter.rename.mockResolvedValue();
 
       await vaultAdapter.write('file.md', 'content');
 
-      expect(mockAdapter.exists).not.toHaveBeenCalled();
       expect(mockAdapter.mkdir).not.toHaveBeenCalled();
-      expect(mockAdapter.write).toHaveBeenCalledWith('file.md', 'content');
+      expect(mockAdapter.write).toHaveBeenCalledWith(
+        expect.stringContaining('file.md.tmp-'),
+        'content'
+      );
     });
 
     it('handles deeply nested paths', async () => {
       mockAdapter.exists.mockResolvedValue(false);
       mockAdapter.mkdir.mockResolvedValue();
       mockAdapter.write.mockResolvedValue();
+      mockAdapter.read.mockResolvedValue('content');
+      mockAdapter.rename.mockResolvedValue();
 
       await vaultAdapter.write('level1/level2/level3/file.md', 'content');
 
       expect(mockAdapter.mkdir).toHaveBeenCalledWith('level1');
       expect(mockAdapter.mkdir).toHaveBeenCalledWith('level1/level2');
       expect(mockAdapter.mkdir).toHaveBeenCalledWith('level1/level2/level3');
-      expect(mockAdapter.write).toHaveBeenCalledWith('level1/level2/level3/file.md', 'content');
+      expect(mockAdapter.write).toHaveBeenCalledWith(
+        expect.stringContaining('level1/level2/level3/file.md.tmp-'),
+        'content'
+      );
+    });
+  });
+
+  describe('restoreFromBackup', () => {
+    it('replaces a corrupt primary file while preserving the valid backup', async () => {
+      const files = new Map<string, string>([
+        ['folder/file.json', '{broken'],
+        ['folder/file.json.bak', '{"valid":true}'],
+      ]);
+      mockAdapter.exists.mockImplementation(async (path: string) =>
+        path === 'folder' || files.has(path)
+      );
+      mockAdapter.read.mockImplementation(async (path: string) => files.get(path));
+      mockAdapter.write.mockImplementation(async (path: string, content: string) => {
+        files.set(path, content);
+      });
+      mockAdapter.remove.mockImplementation(async (path: string) => {
+        files.delete(path);
+      });
+      mockAdapter.rename.mockImplementation(async (from: string, to: string) => {
+        const content = files.get(from);
+        if (content === undefined) throw new Error(`Missing ${from}`);
+        files.delete(from);
+        files.set(to, content);
+      });
+
+      await vaultAdapter.restoreFromBackup('folder/file.json', '{"valid":true}');
+
+      expect(files.get('folder/file.json')).toBe('{"valid":true}');
+      expect(files.get('folder/file.json.bak')).toBe('{"valid":true}');
+      expect(Array.from(files.keys()).some(path => path.includes('.restore-'))).toBe(false);
     });
   });
 
@@ -109,23 +217,34 @@ describe('VaultFileAdapter', () => {
       mockAdapter.exists.mockResolvedValue(false);
       mockAdapter.mkdir.mockResolvedValue();
       mockAdapter.write.mockResolvedValue();
+      mockAdapter.read.mockResolvedValue('new content');
+      mockAdapter.rename.mockResolvedValue();
 
       await vaultAdapter.append('folder/file.md', 'new content');
 
       expect(mockAdapter.mkdir).toHaveBeenCalled();
-      expect(mockAdapter.write).toHaveBeenCalledWith('folder/file.md', 'new content');
-      expect(mockAdapter.read).not.toHaveBeenCalled();
+      expect(mockAdapter.write).toHaveBeenCalledWith(
+        expect.stringContaining('folder/file.md.tmp-'),
+        'new content'
+      );
+      expect(mockAdapter.read).toHaveBeenCalled();
     });
 
     it('appends to existing file', async () => {
       mockAdapter.exists.mockResolvedValue(true);
-      mockAdapter.read.mockResolvedValue('existing content');
+      mockAdapter.read
+        .mockResolvedValueOnce('existing content')
+        .mockResolvedValue('existing content\nmore content');
       mockAdapter.write.mockResolvedValue();
+      mockAdapter.rename.mockResolvedValue();
 
       await vaultAdapter.append('file.md', '\nmore content');
 
       expect(mockAdapter.read).toHaveBeenCalledWith('file.md');
-      expect(mockAdapter.write).toHaveBeenCalledWith('file.md', 'existing content\nmore content');
+      expect(mockAdapter.write).toHaveBeenCalledWith(
+        expect.stringContaining('file.md.tmp-'),
+        'existing content\nmore content'
+      );
       expect(mockAdapter.mkdir).not.toHaveBeenCalled();
     });
 
@@ -133,6 +252,8 @@ describe('VaultFileAdapter', () => {
       mockAdapter.exists.mockResolvedValueOnce(false).mockResolvedValueOnce(false);
       mockAdapter.mkdir.mockResolvedValue();
       mockAdapter.write.mockResolvedValue();
+      mockAdapter.read.mockResolvedValue('content');
+      mockAdapter.rename.mockResolvedValue();
 
       await vaultAdapter.append('folder/file.md', 'content');
 
@@ -141,21 +262,30 @@ describe('VaultFileAdapter', () => {
 
     it('handles file in root', async () => {
       mockAdapter.write.mockResolvedValue();
+      mockAdapter.read.mockResolvedValue('content');
+      mockAdapter.rename.mockResolvedValue();
 
       await vaultAdapter.append('file.md', 'content');
 
       expect(mockAdapter.mkdir).not.toHaveBeenCalled();
-      expect(mockAdapter.write).toHaveBeenCalledWith('file.md', 'content');
+      expect(mockAdapter.write).toHaveBeenCalledWith(
+        expect.stringContaining('file.md.tmp-'),
+        'content'
+      );
     });
 
     it('appends empty string', async () => {
       mockAdapter.exists.mockResolvedValue(true);
       mockAdapter.read.mockResolvedValue('existing');
       mockAdapter.write.mockResolvedValue();
+      mockAdapter.rename.mockResolvedValue();
 
       await vaultAdapter.append('file.md', '');
 
-      expect(mockAdapter.write).toHaveBeenCalledWith('file.md', 'existing');
+      expect(mockAdapter.write).toHaveBeenCalledWith(
+        expect.stringContaining('file.md.tmp-'),
+        'existing'
+      );
     });
   });
 

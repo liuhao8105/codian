@@ -138,7 +138,7 @@ describe('StorageService migration', () => {
     const { plugin, files } = createMockPlugin({
       dataJson: null,
       initialFiles: {
-        '.claudian/codian-settings.json': JSON.stringify(legacySettings),
+        '.claudian/claudian-settings.json': JSON.stringify(legacySettings),
       },
     });
 
@@ -308,8 +308,8 @@ describe('StorageService migration', () => {
 
     const saved = JSON.parse(files.get('.claude/codian-settings.json') || '{}') as Record<string, unknown>;
     expect(saved.lastEnvHash).toBe('abc123');
-    // lastClaudeModel defaults to 'gpt-5' (truthy), so migration doesn't overwrite it
-    expect(saved.lastClaudeModel).toBe('gpt-5');
+    // lastClaudeModel has a truthy current default, so migration doesn't overwrite it
+    expect(saved.lastClaudeModel).toBe(DEFAULT_SETTINGS.lastClaudeModel);
     expect(saved.lastCustomModel).toBe('custom-model');
   });
 

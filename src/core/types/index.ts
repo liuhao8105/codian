@@ -19,8 +19,8 @@ export {
   type ClaudeModel,
   CONTEXT_WINDOW_1M,
   CONTEXT_WINDOW_STANDARD,
-  DEFAULT_CODEX_MODELS,
   DEFAULT_CLAUDE_MODELS,
+  DEFAULT_CODEX_MODELS,
   DEFAULT_THINKING_BUDGET,
   getContextWindowSize,
   type ModelWithBetas,
@@ -38,10 +38,11 @@ export {
   type ApprovalDecision,
   type CCPermissions,
   type CCSettings,
-  type CodianSettings,
   type ClaudianSettings,
   type CliPlatformKey,
+  type CodianSettings,
   createPermissionRule,
+  type DeepSeekProviderConfig,
   DEFAULT_CC_PERMISSIONS,
   DEFAULT_CC_SETTINGS,
   DEFAULT_SETTINGS,
@@ -51,7 +52,6 @@ export {
   getCurrentPlatformBlockedCommands,
   getCurrentPlatformKey,
   getDefaultBlockedCommands,
-  type DeepSeekProviderConfig,
   type HostnameCliPaths,
   type InstructionRefineResult,
   type KeyboardNavigationSettings,
@@ -61,11 +61,11 @@ export {
   parseCCPermissionRule,
   type PermissionMode,
   type PermissionRule,
+  type PlatformBlockedCommands,
+  type PlatformCliPaths,  // Kept for migration
   type ProviderConfigBase,
   type ProviderConfigs,
   type ProviderId,
-  type PlatformBlockedCommands,
-  type PlatformCliPaths,  // Kept for migration
   type SlashCommand,
   type TabBarPosition,
 } from './settings';
@@ -97,10 +97,10 @@ export {
 
 // MCP types
 export {
-  type CodianMcpConfigFile,
-  type CodianMcpServer,
   type ClaudianMcpConfigFile,
   type ClaudianMcpServer,
+  type CodianMcpConfigFile,
+  type CodianMcpServer,
   DEFAULT_MCP_SERVER,
   getMcpServerType,
   isValidMcpServerConfig,
@@ -115,8 +115,8 @@ export {
 
 // Plugin types
 export {
-  type CodianPluginInfo,
   type ClaudianPlugin,
+  type CodianPluginInfo,
   type InstalledPluginEntry,
   type InstalledPluginsFile,
   type PluginScope,

@@ -40,7 +40,7 @@ export class TitleGenerationService {
       this.plugin.settings.titleGenerationModel ||
       envVars.OPENAI_MODEL ||
       envVars.CODEX_MODEL ||
-      'gpt-5.5';
+      'gpt-5.6-sol';
 
     const existingController = this.activeGenerations.get(conversationId);
     if (existingController) {
@@ -65,7 +65,7 @@ Generate a title for this conversation:`;
         prompt,
         cwd: vaultPath,
         model: titleModel,
-        permissionMode: 'normal',
+        permissionMode: 'read-only',
         abortController,
       });
 

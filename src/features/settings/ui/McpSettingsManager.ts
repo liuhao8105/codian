@@ -12,6 +12,10 @@ export class McpSettingsManager {
   private containerEl: HTMLElement;
   private plugin: CodianPlugin;
   private servers: CodianMcpServer[] = [];
+  private activeDropdown: HTMLElement | null = null;
+  private readonly handleDocumentClick = () => {
+    this.activeDropdown?.removeClass('is-visible');
+  };
 
   /**
    * Broadcasts MCP reload to all open Codian views.
@@ -29,6 +33,7 @@ export class McpSettingsManager {
   constructor(containerEl: HTMLElement, plugin: CodianPlugin) {
     this.containerEl = containerEl;
     this.plugin = plugin;
+    document.addEventListener('click', this.handleDocumentClick);
     this.loadAndRender();
   }
 
@@ -51,6 +56,7 @@ export class McpSettingsManager {
     setIcon(addBtn, 'plus');
 
     const dropdown = addContainer.createDiv({ cls: 'codian-mcp-add-dropdown' });
+    this.activeDropdown = dropdown;
 
     const stdioOption = dropdown.createDiv({ cls: 'codian-mcp-add-option' });
     setIcon(stdioOption.createSpan({ cls: 'codian-mcp-add-option-icon' }), 'terminal');
@@ -79,10 +85,6 @@ export class McpSettingsManager {
     addBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       dropdown.toggleClass('is-visible', !dropdown.hasClass('is-visible'));
-    });
-
-    document.addEventListener('click', () => {
-      dropdown.removeClass('is-visible');
     });
 
     if (this.servers.length === 0) {
@@ -389,5 +391,10 @@ export class McpSettingsManager {
   /** Refresh the server list (call after external changes). */
   public refresh() {
     this.loadAndRender();
+  }
+
+  public destroy(): void {
+    document.removeEventListener('click', this.handleDocumentClick);
+    this.activeDropdown = null;
   }
 }

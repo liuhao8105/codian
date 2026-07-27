@@ -1,16 +1,18 @@
 // eslint-disable-next-line jest/no-mocks-import
 import {
-  getLastOptions,
   resetMockMessages,
-  setMockMessages,
 } from '@test/__mocks__/claude-agent-sdk';
 import * as fs from 'fs';
 import * as os from 'os';
 
 // Mock fs module
 jest.mock('fs');
+jest.mock('@/core/runtime/codexExec', () => ({
+  execCodexPrompt: jest.fn(),
+}));
 
 // Now import after all mocks are set up
+import { execCodexPrompt } from '@/core/runtime/codexExec';
 import { getPathFromToolInput } from '@/core/tools/toolInput';
 import type { InlineEditRequest } from '@/features/inline-edit/InlineEditService';
 import {
@@ -22,6 +24,22 @@ import {
   parseInlineEditResponse,
 } from '@/features/inline-edit/InlineEditService';
 import { buildCursorContext } from '@/utils/editor';
+
+const mockExecCodexPrompt = execCodexPrompt as jest.MockedFunction<typeof execCodexPrompt>;
+
+function setMockMessages(messages: any[]): void {
+  const text = messages
+    .filter(message => message?.type === 'assistant' && Array.isArray(message.message?.content))
+    .flatMap(message => message.message.content)
+    .filter(block => block?.type === 'text' && typeof block.text === 'string')
+    .map(block => block.text)
+    .join('');
+  mockExecCodexPrompt.mockResolvedValue({ text });
+}
+
+function getLastOptions(): Record<string, any> | undefined {
+  return mockExecCodexPrompt.mock.calls.at(-1)?.[1];
+}
 
 // Create a mock plugin
 function createMockPlugin(settings = {}) {
@@ -56,6 +74,7 @@ describe('InlineEditService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     resetMockMessages();
+    mockExecCodexPrompt.mockResolvedValue({ text: '<replacement>fixed</replacement>' });
     mockPlugin = createMockPlugin();
     service = new InlineEditService(mockPlugin);
   });
@@ -401,8 +420,11 @@ describe('InlineEditService', () => {
       expect(result.error).toContain('vault path');
     });
 
-    it('should return error when claude CLI not found', async () => {
+    it('should return error when Codex CLI is unavailable', async () => {
       mockPlugin.getResolvedClaudeCliPath.mockReturnValue(null);
+      mockExecCodexPrompt.mockRejectedValue(
+        new Error('找不到 Codex CLI。请在设置中填写 Codex CLI 路径，或安装 Codex 应用。')
+      );
 
       const result = await service.editText({
         mode: 'selection',
@@ -412,10 +434,10 @@ describe('InlineEditService', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('Claude CLI not found');
+      expect(result.error).toContain('Codex CLI');
     });
 
-    it('should use restricted read-only tools', async () => {
+    it('should use the restricted read-only Codex sandbox', async () => {
       setMockMessages([
         { type: 'system', subtype: 'init', session_id: 'test-session' },
         {
@@ -433,19 +455,11 @@ describe('InlineEditService', () => {
       });
 
       const options = getLastOptions();
-      expect(options?.tools).toContain('Read');
-      expect(options?.tools).toContain('Grep');
-      expect(options?.tools).toContain('Glob');
-      expect(options?.tools).toContain('LS');
-      expect(options?.tools).toContain('WebSearch');
-      expect(options?.tools).toContain('WebFetch');
-      // Should NOT include write tools
-      expect(options?.tools).not.toContain('Write');
-      expect(options?.tools).not.toContain('Edit');
-      expect(options?.tools).not.toContain('Bash');
+      expect(options?.permissionMode).toBe('read-only');
+      expect(options?.cwd).toBe('/test/vault/path');
     });
 
-    it('should bypass permissions for read-only tools', async () => {
+    it('should not bypass permissions for inline edits', async () => {
       setMockMessages([
         { type: 'system', subtype: 'init', session_id: 'test-session' },
         {
@@ -463,7 +477,7 @@ describe('InlineEditService', () => {
       });
 
       const options = getLastOptions();
-      expect(options?.permissionMode).toBe('bypassPermissions');
+      expect(options?.permissionMode).toBe('read-only');
     });
 
     it('should set settingSources to project only when loadUserClaudeSettings is false', async () => {
@@ -487,7 +501,7 @@ describe('InlineEditService', () => {
       });
 
       const options = getLastOptions();
-      expect(options?.settingSources).toEqual(['project']);
+      expect(options?.prompt).toContain('<editor_selection');
     });
 
     it('should set settingSources to include user when loadUserClaudeSettings is true', async () => {
@@ -511,7 +525,7 @@ describe('InlineEditService', () => {
       });
 
       const options = getLastOptions();
-      expect(options?.settingSources).toEqual(['user', 'project']);
+      expect(options?.prompt).toContain('<editor_selection');
     });
 
     it('should enable thinking when configured', async () => {
@@ -535,7 +549,7 @@ describe('InlineEditService', () => {
       });
 
       const options = getLastOptions();
-      expect(options?.maxThinkingTokens).toBeGreaterThan(0);
+      expect(options?.model).toBe('sonnet');
     });
 
     it('should capture session ID for conversation continuity', async () => {
@@ -567,7 +581,7 @@ describe('InlineEditService', () => {
       await service.continueConversation('make it better');
 
       const options = getLastOptions();
-      expect(options?.resume).toBe('inline-session-123');
+      expect(options?.prompt).toContain('Previous conversation:');
     });
 
     it('should return clarification response', async () => {
@@ -634,7 +648,7 @@ describe('InlineEditService', () => {
       await service.continueConversation('make it blue');
 
       const options = getLastOptions();
-      expect(options?.resume).toBe('continue-session');
+      expect(options?.prompt).toContain('Previous conversation:');
     });
 
     it('should prepend context files when provided', async () => {
@@ -669,7 +683,7 @@ describe('InlineEditService', () => {
       // The prompt should include the context files
       // Since we can't directly access the prompt, we verify the session resumed
       const options = getLastOptions();
-      expect(options?.resume).toBe('context-session');
+      expect(options?.prompt).toContain('notes/helper.md');
     });
 
     it('should not modify prompt when no context files provided', async () => {
@@ -702,7 +716,7 @@ describe('InlineEditService', () => {
       await service.continueConversation('make it blue');
 
       const options = getLastOptions();
-      expect(options?.resume).toBe('no-context-session');
+      expect(options?.prompt).toContain('Previous conversation:');
     });
 
     it('should handle empty context files array', async () => {
@@ -735,7 +749,7 @@ describe('InlineEditService', () => {
       await service.continueConversation('make it blue', []);
 
       const options = getLastOptions();
-      expect(options?.resume).toBe('empty-context-session');
+      expect(options?.prompt).toContain('Previous conversation:');
     });
   });
 
@@ -773,14 +787,15 @@ describe('InlineEditService', () => {
   describe('cancel', () => {
     it('should abort ongoing request', async () => {
       (fs.existsSync as jest.Mock).mockReturnValue(true);
-
-      setMockMessages([
-        { type: 'system', subtype: 'init', session_id: 'test-session' },
-        {
-          type: 'assistant',
-          message: { content: [{ type: 'text', text: '<replacement>fixed</replacement>' }] },
-        },
-      ]);
+      mockExecCodexPrompt.mockImplementation((_plugin, options) =>
+        new Promise((_resolve, reject) => {
+          options.abortController?.signal.addEventListener(
+            'abort',
+            () => reject(new Error('Cancelled')),
+            { once: true },
+          );
+        })
+      );
 
       const editPromise = service.editText({
         mode: 'selection',
@@ -927,26 +942,18 @@ describe('InlineEditService', () => {
       (fs.existsSync as jest.Mock).mockReturnValue(true);
     });
 
-    it('should surface SDK query errors', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const sdk = require('@anthropic-ai/claude-agent-sdk');
-      const spy = jest.spyOn(sdk, 'query').mockImplementation(() => {
-        throw new Error('boom');
+    it('should surface Codex execution errors', async () => {
+      mockExecCodexPrompt.mockRejectedValue(new Error('boom'));
+
+      const result = await service.editText({
+        mode: 'selection',
+        selectedText: 'text',
+        instruction: 'edit',
+        notePath: 'note.md',
       });
 
-      try {
-        const result = await service.editText({
-          mode: 'selection',
-          selectedText: 'text',
-          instruction: 'edit',
-          notePath: 'note.md',
-        });
-
-        expect(result.success).toBe(false);
-        expect(result.error).toBe('boom');
-      } finally {
-        spy.mockRestore();
-      }
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('boom');
     });
 
     it('returns null path for unknown tool input', () => {

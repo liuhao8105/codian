@@ -116,9 +116,23 @@ function getCodexSessionsPath(): string {
   return path.join(os.homedir(), '.codex', 'sessions');
 }
 
+const codexSessionPathCache = new Map<string, string>();
+
+function pathExistsSync(filePath: string): boolean {
+  try {
+    return existsSync(filePath);
+  } catch {
+    return false;
+  }
+}
+
 function findCodexSessionPathSync(sessionId: string): string | null {
+  const cached = codexSessionPathCache.get(sessionId);
+  if (cached && pathExistsSync(cached)) return cached;
+  if (cached) codexSessionPathCache.delete(sessionId);
+
   const root = getCodexSessionsPath();
-  if (!existsSync(root)) return null;
+  if (!pathExistsSync(root)) return null;
 
   const stack = [root];
   while (stack.length > 0) {
@@ -134,6 +148,7 @@ function findCodexSessionPathSync(sessionId: string): string | null {
           continue;
         }
         if (entry.isFile() && entryName.endsWith('.jsonl') && entryName.includes(sessionId)) {
+          codexSessionPathCache.set(sessionId, fullPath);
           return fullPath;
         }
       }
@@ -146,8 +161,12 @@ function findCodexSessionPathSync(sessionId: string): string | null {
 }
 
 async function findCodexSessionPath(sessionId: string): Promise<string | null> {
+  const cached = codexSessionPathCache.get(sessionId);
+  if (cached && pathExistsSync(cached)) return cached;
+  if (cached) codexSessionPathCache.delete(sessionId);
+
   const root = getCodexSessionsPath();
-  if (!existsSync(root)) return null;
+  if (!pathExistsSync(root)) return null;
 
   const stack = [root];
   while (stack.length > 0) {
@@ -163,6 +182,7 @@ async function findCodexSessionPath(sessionId: string): Promise<string | null> {
           continue;
         }
         if (entry.isFile() && entryName.endsWith('.jsonl') && entryName.includes(sessionId)) {
+          codexSessionPathCache.set(sessionId, fullPath);
           return fullPath;
         }
       }
@@ -451,22 +471,23 @@ export function getSDKSessionPath(vaultPath: string, sessionId: string): string 
 export function sdkSessionExists(vaultPath: string, sessionId: string): boolean {
   try {
     const sessionPath = getSDKSessionPath(vaultPath, sessionId);
-    return existsSync(sessionPath) || !!findCodexSessionPathSync(sessionId);
+    return pathExistsSync(sessionPath) || !!findCodexSessionPathSync(sessionId);
   } catch {
-    return !!findCodexSessionPathSync(sessionId);
+    return false;
   }
 }
 
 export async function deleteSDKSession(vaultPath: string, sessionId: string): Promise<void> {
   try {
     const sessionPath = getSDKSessionPath(vaultPath, sessionId);
-    if (existsSync(sessionPath)) {
+    if (pathExistsSync(sessionPath)) {
       await fs.unlink(sessionPath);
       return;
     }
     const codexSessionPath = await findCodexSessionPath(sessionId);
-    if (codexSessionPath && existsSync(codexSessionPath)) {
+    if (codexSessionPath && pathExistsSync(codexSessionPath)) {
       await fs.unlink(codexSessionPath);
+      codexSessionPathCache.delete(sessionId);
     }
   } catch {
     // Best-effort deletion

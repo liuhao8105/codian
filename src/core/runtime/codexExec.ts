@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'child_process';
+import { type ChildProcess,spawn } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -11,7 +11,7 @@ export interface CodexExecParams {
   prompt: string;
   cwd: string;
   model?: string;
-  permissionMode?: 'yolo' | 'plan' | 'normal';
+  permissionMode?: 'yolo' | 'plan' | 'normal' | 'read-only';
   abortController?: AbortController | null;
 }
 
@@ -24,7 +24,7 @@ export interface CodexExecResult {
   };
 }
 
-const CHATGPT_SAFE_CODEX_MODEL = 'gpt-5.5';
+const CHATGPT_SAFE_CODEX_MODEL = 'gpt-5.6-sol';
 
 function isExistingFile(filePath: string): boolean {
   try {
@@ -95,7 +95,96 @@ export function normalizeCodexModelForRuntime(model: string | undefined): string
 
 export function buildCodexConfigOverrideArgs(model: string | null): string[] {
   if (!model) return [];
-  return ['-c', `model=\"${model}\"`];
+  return ['-c', `model="${model}"`];
+}
+
+const SAFE_CODEX_MCP_NAME = /^[A-Za-z0-9_-]+$/;
+
+export function parseEnabledCodexMcpServerNames(raw: string): string[] {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter((entry): entry is { name: string; enabled: boolean } => (
+        !!entry &&
+        typeof entry === 'object' &&
+        typeof (entry as { name?: unknown }).name === 'string' &&
+        (entry as { enabled?: unknown }).enabled === true &&
+        SAFE_CODEX_MCP_NAME.test((entry as { name: string }).name)
+      ))
+      .map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+}
+
+export function extractExplicitCodexMcpNames(prompt: string, availableNames: string[]): string[] {
+  const normalizedPrompt = prompt.toLocaleLowerCase();
+  return availableNames.filter((name) => {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|\\s|[，。！？、；：,(（])@${escaped}(?=$|\\s|[，。！？、；：,.!?)）])`, 'i')
+      .test(normalizedPrompt);
+  });
+}
+
+export function buildCodexMcpDisableOverrideArgs(
+  availableNames: string[],
+  requestedNames: string[],
+): string[] {
+  const requested = new Set(requestedNames.map((name) => name.toLocaleLowerCase()));
+  return availableNames
+    .filter((name) => SAFE_CODEX_MCP_NAME.test(name) && !requested.has(name.toLocaleLowerCase()))
+    .flatMap((name) => ['-c', `mcp_servers.${name}.enabled=false`]);
+}
+
+export function parseConfiguredCodexMcpServerNames(rawToml: string): string[] {
+  const names: string[] = [];
+  let currentName: string | null = null;
+  let currentEnabled = true;
+
+  const flushCurrent = () => {
+    if (currentName && currentEnabled && !names.includes(currentName)) {
+      names.push(currentName);
+    }
+  };
+
+  for (const line of rawToml.split(/\r?\n/)) {
+    const section = line.match(/^\s*\[([^\]]+)\]\s*(?:#.*)?$/);
+    if (section) {
+      flushCurrent();
+      const mcpSection = section[1].match(/^mcp_servers\.(?:"([^"]+)"|([A-Za-z0-9_-]+))$/);
+      const name = mcpSection?.[1] ?? mcpSection?.[2] ?? null;
+      currentName = name && SAFE_CODEX_MCP_NAME.test(name) ? name : null;
+      currentEnabled = true;
+      continue;
+    }
+
+    if (currentName && /^\s*enabled\s*=\s*false\s*(?:#.*)?$/i.test(line)) {
+      currentEnabled = false;
+    }
+  }
+  flushCurrent();
+  return names;
+}
+
+export type CodexConfigReader = (filePath: string, encoding: 'utf8') => Promise<string>;
+
+const readCodexConfig: CodexConfigReader = async (filePath, encoding) => {
+  return await fs.promises.readFile(filePath, encoding);
+};
+
+export async function discoverConfiguredCodexMcpServerNames(
+  env: NodeJS.ProcessEnv,
+  reader: CodexConfigReader = readCodexConfig,
+): Promise<string[]> {
+  try {
+    const codexHome = env.CODEX_HOME?.trim() || path.join(os.homedir(), '.codex');
+    const raw = await reader(path.join(codexHome, 'config.toml'), 'utf8');
+    return parseConfiguredCodexMcpServerNames(raw);
+  } catch {
+    return [];
+  }
 }
 
 export function resolveCodexCliPath(plugin: CodianPlugin): string | null {
@@ -160,13 +249,16 @@ function buildRuntimeEnv(plugin: CodianPlugin, codexPath: string): NodeJS.Proces
   };
 }
 
-function buildExecArgs(params: CodexExecParams, startupModel: string | null): string[] {
+export function buildCodexExecArgs(
+  params: CodexExecParams,
+  startupModel: string | null,
+): string[] {
   const args = [...buildCodexConfigOverrideArgs(startupModel), 'exec', '--json', '--skip-git-repo-check', '-C', params.cwd];
 
   if (params.permissionMode === 'yolo') {
     args.push('--full-auto');
   } else {
-    args.push('--sandbox', 'workspace-write');
+    args.push('--sandbox', params.permissionMode === 'read-only' ? 'read-only' : 'workspace-write');
   }
 
   if (isLikelyCodexModel(params.model)) {
@@ -188,7 +280,7 @@ export async function execCodexPrompt(
 
   const env = buildRuntimeEnv(plugin, codexPath);
   const startupModel = normalizeCodexModelForRuntime(params.model ?? plugin.settings.model);
-  const args = buildExecArgs(params, startupModel);
+  const args = buildCodexExecArgs(params, startupModel);
 
   return await new Promise<CodexExecResult>((resolve, reject) => {
     let child: ChildProcess | null = null;

@@ -270,7 +270,7 @@ ${historyPrefix}${prompt}`;
         prompt: fullPrompt,
         cwd: vaultPath,
         model: this.plugin.settings.model,
-        permissionMode: 'normal',
+        permissionMode: 'read-only',
         abortController: this.abortController,
       });
 

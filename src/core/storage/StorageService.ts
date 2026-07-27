@@ -19,6 +19,13 @@
 import type { App, Plugin } from 'obsidian';
 import { Notice } from 'obsidian';
 
+import {
+  extractSensitiveSettings,
+  hasSensitiveSettings,
+  hydrateSensitiveSettings,
+  sanitizeSensitiveSettings,
+  SecureSecretStorage,
+} from '../security';
 import type {
   CCPermissions,
   CCSettings,
@@ -40,10 +47,9 @@ import {
   CodianSettingsStorage,
   normalizeBlockedCommands,
   type StoredCodianSettings,
-  type StoredClaudianSettings,
 } from './ClaudianSettingsStorage';
-import { McpStorage } from './McpStorage';
 import { LOCAL_MEMORY_PATH, LocalMemoryStorage } from './LocalMemoryStorage';
+import { McpStorage } from './McpStorage';
 import {
   CLAUDIAN_ONLY_FIELDS,
   convertEnvObjectToString,
@@ -136,10 +142,13 @@ export class StorageService {
   private adapter: VaultFileAdapter;
   private plugin: Plugin;
   private app: App;
+  private secretStorage: SecureSecretStorage;
+  private retainedLegacyPlaintext = false;
 
-  constructor(plugin: Plugin) {
+  constructor(plugin: Plugin, secretStorage = new SecureSecretStorage(plugin)) {
     this.plugin = plugin;
     this.app = plugin.app;
+    this.secretStorage = secretStorage;
     this.adapter = new VaultFileAdapter(this.app);
     this.ccSettings = new CCSettingsStorage(this.adapter);
     this.codianSettings = new CodianSettingsStorage(this.adapter);
@@ -156,12 +165,39 @@ export class StorageService {
     await this.runMigrations();
 
     const cc = await this.ccSettings.load();
-    const claudian = await this.codianSettings.load();
+    let claudian = await this.codianSettings.load();
     if (!(await this.adapter.exists(CODIAN_SETTINGS_PATH))) {
       await this.codianSettings.save(claudian);
     }
+    claudian = await this.hydrateAndMigrateSecrets(claudian);
 
     return { cc, claudian };
+  }
+
+  private async hydrateAndMigrateSecrets(
+    settings: StoredCodianSettings,
+  ): Promise<StoredCodianSettings> {
+    const plaintext = extractSensitiveSettings(settings);
+    if (hasSensitiveSettings(plaintext)) {
+      const encrypted = await this.secretStorage.save(plaintext);
+      if (!encrypted) {
+        this.retainedLegacyPlaintext = true;
+        new Notice('系统安全存储不可用，旧密钥暂时保留在原设置文件中。');
+        return settings;
+      }
+
+      const sanitized = sanitizeSensitiveSettings(settings);
+      // The first atomic save moves the legacy plaintext primary to `.bak`.
+      // Save the sanitized payload a second time so both primary and rollback
+      // copies are safe to sync after a successful encrypted migration.
+      await this.codianSettings.save(sanitized);
+      await this.codianSettings.save(sanitized);
+      const verified = await this.secretStorage.load();
+      return hydrateSensitiveSettings(sanitized, verified ?? plaintext);
+    }
+
+    const encrypted = await this.secretStorage.load();
+    return encrypted ? hydrateSensitiveSettings(settings, encrypted) : settings;
   }
 
   private async runMigrations(): Promise<void> {
@@ -463,15 +499,33 @@ export class StorageService {
   }
 
   async updateCodianSettings(updates: Partial<StoredCodianSettings>): Promise<void> {
-    return this.codianSettings.update(updates);
+    const current = await this.loadCodianSettings();
+    return this.saveCodianSettings({ ...current, ...updates });
   }
 
   async saveCodianSettings(settings: StoredCodianSettings): Promise<void> {
-    return this.codianSettings.save(settings);
+    const payload = extractSensitiveSettings(settings);
+    const encrypted = await this.secretStorage.save(payload);
+    if (encrypted) {
+      this.retainedLegacyPlaintext = false;
+      return this.codianSettings.save(sanitizeSensitiveSettings(settings));
+    }
+
+    if (hasSensitiveSettings(payload)) {
+      new Notice('系统安全存储不可用：本次密钥仅在当前运行期间有效。');
+    }
+    return this.codianSettings.save(
+      this.retainedLegacyPlaintext ? settings : sanitizeSensitiveSettings(settings)
+    );
   }
 
   async loadCodianSettings(): Promise<StoredCodianSettings> {
-    return this.codianSettings.load();
+    const settings = await this.codianSettings.load();
+    if (hasSensitiveSettings(extractSensitiveSettings(settings))) {
+      return settings;
+    }
+    const encrypted = await this.secretStorage.load();
+    return encrypted ? hydrateSensitiveSettings(settings, encrypted) : settings;
   }
 
   /**

@@ -1,11 +1,31 @@
 // eslint-disable-next-line jest/no-mocks-import
 import {
-  getLastOptions,
   resetMockMessages,
-  setMockMessages,
 } from '@test/__mocks__/claude-agent-sdk';
 
+jest.mock('@/core/runtime/codexExec', () => ({
+  execCodexPrompt: jest.fn(),
+}));
+
+import { execCodexPrompt } from '@/core/runtime/codexExec';
 import { type TitleGenerationResult, TitleGenerationService } from '@/features/chat/services/TitleGenerationService';
+
+const mockExecCodexPrompt = execCodexPrompt as jest.MockedFunction<typeof execCodexPrompt>;
+
+function setMockMessages(messages: any[]): void {
+  const text = messages
+    .filter(message => message?.type === 'assistant' && Array.isArray(message.message?.content))
+    .flatMap(message => message.message.content)
+    .filter(block => block?.type === 'text' && typeof block.text === 'string')
+    .map(block => block.text)
+    .join('');
+  mockExecCodexPrompt.mockResolvedValue({ text });
+}
+
+function getLastOptions(): Record<string, any> | undefined {
+  return mockExecCodexPrompt.mock.calls.at(-1)?.[1];
+}
+
 function createMockPlugin(settings = {}) {
   return {
     settings: {
@@ -33,6 +53,7 @@ describe('TitleGenerationService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     resetMockMessages();
+    mockExecCodexPrompt.mockResolvedValue({ text: 'Title' });
     mockPlugin = createMockPlugin();
     service = new TitleGenerationService(mockPlugin);
   });
@@ -63,7 +84,7 @@ describe('TitleGenerationService', () => {
       });
     });
 
-    it('should use no tools for title generation', async () => {
+    it('should use the read-only sandbox for title generation', async () => {
       setMockMessages([
         { type: 'system', subtype: 'init', session_id: 'test-session' },
         {
@@ -79,8 +100,7 @@ describe('TitleGenerationService', () => {
       await service.generateTitle('conv-123', 'test', callback);
 
       const options = getLastOptions();
-      expect(options?.tools).toEqual([]);
-      expect(options?.permissionMode).toBe('bypassPermissions');
+      expect(options?.permissionMode).toBe('read-only');
     });
 
     it('should use titleGenerationModel setting when set', async () => {
@@ -107,7 +127,7 @@ describe('TitleGenerationService', () => {
     it('should prioritize setting over env var', async () => {
       mockPlugin.settings.titleGenerationModel = 'sonnet';
       mockPlugin.getActiveEnvironmentVariables.mockReturnValue(
-        'ANTHROPIC_DEFAULT_HAIKU_MODEL=custom-haiku'
+        'OPENAI_MODEL=custom-openai-model'
       );
 
       setMockMessages([
@@ -128,10 +148,10 @@ describe('TitleGenerationService', () => {
       expect(options?.model).toBe('sonnet');
     });
 
-    it('should use ANTHROPIC_DEFAULT_HAIKU_MODEL when setting is empty', async () => {
+    it('should use OPENAI_MODEL when setting is empty', async () => {
       mockPlugin.settings.titleGenerationModel = '';
       mockPlugin.getActiveEnvironmentVariables.mockReturnValue(
-        'ANTHROPIC_DEFAULT_HAIKU_MODEL=custom-haiku'
+        'OPENAI_MODEL=custom-openai-model'
       );
 
       setMockMessages([
@@ -149,10 +169,10 @@ describe('TitleGenerationService', () => {
       await service.generateTitle('conv-123', 'test', callback);
 
       const options = getLastOptions();
-      expect(options?.model).toBe('custom-haiku');
+      expect(options?.model).toBe('custom-openai-model');
     });
 
-    it('should fallback to claude-haiku-4-5 model', async () => {
+    it('should fallback to the current safe Codex model', async () => {
       setMockMessages([
         { type: 'system', subtype: 'init', session_id: 'test-session' },
         {
@@ -168,7 +188,7 @@ describe('TitleGenerationService', () => {
       await service.generateTitle('conv-123', 'test', callback);
 
       const options = getLastOptions();
-      expect(options?.model).toBe('claude-haiku-4-5');
+      expect(options?.model).toBe('gpt-5.6-sol');
     });
 
     it('should strip surrounding quotes from title', async () => {
@@ -268,15 +288,18 @@ describe('TitleGenerationService', () => {
       });
     });
 
-    it('should fail when Claude CLI is not found', async () => {
+    it('should fail when Codex CLI is not found', async () => {
       mockPlugin.getResolvedClaudeCliPath.mockReturnValue(null);
+      mockExecCodexPrompt.mockRejectedValue(
+        new Error('找不到 Codex CLI。请在设置中填写 Codex CLI 路径，或安装 Codex 应用。')
+      );
 
       const callback = jest.fn();
       await service.generateTitle('conv-123', 'test', callback);
 
       expect(callback).toHaveBeenCalledWith('conv-123', {
         success: false,
-        error: 'Claude CLI not found',
+        error: '找不到 Codex CLI。请在设置中填写 Codex CLI 路径，或安装 Codex 应用。',
       });
     });
 
@@ -298,7 +321,7 @@ describe('TitleGenerationService', () => {
       await service.generateTitle('conv-123', 'test', callback);
 
       const options = getLastOptions();
-      expect(options?.settingSources).toEqual(['project']);
+      expect(options?.permissionMode).toBe('read-only');
     });
 
     it('should set settingSources to include user when loadUserClaudeSettings is true', async () => {
@@ -319,7 +342,7 @@ describe('TitleGenerationService', () => {
       await service.generateTitle('conv-123', 'test', callback);
 
       const options = getLastOptions();
-      expect(options?.settingSources).toEqual(['user', 'project']);
+      expect(options?.permissionMode).toBe('read-only');
     });
 
     it('should truncate long user messages', async () => {

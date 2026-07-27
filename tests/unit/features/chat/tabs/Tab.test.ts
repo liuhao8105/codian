@@ -149,6 +149,7 @@ let mockContextUsageMeter: ReturnType<typeof createMockContextUsageMeter>;
 let mockExternalContextSelector: ReturnType<typeof createMockExternalContextSelector>;
 let mockMcpServerSelector: ReturnType<typeof createMockMcpServerSelector>;
 let mockPermissionToggle: ReturnType<typeof createMockPermissionToggle>;
+let mockInputToolbarCallbacks: any;
 let mockMessageRenderer: { scrollToBottomIfNeeded: jest.Mock; setAsyncSubagentClickCallback: jest.Mock };
 let mockSelectionController: ReturnType<typeof createMockSelectionController>;
 let mockBrowserSelectionController: ReturnType<typeof createMockBrowserSelectionController>;
@@ -207,7 +208,8 @@ jest.mock('@/features/chat/ui', () => ({
     mockStatusPanel = createMockStatusPanel();
     return mockStatusPanel;
   }),
-  createInputToolbar: jest.fn().mockImplementation(() => {
+  createInputToolbar: jest.fn().mockImplementation((_container, callbacks) => {
+    mockInputToolbarCallbacks = callbacks;
     mockModelSelector = createMockModelSelector();
     mockThinkingBudgetSelector = createMockThinkingBudgetSelector();
     mockContextUsageMeter = createMockContextUsageMeter();
@@ -328,6 +330,7 @@ function createMockPlugin(overrides: Record<string, any> = {}): any {
     agentManager: { searchAgents: jest.fn().mockReturnValue([]) },
     getConversationById: jest.fn().mockResolvedValue(null),
     getConversationSync: jest.fn().mockReturnValue(null),
+    setCurrentModel: jest.fn().mockResolvedValue(undefined),
     saveSettings: jest.fn().mockResolvedValue(undefined),
     getActiveEnvironmentVariables: jest.fn().mockReturnValue({}),
     ...overrides,
@@ -997,6 +1000,17 @@ describe('Tab - UI Initialization', () => {
       expect(tab.ui.externalContextSelector).toBeDefined();
       expect(tab.ui.mcpServerSelector).toBeDefined();
       expect(tab.ui.permissionToggle).toBeDefined();
+    });
+
+    it('should delegate model changes to the plugin session-safe model switch', async () => {
+      const plugin = createMockPlugin();
+      const options = createMockOptions({ plugin });
+      const tab = createTab(options);
+
+      initializeTabUI(tab, plugin);
+      await mockInputToolbarCallbacks.onModelChange('gpt-5.6-sol');
+
+      expect(plugin.setCurrentModel).toHaveBeenCalledWith('gpt-5.6-sol');
     });
 
     it('should wire MCP server selector to MCP service', () => {

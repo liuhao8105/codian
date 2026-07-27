@@ -4,6 +4,15 @@
 
 ### What changed
 
+- Synced Codian's built-in model catalog with Codex CLI `0.144.5`: GPT-5.6 Sol, Terra, Luna, GPT-5.5, GPT-5.4, and GPT-5.4 Mini.
+- Added automatic `model/list` discovery so the selector reflects the models available to the current Codex account, with a five-second timeout and a built-in fallback catalog.
+- New installations now default to GPT-5.6 Sol; retired GPT-5.2 and GPT-5.3-Codex selections migrate safely while supported and custom selections remain unchanged.
+- Synced default thinking levels with the values reported by the Codex CLI.
+- Improved final Codex connection failures: retryable App Server events remain hidden while Codex reconnects, and exhausted ChatGPT transport retries now show a concise Chinese recovery message instead of the raw backend endpoint error.
+- Model changes now preserve chat history while clearing the old Codex session binding and rebuilding open-tab runtimes, preventing a conversation created with one model from being resumed with another model.
+- User-configured global Codex MCP servers now use on-demand startup: ordinary chat disables them, while an explicit `@server-name` request enables only the named server for that turn.
+- Added a startup watchdog that rebuilds a turn once when an MCP remains stuck before any model or tool activity, then returns an actionable error instead of waiting forever if recovery also stalls.
+- MCP discovery reads only sanitized section names from the local Codex configuration; transport configuration, environment variables, headers, and credentials are never persisted or logged by Codian.
 - Added a local-memory system inspired by [`supermemoryai/supermemory`](https://github.com/supermemoryai/supermemory)'s `memory / recall / context / profile` model, implemented entirely inside the local Obsidian vault.
 - Added `.claude/local-memory/memories.jsonl` for structured local memories and `.claude/local-memory/profile.md` as a stable profile placeholder.
 - Added `/remember [要记住的内容]` to save a local memory and `/recall [搜索关键词]` to search local memories.

@@ -1,1 +1,1 @@
-export { CodianSettingTab, CodianSettingTab as ClaudianSettingTab } from './CodianSettings';
+export { CodianSettingTab as ClaudianSettingTab,CodianSettingTab } from './CodianSettings';

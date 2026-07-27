@@ -1,7 +1,7 @@
 import { Notice } from 'obsidian';
 
-import type { AgentRuntime } from '../../../core/runtime';
 import type { McpServerManager } from '../../../core/mcp';
+import type { AgentRuntime } from '../../../core/runtime';
 import type { SlashCommand } from '../../../core/types';
 import { t } from '../../../i18n';
 import type CodianPlugin from '../../../main';
