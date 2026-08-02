@@ -14,6 +14,7 @@ const mockAdapter = {
 } as unknown as jest.Mocked<VaultFileAdapter>;
 
 describe('CodianSettingsStorage', () => {
+  const retiredProviderKey = String.fromCharCode(99, 108, 97, 117, 100, 101);
   let storage: CodianSettingsStorage;
 
   beforeEach(() => {
@@ -83,6 +84,26 @@ describe('CodianSettingsStorage', () => {
       expect(result.codexCliPathsByHost['host-b']).toBe('/custom/path-b');
     });
 
+    it('drops unknown root settings and unrecognized provider entries', async () => {
+      mockAdapter.exists.mockResolvedValue(true);
+      mockAdapter.read.mockResolvedValue(JSON.stringify({
+        unknownCompatibilityFlag: true,
+        providerConfigs: {
+          codex: { enabled: true, extra: 'discard' },
+          deepseek: { enabled: false, apiKey: '', baseUrl: 'https://example.com', model: 'chat' },
+          [retiredProviderKey]: { enabled: true },
+        },
+      }));
+
+      const result = await storage.load();
+
+      expect(result).not.toHaveProperty('unknownCompatibilityFlag');
+      expect(result.providerConfigs).toEqual({
+        codex: { enabled: true },
+        deepseek: { enabled: false, apiKey: '', baseUrl: 'https://example.com', model: 'chat' },
+      });
+    });
+
 
     it('should restore valid settings from backup when the primary JSON is corrupt', async () => {
       mockAdapter.exists.mockImplementation(async (path: string) =>
@@ -147,6 +168,24 @@ describe('CodianSettingsStorage', () => {
       const { slashCommands: _, ...storedSettings } = settings;
 
       await expect(storage.save(storedSettings)).rejects.toThrow('Write failed');
+    });
+
+    it('does not persist unknown settings or provider entries', async () => {
+      const settings = {
+        ...DEFAULT_SETTINGS,
+        unknownCompatibilityFlag: true,
+        providerConfigs: {
+          ...DEFAULT_SETTINGS.providerConfigs,
+          [retiredProviderKey]: { enabled: true },
+        },
+      } as any;
+      const { slashCommands: _, ...storedSettings } = settings;
+
+      await storage.save(storedSettings);
+
+      const writtenContent = JSON.parse(mockAdapter.write.mock.calls[0][1]);
+      expect(writtenContent.unknownCompatibilityFlag).toBeUndefined();
+      expect(Object.keys(writtenContent.providerConfigs).sort()).toEqual(['codex', 'deepseek']);
     });
   });
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.87-settings-sanitization
+
+- Restricted persisted settings to the currently supported schema.
+- Restricted provider configuration to Codex and DeepSeek entries.
+- Prevented removed compatibility fields from being loaded and written back.
+
 ## 1.3.86-provider-cleanup
 
 - Consolidated execution on the Codex App Server and the optional DeepSeek provider.
