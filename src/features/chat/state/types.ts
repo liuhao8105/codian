@@ -105,7 +105,7 @@ export interface ChatStateData {
   // Pending plan content for approve-new-session (auto-sends in new session after stream ends)
   pendingNewSessionPlan: string | null;
 
-  // Plan file path captured from Write tool calls to ~/.claude/plans/ during plan mode
+  // Plan file path captured from writes to the Codian plan directory.
   planFilePath: string | null;
 
   // Saved permission mode before entering plan mode (for Shift+Tab toggle restore)

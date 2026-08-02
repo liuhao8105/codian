@@ -10,19 +10,11 @@
 
 An Obsidian plugin for using `Codex` and `DeepSeek` inside your vault with a `Codian` Obsidian experience.
 
-## Attribution
-
-This project is a derivative work based on the open-source project
-[`YishenTu/claudian`](https://github.com/YishenTu/claudian), adapted for `Codex`
-and the `Codian` plugin experience. The upstream project is licensed under MIT,
-and the original license notice is preserved in this repository.
-
 ## Current Status
 
 - Plugin identity, installation metadata, and key user-facing wording now target `Codex`.
 - Main chat, inline edit, title generation, and instruction refinement now run through a `Codex CLI` adapter.
 - **v1.3.76**: DeepSeek provider with SSE streaming, tool loop, read-only MCP bridge, session-level approval memory, transaction log, vault sandbox, and production stability polish.
-- Some legacy settings and docs from the upstream project are still being cleaned up.
 
 ## Providers
 
@@ -85,12 +77,10 @@ Codian supports two AI providers with independent runtime implementations:
 - **Slash Commands**: Create reusable prompt templates triggered by `/command`, with argument placeholders, `@file` references, and optional inline bash substitutions.
 - **Skills**: Extend Codian with reusable capability modules that are automatically invoked based on context.
 - **Custom Agents**: Define custom subagents that Codian can invoke, with support for tool restrictions and model overrides.
-- **Legacy Plugin Compatibility**: Keep compatibility with some upstream plugin settings discovered from `~/.claude/plugins`.
 - **MCP Support**: Connect external tools and data sources via Model Context Protocol servers (stdio, SSE, HTTP) with context-saving mode and `@`-mention activation.
-- **Advanced Model Control**: Select between Haiku, Sonnet, and Opus, configure custom models via environment variables, fine-tune thinking budget, and enable Sonnet with 1M context window (requires Max subscription).
+- **Advanced Model Control**: Load the available Codex model catalog, configure compatible model overrides, and fine-tune reasoning effort.
 - **Plan Mode**: Toggle plan mode via Shift+Tab in the chat input. Codian explores and designs before implementing, presenting a plan for approval with options to approve in a new session, continue in the current session, or provide feedback.
 - **Security**: Permission modes (YOLO/Safe/Plan), safety blocklist, and vault confinement with symlink-safe checks.
-- **Chrome Compatibility**: Keep compatibility with the `claude-in-chrome` extension where available.
 
 ## Requirements
 
@@ -180,9 +170,8 @@ Use it like Codex in Obsidian: read, write, edit, and search files in your vault
 - **Inline Edit**: Select text + hotkey to edit directly in notes with word-level diff preview
 - **Instruction Mode**: Type `#` to add refined instructions to system prompt
 - **Slash Commands**: Type `/` for custom prompt templates or skills
-- **Skills**: Add `skill/SKILL.md` files to `~/.claude/skills/` or `{vault}/.claude/skills/`
-- **Custom Agents**: Add `agent.md` files to `~/.claude/agents/` (global) or `{vault}/.claude/agents/` (vault-specific); select via `@Agents/` in chat, or prompt Codian to invoke agents
-- **Legacy Plugin Compatibility**: Review compatibility entries via Settings → Legacy Plugin Compatibility
+- **Skills**: Add `skill/SKILL.md` files to `~/.codian/skills/` or `{vault}/.codian/skills/`
+- **Custom Agents**: Add `agent.md` files to `~/.codian/agents/` (global) or `{vault}/.codian/agents/` (vault-specific); select via `@Agents/` in chat, or prompt Codian to invoke agents
 - **MCP**: Add external tools via Settings → MCP Servers; use `@mcp-server` in chat to activate
 
 ## Configuration
@@ -196,7 +185,7 @@ Use it like Codex in Obsidian: read, write, edit, and search files in your vault
 - **Custom system prompt**: Additional instructions appended to the default system prompt (Instruction Mode `#` saves here)
 - **Enable auto-scroll**: Toggle automatic scrolling to bottom during streaming (default: on)
 - **Auto-generate conversation titles**: Toggle AI-powered title generation after the first user message is sent
-- **Title generation model**: Model used for auto-generating conversation titles (default: Auto/Haiku)
+- **Title generation model**: Model used for auto-generating conversation titles (default: Auto/GPT-5.6-Luna)
 - **Vim-style navigation mappings**: Configure key bindings with lines like `map w scrollUp`, `map s scrollDown`, `map i focusInput`
 
 **Hotkeys**
@@ -209,12 +198,7 @@ Use it like Codex in Obsidian: read, write, edit, and search files in your vault
 **MCP Servers**
 - Add/edit/verify/delete MCP server configurations with context-saving mode
 
-**Legacy Plugin Compatibility**
-- Review or toggle compatible legacy plugin entries discovered from `~/.claude/plugins`
-- User-scoped plugins are available in all vaults; project-scoped plugins only in matching vaults
-
 **Safety**
-- **Load legacy settings**: Load `~/.claude/settings.json` (legacy permission rules may bypass Safe mode)
 - **Enable command blocklist**: Block dangerous bash commands (default: on)
 - **Blocked commands**: Patterns to block (supports regex, platform-specific)
 - **Allowed export paths**: Paths outside the vault where files can be exported (default: `~/Desktop`, `~/Downloads`). Supports `~`, `$VAR`, `${VAR}`, and `%VAR%` (Windows).
@@ -240,8 +224,8 @@ Use it like Codex in Obsidian: read, write, edit, and search files in your vault
 
 ## Privacy & Data Use
 
-- **Sent to API**: Your input, attached files, images, and tool call outputs. Default: Anthropic; custom endpoint via `ANTHROPIC_BASE_URL`.
-- **Local storage**: Settings, session metadata, and commands stored in `vault/.claude/`; session messages in `~/.claude/projects/` (SDK-native); legacy sessions in `vault/.claude/sessions/`.
+- **Sent to API**: Your input, attached files, images, and tool call outputs. Default: OpenAI; custom endpoint via `OPENAI_BASE_URL`.
+- **Local storage**: Plugin settings, commands, and session metadata are stored under the vault's `.codian/` directory. Codex CLI session history remains under `~/.codex/sessions/`.
 - **No telemetry**: No tracking beyond your configured API provider.
 
 ## Troubleshooting
@@ -283,16 +267,13 @@ If different, GUI apps like Obsidian may not find Node.js.
 src/
 ├── main.ts                      # Plugin entry point
 ├── core/                        # Core infrastructure
-│   ├── agent/                   # Legacy compatibility helpers
 │   ├── agents/                  # Custom agent management (AgentManager)
 │   ├── commands/                # Slash command management (SlashCommandManager)
 │   ├── hooks/                   # PreToolUse/PostToolUse hooks
 │   ├── images/                  # Image caching and loading
 │   ├── mcp/                     # MCP server config, service, and testing
-│   ├── plugins/                 # Upstream plugin compatibility and management
 │   ├── prompts/                 # System prompts for agents
-│   ├── runtime/                 # Codex Agent Runtime + DeepSeek Runtime
-│   ├── sdk/                     # Legacy session/message compatibility utilities
+│   ├── runtime/                 # Codex and DeepSeek clients plus session utilities
 │   ├── security/                # Approval, blocklist, path validation
 │   ├── storage/                 # Distributed storage system
 │   ├── tools/                   # Tool constants, schemas, and executor
@@ -315,9 +296,7 @@ src/
 
 ## Roadmap
 
-- [x] Upstream plugin compatibility
 - [x] Custom agent (subagent) support
-- [x] Chrome compatibility support
 - [x] `/compact` command
 - [x] Plan mode
 - [x] `rewind` and `fork` support (including `/fork` command)
@@ -338,4 +317,3 @@ Licensed under the [MIT License](LICENSE).
 
 - [Obsidian](https://obsidian.md) for the plugin API
 - [OpenAI](https://openai.com) for Codex and the Codex CLI/App Server runtime
-- [`YishenTu/claudian`](https://github.com/YishenTu/claudian) as the upstream open-source base project

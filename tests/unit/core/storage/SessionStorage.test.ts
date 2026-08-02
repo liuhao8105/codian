@@ -19,15 +19,15 @@ describe('SessionStorage', () => {
   });
 
   describe('SESSIONS_PATH', () => {
-    it('should be .claude/sessions', () => {
-      expect(SESSIONS_PATH).toBe('.claude/sessions');
+    it('should be .codian/sessions', () => {
+      expect(SESSIONS_PATH).toBe('.codian/sessions');
     });
   });
 
   describe('getFilePath', () => {
     it('returns correct file path for conversation id', () => {
       const path = storage.getFilePath('conv-123');
-      expect(path).toBe('.claude/sessions/conv-123.jsonl');
+      expect(path).toBe('.codian/sessions/conv-123.jsonl');
     });
   });
 
@@ -38,12 +38,12 @@ describe('SessionStorage', () => {
       const result = await storage.loadConversation('conv-123');
 
       expect(result).toBeNull();
-      expect(mockAdapter.exists).toHaveBeenCalledWith('.claude/sessions/conv-123.jsonl');
+      expect(mockAdapter.exists).toHaveBeenCalledWith('.codian/sessions/conv-123.jsonl');
     });
 
     it('loads and parses conversation from JSONL file', async () => {
       const jsonlContent = [
-        '{"type":"meta","id":"conv-123","title":"Test Chat","createdAt":1700000000,"updatedAt":1700001000,"sessionId":"sdk-session"}',
+        '{"type":"meta","id":"conv-123","title":"Test Chat","createdAt":1700000000,"updatedAt":1700001000,"sessionId":"runtime-session"}',
         '{"type":"message","message":{"id":"msg-1","role":"user","content":"Hello","timestamp":1700000100}}',
         '{"type":"message","message":{"id":"msg-2","role":"assistant","content":"Hi!","timestamp":1700000200}}',
       ].join('\n');
@@ -59,7 +59,7 @@ describe('SessionStorage', () => {
         createdAt: 1700000000,
         updatedAt: 1700001000,
         lastResponseAt: undefined,
-        sessionId: 'sdk-session',
+        sessionId: 'runtime-session',
         messages: [
           { id: 'msg-1', role: 'user', content: 'Hello', timestamp: 1700000100 },
           { id: 'msg-2', role: 'assistant', content: 'Hi!', timestamp: 1700000200 },
@@ -134,7 +134,7 @@ describe('SessionStorage', () => {
 
     it('preserves all conversation metadata', async () => {
       const usage: UsageInfo = {
-        model: 'claude-sonnet-4-5',
+        model: 'gpt-5.6-sol',
         inputTokens: 1000,
         cacheCreationInputTokens: 500,
         cacheReadInputTokens: 200,
@@ -150,7 +150,7 @@ describe('SessionStorage', () => {
         createdAt: 1700000000,
         updatedAt: 1700001000,
         lastResponseAt: 1700000900,
-        sessionId: 'sdk-session',
+        sessionId: 'runtime-session',
         currentNote: 'notes/test.md',
         usage,
         titleGenerationStatus: 'success',
@@ -176,7 +176,7 @@ describe('SessionStorage', () => {
         title: 'Save Test',
         createdAt: 1700000000,
         updatedAt: 1700001000,
-        sessionId: 'sdk-session',
+        sessionId: 'runtime-session',
         messages: [
           { id: 'msg-1', role: 'user', content: 'Hello', timestamp: 1700000100 },
           { id: 'msg-2', role: 'assistant', content: 'Hi!', timestamp: 1700000200 },
@@ -186,7 +186,7 @@ describe('SessionStorage', () => {
       await storage.saveConversation(conversation);
 
       expect(mockAdapter.write).toHaveBeenCalledWith(
-        '.claude/sessions/conv-456.jsonl',
+        '.codian/sessions/conv-456.jsonl',
         expect.any(String)
       );
 
@@ -294,7 +294,7 @@ describe('SessionStorage', () => {
 
     it('preserves all metadata fields in serialization', async () => {
       const usage: UsageInfo = {
-        model: 'claude-opus-4-5',
+        model: 'gpt-5.6-terra',
         inputTokens: 5000,
         cacheCreationInputTokens: 1000,
         cacheReadInputTokens: 500,
@@ -309,7 +309,7 @@ describe('SessionStorage', () => {
         createdAt: 1700000000,
         updatedAt: 1700001000,
         lastResponseAt: 1700000900,
-        sessionId: 'sdk-session-abc',
+        sessionId: 'runtime-session-abc',
         currentNote: 'projects/notes.md',
         usage,
         titleGenerationStatus: 'pending',
@@ -332,16 +332,16 @@ describe('SessionStorage', () => {
     it('deletes the JSONL file', async () => {
       await storage.deleteConversation('conv-del');
 
-      expect(mockAdapter.delete).toHaveBeenCalledWith('.claude/sessions/conv-del.jsonl');
+      expect(mockAdapter.delete).toHaveBeenCalledWith('.codian/sessions/conv-del.jsonl');
     });
   });
 
   describe('listConversations', () => {
     it('returns metadata for all JSONL files', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/conv-1.jsonl',
-        '.claude/sessions/conv-2.jsonl',
-        '.claude/sessions/readme.txt', // Should be skipped
+        '.codian/sessions/conv-1.jsonl',
+        '.codian/sessions/conv-2.jsonl',
+        '.codian/sessions/readme.txt', // Should be skipped
       ]);
 
       mockAdapter.read.mockImplementation((path: string) => {
@@ -353,7 +353,7 @@ describe('SessionStorage', () => {
         }
         if (path.includes('conv-2')) {
           return Promise.resolve([
-            '{"type":"meta","id":"conv-2","title":"Second","createdAt":1700000000,"updatedAt":1700001000,"sessionId":"sdk-2"}',
+            '{"type":"meta","id":"conv-2","title":"Second","createdAt":1700000000,"updatedAt":1700001000,"sessionId":"runtime-2"}',
             '{"type":"message","message":{"id":"msg-1","role":"assistant","content":"Assistant first","timestamp":1700000100}}',
             '{"type":"message","message":{"id":"msg-2","role":"user","content":"User message","timestamp":1700000200}}',
           ].join('\n'));
@@ -397,8 +397,8 @@ describe('SessionStorage', () => {
 
     it('skips files that fail to load', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/good.jsonl',
-        '.claude/sessions/bad.jsonl',
+        '.codian/sessions/good.jsonl',
+        '.codian/sessions/bad.jsonl',
       ]);
 
       mockAdapter.read.mockImplementation((path: string) => {
@@ -419,7 +419,7 @@ describe('SessionStorage', () => {
     });
 
     it('truncates long previews', async () => {
-      mockAdapter.listFiles.mockResolvedValue(['.claude/sessions/conv-long.jsonl']);
+      mockAdapter.listFiles.mockResolvedValue(['.codian/sessions/conv-long.jsonl']);
 
       const longContent = 'A'.repeat(100);
       mockAdapter.read.mockResolvedValue([
@@ -433,7 +433,7 @@ describe('SessionStorage', () => {
     });
 
     it('uses default preview for conversations without user messages', async () => {
-      mockAdapter.listFiles.mockResolvedValue(['.claude/sessions/conv-no-user.jsonl']);
+      mockAdapter.listFiles.mockResolvedValue(['.codian/sessions/conv-no-user.jsonl']);
 
       mockAdapter.read.mockResolvedValue([
         '{"type":"meta","id":"conv-no-user","title":"No User","createdAt":1700000000,"updatedAt":1700001000,"sessionId":null}',
@@ -446,7 +446,7 @@ describe('SessionStorage', () => {
     });
 
     it('preserves titleGenerationStatus in meta', async () => {
-      mockAdapter.listFiles.mockResolvedValue(['.claude/sessions/conv-status.jsonl']);
+      mockAdapter.listFiles.mockResolvedValue(['.codian/sessions/conv-status.jsonl']);
 
       mockAdapter.read.mockResolvedValue(
         '{"type":"meta","id":"conv-status","title":"Status Test","createdAt":1700000000,"updatedAt":1700001000,"sessionId":null,"titleGenerationStatus":"failed"}'
@@ -461,8 +461,8 @@ describe('SessionStorage', () => {
   describe('loadAllConversations', () => {
     it('loads full conversation data for all JSONL files', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/conv-a.jsonl',
-        '.claude/sessions/conv-b.jsonl',
+        '.codian/sessions/conv-a.jsonl',
+        '.codian/sessions/conv-b.jsonl',
       ]);
 
       mockAdapter.read.mockImplementation((path: string) => {
@@ -495,9 +495,9 @@ describe('SessionStorage', () => {
 
     it('skips non-JSONL files', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/conv.jsonl',
-        '.claude/sessions/notes.md',
-        '.claude/sessions/.DS_Store',
+        '.codian/sessions/conv.jsonl',
+        '.codian/sessions/notes.md',
+        '.codian/sessions/.DS_Store',
       ]);
 
       mockAdapter.read.mockResolvedValue(
@@ -522,8 +522,8 @@ describe('SessionStorage', () => {
 
     it('continues loading after individual file errors', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/good.jsonl',
-        '.claude/sessions/bad.jsonl',
+        '.codian/sessions/good.jsonl',
+        '.codian/sessions/bad.jsonl',
       ]);
 
       mockAdapter.read.mockImplementation((path: string) => {
@@ -548,8 +548,8 @@ describe('SessionStorage', () => {
   describe('hasSessions', () => {
     it('returns true if JSONL files exist', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/conv-1.jsonl',
-        '.claude/sessions/conv-2.jsonl',
+        '.codian/sessions/conv-1.jsonl',
+        '.codian/sessions/conv-2.jsonl',
       ]);
 
       const result = await storage.hasSessions();
@@ -559,8 +559,8 @@ describe('SessionStorage', () => {
 
     it('returns false if no JSONL files exist', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/readme.txt',
-        '.claude/sessions/.gitkeep',
+        '.codian/sessions/readme.txt',
+        '.codian/sessions/.gitkeep',
       ]);
 
       const result = await storage.hasSessions();
@@ -578,7 +578,7 @@ describe('SessionStorage', () => {
   });
 
   // ============================================
-  // SDK-Native Session Metadata Tests
+  // Runtime-Native Session Metadata Tests
   // ============================================
 
   describe('isNativeSession', () => {
@@ -622,7 +622,7 @@ describe('SessionStorage', () => {
   describe('getMetadataPath', () => {
     it('returns correct file path for session id', () => {
       const path = storage.getMetadataPath('session-abc');
-      expect(path).toBe('.claude/sessions/session-abc.meta.json');
+      expect(path).toBe('.codian/sessions/session-abc.meta.json');
     });
   });
 
@@ -641,7 +641,7 @@ describe('SessionStorage', () => {
       await storage.saveMetadata(metadata);
 
       expect(mockAdapter.write).toHaveBeenCalledWith(
-        '.claude/sessions/session-456.meta.json',
+        '.codian/sessions/session-456.meta.json',
         expect.any(String)
       );
 
@@ -656,7 +656,7 @@ describe('SessionStorage', () => {
 
     it('preserves all optional fields', async () => {
       const usage: UsageInfo = {
-        model: 'claude-sonnet-4-5',
+        model: 'gpt-5.6-sol',
         inputTokens: 1000,
         cacheCreationInputTokens: 500,
         cacheReadInputTokens: 200,
@@ -735,25 +735,25 @@ describe('SessionStorage', () => {
     it('deletes the meta.json file', async () => {
       await storage.deleteMetadata('session-del');
 
-      expect(mockAdapter.delete).toHaveBeenCalledWith('.claude/sessions/session-del.meta.json');
+      expect(mockAdapter.delete).toHaveBeenCalledWith('.codian/sessions/session-del.meta.json');
     });
   });
 
   describe('listNativeMetadata', () => {
     it('returns metadata for .meta.json files without .jsonl counterparts', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/native-1.meta.json',
-        '.claude/sessions/native-2.meta.json',
-        '.claude/sessions/legacy.jsonl',
-        '.claude/sessions/legacy.meta.json', // Has JSONL counterpart, skip
+        '.codian/sessions/native-1.meta.json',
+        '.codian/sessions/native-2.meta.json',
+        '.codian/sessions/legacy.jsonl',
+        '.codian/sessions/legacy.meta.json', // Has JSONL counterpart, skip
       ]);
 
       // native-1.meta.json and native-2.meta.json have no .jsonl
       // legacy.meta.json has .jsonl counterpart
       mockAdapter.exists.mockImplementation((path: string) => {
-        if (path === '.claude/sessions/native-1.jsonl') return Promise.resolve(false);
-        if (path === '.claude/sessions/native-2.jsonl') return Promise.resolve(false);
-        if (path === '.claude/sessions/legacy.jsonl') return Promise.resolve(true);
+        if (path === '.codian/sessions/native-1.jsonl') return Promise.resolve(false);
+        if (path === '.codian/sessions/native-2.jsonl') return Promise.resolve(false);
+        if (path === '.codian/sessions/legacy.jsonl') return Promise.resolve(true);
         return Promise.resolve(false);
       });
 
@@ -802,8 +802,8 @@ describe('SessionStorage', () => {
 
     it('skips files that fail to load', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/good.meta.json',
-        '.claude/sessions/bad.meta.json',
+        '.codian/sessions/good.meta.json',
+        '.codian/sessions/bad.meta.json',
       ]);
 
       mockAdapter.exists.mockResolvedValue(false); // No JSONL files
@@ -831,13 +831,13 @@ describe('SessionStorage', () => {
     it('merges legacy and native conversations', async () => {
       // Set up legacy JSONL files
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/legacy-1.jsonl',
-        '.claude/sessions/native-1.meta.json',
+        '.codian/sessions/legacy-1.jsonl',
+        '.codian/sessions/native-1.meta.json',
       ]);
 
       mockAdapter.exists.mockImplementation((path: string) => {
         // native-1 has no .jsonl counterpart
-        if (path === '.claude/sessions/native-1.jsonl') return Promise.resolve(false);
+        if (path === '.codian/sessions/native-1.jsonl') return Promise.resolve(false);
         return Promise.resolve(true);
       });
 
@@ -874,8 +874,8 @@ describe('SessionStorage', () => {
 
     it('legacy takes precedence over native with same ID', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/conv-1.jsonl',
-        '.claude/sessions/conv-1.meta.json', // Same ID, should be skipped
+        '.codian/sessions/conv-1.jsonl',
+        '.codian/sessions/conv-1.meta.json', // Same ID, should be skipped
       ]);
 
       mockAdapter.exists.mockResolvedValue(true); // .jsonl exists for conv-1
@@ -903,7 +903,7 @@ describe('SessionStorage', () => {
 
     it('native sessions have isNative flag and default preview', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/native-only.meta.json',
+        '.codian/sessions/native-only.meta.json',
       ]);
 
       mockAdapter.exists.mockResolvedValue(false); // No .jsonl
@@ -919,7 +919,7 @@ describe('SessionStorage', () => {
 
       expect(metas).toHaveLength(1);
       expect(metas[0].isNative).toBe(true);
-      expect(metas[0].preview).toBe('SDK session');
+      expect(metas[0].preview).toBe('Runtime session');
       expect(metas[0].messageCount).toBe(0);
     });
   });
@@ -927,8 +927,8 @@ describe('SessionStorage', () => {
   describe('loadAllConversations - failedCount for unparseable JSONL', () => {
     it('increments failedCount when parseJSONL returns null', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/good.jsonl',
-        '.claude/sessions/empty.jsonl',
+        '.codian/sessions/good.jsonl',
+        '.codian/sessions/empty.jsonl',
       ]);
 
       mockAdapter.read.mockImplementation((path: string) => {
@@ -951,7 +951,7 @@ describe('SessionStorage', () => {
 
   describe('listConversations - loadMetaOnly edge cases', () => {
     it('handles corrupted message lines in loadMetaOnly', async () => {
-      mockAdapter.listFiles.mockResolvedValue(['.claude/sessions/corrupted.jsonl']);
+      mockAdapter.listFiles.mockResolvedValue(['.codian/sessions/corrupted.jsonl']);
 
       mockAdapter.read.mockResolvedValue([
         '{"type":"meta","id":"corrupted","title":"Corrupted","createdAt":1700000000,"updatedAt":1700001000,"sessionId":null}',
@@ -968,7 +968,7 @@ describe('SessionStorage', () => {
     });
 
     it('returns empty when first line (meta) parse fails', async () => {
-      mockAdapter.listFiles.mockResolvedValue(['.claude/sessions/bad-meta.jsonl']);
+      mockAdapter.listFiles.mockResolvedValue(['.codian/sessions/bad-meta.jsonl']);
 
       mockAdapter.read.mockResolvedValue('not valid json at all');
 
@@ -985,7 +985,7 @@ describe('SessionStorage', () => {
         title: 'Subagent Test',
         createdAt: 1700000000,
         updatedAt: 1700001000,
-        sessionId: 'sdk-session',
+        sessionId: 'runtime-session',
         messages: [
           { id: 'msg-1', role: 'user', content: 'Hello', timestamp: 1700000100 },
           {
@@ -1048,7 +1048,7 @@ describe('SessionStorage', () => {
         title: 'Task Subagent Test',
         createdAt: 1700000000,
         updatedAt: 1700001000,
-        sessionId: 'sdk-session',
+        sessionId: 'runtime-session',
         messages: [
           {
             id: 'msg-1',
@@ -1081,7 +1081,7 @@ describe('SessionStorage', () => {
         title: 'Rewind Test',
         createdAt: 1700000000,
         updatedAt: 1700001000,
-        sessionId: 'sdk-session',
+        sessionId: 'runtime-session',
         messages: [],
         resumeSessionAt: 'assistant-uuid-123',
       };
@@ -1110,7 +1110,7 @@ describe('SessionStorage', () => {
   describe('toSessionMetadata', () => {
     it('converts Conversation to SessionMetadata', () => {
       const usage: UsageInfo = {
-        model: 'claude-opus-4-5',
+        model: 'gpt-5.6-terra',
         inputTokens: 5000,
         cacheCreationInputTokens: 1000,
         cacheReadInputTokens: 500,
@@ -1125,8 +1125,8 @@ describe('SessionStorage', () => {
         createdAt: 1700000000,
         updatedAt: 1700001000,
         lastResponseAt: 1700000900,
-        sessionId: 'sdk-session',
-        sdkSessionId: 'current-sdk-session',
+        sessionId: 'runtime-session',
+        runtimeSessionId: 'current-runtime-session',
         messages: [
           { id: 'msg-1', role: 'user', content: 'Hello', timestamp: 1700000100 },
         ],
@@ -1145,8 +1145,8 @@ describe('SessionStorage', () => {
       expect(metadata.createdAt).toBe(1700000000);
       expect(metadata.updatedAt).toBe(1700001000);
       expect(metadata.lastResponseAt).toBe(1700000900);
-      expect(metadata.sessionId).toBe('sdk-session');
-      expect(metadata.sdkSessionId).toBe('current-sdk-session');
+      expect(metadata.sessionId).toBe('runtime-session');
+      expect(metadata.runtimeSessionId).toBe('current-runtime-session');
       expect(metadata.legacyCutoffAt).toBe(1700000050);
       expect(metadata.currentNote).toBe('notes/test.md');
       expect(metadata.externalContextPaths).toEqual(['/external/path']);
@@ -1183,7 +1183,7 @@ describe('SessionStorage', () => {
         title: 'No Fork',
         createdAt: 1700000000,
         updatedAt: 1700001000,
-        sessionId: 'sdk-session',
+        sessionId: 'runtime-session',
         messages: [],
       };
 

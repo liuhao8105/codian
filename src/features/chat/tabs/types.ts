@@ -35,7 +35,7 @@ import type { NavigationSidebar } from '../ui';
  *
  * Set to 3 to balance usability with resource usage:
  * - Each tab has its own agent runtime and persistent query
- * - More tabs = more memory and potential SDK processes
+ * - More tabs = more memory and potential Runtime processes
  * - 3 tabs allows multi-tasking without excessive overhead
  */
 export const DEFAULT_MAX_TABS = 3;

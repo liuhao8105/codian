@@ -271,7 +271,7 @@ export function getMissingNodeError(cliPath: string, enhancedPath?: string): str
     return null;
   }
 
-  return 'Claude Code CLI requires Node.js, but Node was not found on PATH. Install Node.js or use the native Claude Code binary, then restart Obsidian.';
+  return 'The configured CLI requires Node.js, but Node was not found on PATH. Install Node.js or use the native Codex binary, then restart Obsidian.';
 }
 
 /**
@@ -342,10 +342,6 @@ export function getEnhancedPath(additionalPaths?: string, cliPath?: string): str
 const CUSTOM_MODEL_ENV_KEYS = [
   'OPENAI_MODEL',
   'CODEX_MODEL',
-  'ANTHROPIC_MODEL',
-  'ANTHROPIC_DEFAULT_OPUS_MODEL',
-  'ANTHROPIC_DEFAULT_SONNET_MODEL',
-  'ANTHROPIC_DEFAULT_HAIKU_MODEL',
 ] as const;
 
 export const DEEPSEEK_MODEL_OPTIONS: { value: string; label: string; description: string }[] = [
@@ -449,9 +445,7 @@ export function isProviderConfigured(
 function getModelTypeFromEnvKey(envKey: string): string {
   if (envKey === 'OPENAI_MODEL') return 'openai';
   if (envKey === 'CODEX_MODEL') return 'codex';
-  if (envKey === 'ANTHROPIC_MODEL') return 'model';
-  const match = envKey.match(/ANTHROPIC_DEFAULT_(\w+)_MODEL/);
-  return match ? match[1].toLowerCase() : envKey;
+  return envKey;
 }
 
 /** Parses KEY=VALUE environment variables from text. Supports comments (#) and empty lines. */
@@ -499,7 +493,7 @@ export function getModelsFromEnvironment(envVars: Record<string, string>): { val
   }
 
   const models: { value: string; label: string; description: string }[] = [];
-  const typePriority = { 'model': 4, 'haiku': 3, 'sonnet': 2, 'opus': 1 };
+  const typePriority = { codex: 2, openai: 1 };
 
   const sortedEntries = Array.from(modelMap.entries()).sort(([, aInfo], [, bInfo]) => {
     const aPriority = Math.max(...aInfo.types.map(t => typePriority[t as keyof typeof typePriority] || 0));
@@ -529,18 +523,6 @@ export function getCurrentModelFromEnvironment(envVars: Record<string, string>):
   }
   if (envVars.CODEX_MODEL) {
     return envVars.CODEX_MODEL;
-  }
-  if (envVars.ANTHROPIC_MODEL) {
-    return envVars.ANTHROPIC_MODEL;
-  }
-  if (envVars.ANTHROPIC_DEFAULT_HAIKU_MODEL) {
-    return envVars.ANTHROPIC_DEFAULT_HAIKU_MODEL;
-  }
-  if (envVars.ANTHROPIC_DEFAULT_SONNET_MODEL) {
-    return envVars.ANTHROPIC_DEFAULT_SONNET_MODEL;
-  }
-  if (envVars.ANTHROPIC_DEFAULT_OPUS_MODEL) {
-    return envVars.ANTHROPIC_DEFAULT_OPUS_MODEL;
   }
   return null;
 }

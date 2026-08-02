@@ -153,10 +153,6 @@
       "name": "MCP Servers",
       "desc": "Configure Model Context Protocol servers to extend Codex capabilities with external tools and data sources. Servers with context-saving mode require @mention to activate."
     },
-    "plugins": {
-      "name": "Legacy Plugin Compatibility",
-      "desc": "Compatibility settings carried over from the upstream project. These are kept only for migration and backward compatibility."
-    },
     "subagents": {
       "name": "Subagents",
       "desc": "Configure custom subagents that Codian can delegate to.",
@@ -196,10 +192,6 @@
       }
     },
     "safety": "Safety",
-    "loadUserSettings": {
-      "name": "Load legacy settings",
-      "desc": "Load ~/.claude/settings.json for backward compatibility during migration. These legacy permission rules may bypass Safe mode."
-    },
     "enableBlocklist": {
       "name": "Enable command blocklist",
       "desc": "Block potentially dangerous bash commands"
@@ -244,14 +236,6 @@
       "invalid": "Invalid format. Use: 256k, 1m, or exact count (1000-10000000)."
     },
     "advanced": "Advanced",
-    "show1MModel": {
-      "name": "Legacy Anthropic 1M option",
-      "desc": "Deprecated legacy option retained only for backward compatibility."
-    },
-    "enableChrome": {
-      "name": "Enable Chrome extension",
-      "desc": "Allow Codian to interact with Chrome via the claude-in-chrome extension. Requires the extension to be installed. Requires session restart."
-    },
     "enableBangBash": {
       "name": "Enable bash mode (!)",
       "desc": "Type ! on empty input to enter bash mode. Runs commands directly via Node.js child_process. Requires view reopen.",

@@ -26,7 +26,7 @@ npm run test:watch # Run tests in watch mode
 | **features/settings** | Settings tab | UI components for all settings |
 | **shared** | Reusable UI | Dropdowns, instruction modal, fork target modal, @-mention, icons |
 | **i18n** | Internationalization | 10 locales |
-| **utils** | Utility functions | date, path, env, editor, session, markdown, diff, context, sdkSession, frontmatter, slashCommand, mcp, claudeCli, externalContext, externalContextScanner, fileLink, imageEmbed, inlineEdit |
+| **utils** | Utility functions | date, path, env, editor, session, markdown, diff, context, runtimeSession, frontmatter, slashCommand, mcp, codexCli, externalContext, externalContextScanner, fileLink, imageEmbed, inlineEdit |
 | **style** | Modular CSS | See [`src/style/CODEX.md`](src/style/CODEX.md) |
 
 ## Tests
@@ -43,20 +43,20 @@ Tests mirror `src/` structure in `tests/unit/` and `tests/integration/`.
 
 | File | Contents |
 |------|----------|
-| `.claude/settings.json` | CC-compatible: permissions, env, enabledPlugins |
-| `.claude/claudian-settings.json` | Codian-specific settings (model, UI, etc.) |
-| `.claude/settings.local.json` | Local overrides (gitignored) |
-| `.claude/mcp.json` | MCP server configs |
-| `.claude/commands/*.md` | Slash commands (YAML frontmatter) |
-| `.claude/agents/*.md` | Custom agents (YAML frontmatter) |
-| `.claude/skills/*/SKILL.md` | Skill definitions |
-| `.claude/sessions/*.meta.json` | Session metadata |
-| `~/.claude/projects/{vault}/*.jsonl` | SDK-native session messages |
+| `.codian/settings.json` | Runtime permission rules |
+| `.codian/codian-settings.json` | Codian-specific settings (model, UI, etc.) |
+| `.codian/settings.local.json` | Local overrides (gitignored) |
+| `.codian/mcp.json` | MCP server configs |
+| `.codian/commands/*.md` | Slash commands (YAML frontmatter) |
+| `.codian/agents/*.md` | Custom agents (YAML frontmatter) |
+| `.codian/skills/*/SKILL.md` | Skill definitions |
+| `.codian/sessions/*.meta.json` | Session metadata |
+| `~/.codex/sessions/**/*.jsonl` | Codex CLI session history |
 
 ## Development Notes
 
 - **Codex-first**: Prefer native Codex App Server and Codex runtime capabilities over custom reimplementation whenever possible.
-- **Runtime exploration**: When developing runtime-related features, write a throwaway test script (e.g., in `dev/`) that calls the real Codex runtime to observe actual response shapes, event sequences, and edge cases. Real output lands in `~/.codex/` or `{vault}/.claude/` compatibility files — inspect those files before writing implementation or tests.
+- **Runtime exploration**: When developing runtime-related features, call the real Codex runtime to observe response shapes, event sequences, and edge cases. Inspect `~/.codex/` diagnostics and the vault's `.codian/` runtime files before writing implementation or tests.
 - **Comments**: Only comment WHY, not WHAT. No JSDoc that restates the function name (`/** Get servers. */` on `getServers()`), no narrating inline comments (`// Create the channel` before `new Channel()`), no module-level docs on barrel `index.ts` files. Keep JSDoc only when it adds non-obvious context (edge cases, constraints, surprising behavior).
 - **TDD workflow**: For new functions/modules and bug fixes, follow red-green-refactor:
   1. Write a failing test first in the mirrored path under `tests/unit/` (or `tests/integration/`)

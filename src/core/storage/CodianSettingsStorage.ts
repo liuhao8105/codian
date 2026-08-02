@@ -1,8 +1,8 @@
 /**
- * ClaudianSettingsStorage - Handles claudian-settings.json read/write.
+ * CodianSettingsStorage - Handles codian-settings.json read/write.
  *
- * Manages the .claude/claudian-settings.json file for Claudian-specific settings.
- * These settings are NOT shared with Claude Code CLI.
+ * Manages the .codian/codian-settings.json file for Codian-specific settings.
+ * These settings are NOT shared with Codian runtime.
  *
  * Includes:
  * - User preferences (userName)
@@ -19,21 +19,18 @@ import * as os from 'os';
 import * as path from 'path';
 
 import { appendBoundedLogSync } from '../../utils/boundedLog';
-import type { ClaudeModel, CodianSettings, PlatformBlockedCommands } from '../types';
+import type { AgentModel, CodianSettings, PlatformBlockedCommands } from '../types';
 import { DEFAULT_SETTINGS, getDefaultBlockedCommands } from '../types';
 import type { VaultFileAdapter } from './VaultFileAdapter';
 
 /** Codian isolated settings file path relative to vault root. */
-export const CODIAN_SETTINGS_PATH = '.claude/codian-settings.json';
-/** Legacy shared settings file path used by Claudian-derived builds. */
-export const CLAUDIAN_SETTINGS_PATH = '.claude/claudian-settings.json';
+export const CODIAN_SETTINGS_PATH = '.codian/codian-settings.json';
 
-/** Fields that are loaded separately (slash commands from .claude/commands/). */
+/** Fields that are loaded separately (slash commands from .codian/commands/). */
 type SeparatelyLoadedFields = 'slashCommands';
 
-/** Settings stored in .claude/claudian-settings.json. */
+/** Settings stored in .codian/codian-settings.json. */
 export type StoredCodianSettings = Omit<CodianSettings, SeparatelyLoadedFields>;
-export type StoredClaudianSettings = StoredCodianSettings;
 const SETTINGS_SAVE_DIAGNOSTIC_LOG = path.join(os.tmpdir(), 'codian-settings-save.log');
 
 function appendSettingsDiagnosticLog(message: string): void {
@@ -98,7 +95,7 @@ export class CodianSettingsStorage {
   constructor(private adapter: VaultFileAdapter) { }
 
   /**
-  * Load Claudian settings from .claude/claudian-settings.json.
+  * Load Codian settings from .codian/codian-settings.json.
   * Returns default settings if file doesn't exist.
   * Throws if file exists but cannot be read or parsed.
   */
@@ -112,15 +109,13 @@ export class CodianSettingsStorage {
     const { activeConversationId: _activeConversationId, ...storedWithoutLegacy } = stored;
 
     const blockedCommands = normalizeBlockedCommands(stored.blockedCommands);
-    const hostnameCliPaths = normalizeHostnameCliPaths(stored.claudeCliPathsByHost);
-    const legacyCliPath = typeof stored.claudeCliPath === 'string' ? stored.claudeCliPath : '';
+    const hostnameCliPaths = normalizeHostnameCliPaths(stored.codexCliPathsByHost);
 
     return {
       ...this.getDefaults(),
       ...storedWithoutLegacy,
       blockedCommands,
-      claudeCliPath: legacyCliPath,
-      claudeCliPathsByHost: hostnameCliPaths,
+      codexCliPathsByHost: hostnameCliPaths,
     } as StoredCodianSettings;
   }
 
@@ -134,7 +129,7 @@ export class CodianSettingsStorage {
   }
 
   async exists(): Promise<boolean> {
-    return (await this.adapter.exists(CODIAN_SETTINGS_PATH)) || (await this.adapter.exists(CLAUDIAN_SETTINGS_PATH));
+    return this.adapter.exists(CODIAN_SETTINGS_PATH);
   }
 
   async update(updates: Partial<StoredCodianSettings>): Promise<void> {
@@ -143,7 +138,7 @@ export class CodianSettingsStorage {
   }
 
   /**
-   * Read legacy activeConversationId from claudian-settings.json, if present.
+   * Read legacy activeConversationId from codian-settings.json, if present.
    * Used only for one-time migration to tabManagerState.
    */
   async getLegacyActiveConversationId(): Promise<string | null> {
@@ -164,7 +159,7 @@ export class CodianSettingsStorage {
   }
 
   /**
-   * Remove legacy activeConversationId from claudian-settings.json.
+   * Remove legacy activeConversationId from codian-settings.json.
    */
   async clearLegacyActiveConversationId(): Promise<void> {
     const activePath = await this.getExistingSettingsPath();
@@ -184,11 +179,11 @@ export class CodianSettingsStorage {
     await this.adapter.write(activePath, nextContent);
   }
 
-  async setLastModel(model: ClaudeModel, isCustom: boolean): Promise<void> {
+  async setLastModel(model: AgentModel, isCustom: boolean): Promise<void> {
     if (isCustom) {
       await this.update({ lastCustomModel: model });
     } else {
-      await this.update({ lastClaudeModel: model });
+      await this.update({ lastCodexModel: model });
     }
   }
 
@@ -212,9 +207,6 @@ export class CodianSettingsStorage {
     if (await this.adapter.exists(CODIAN_SETTINGS_PATH)) {
       return CODIAN_SETTINGS_PATH;
     }
-    if (await this.adapter.exists(CLAUDIAN_SETTINGS_PATH)) {
-      return CLAUDIAN_SETTINGS_PATH;
-    }
     return null;
   }
 
@@ -236,5 +228,3 @@ export class CodianSettingsStorage {
     }
   }
 }
-
-export { CodianSettingsStorage as ClaudianSettingsStorage };

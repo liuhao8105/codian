@@ -45,8 +45,8 @@ describe('AgentSettings save orchestration', () => {
   });
 
   it('renaming saves with filePath undefined, then deletes old file', async () => {
-    const existing = createAgent('old-name', '.claude/agents/custom-old.md');
-    const renamed = createAgent('new-name', '.claude/agents/custom-old.md');
+    const existing = createAgent('old-name', '.codian/agents/custom-old.md');
+    const renamed = createAgent('new-name', '.codian/agents/custom-old.md');
 
     await (settings as any).saveAgent(renamed, existing);
 
@@ -59,8 +59,8 @@ describe('AgentSettings save orchestration', () => {
   });
 
   it('non-rename saves original agent and does not delete', async () => {
-    const existing = createAgent('same-name', '.claude/agents/custom-name.md');
-    const updated = createAgent('same-name', '.claude/agents/custom-name.md');
+    const existing = createAgent('same-name', '.codian/agents/custom-name.md');
+    const updated = createAgent('same-name', '.codian/agents/custom-name.md');
 
     await (settings as any).saveAgent(updated, existing);
 
@@ -70,7 +70,7 @@ describe('AgentSettings save orchestration', () => {
   });
 
   it('shows notice and aborts when loading existing agent fails', async () => {
-    const existing = createAgent('existing-agent', '.claude/agents/existing-agent.md');
+    const existing = createAgent('existing-agent', '.codian/agents/existing-agent.md');
     plugin.storage.agents.load.mockRejectedValue(new Error('permission denied'));
 
     await (settings as any).openAgentModal(existing);

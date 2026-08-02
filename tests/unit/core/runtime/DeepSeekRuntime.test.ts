@@ -37,7 +37,7 @@ describe('DeepSeekRuntime DSML fallback parsing', () => {
     const compact = `< | | DSML | | tool_calls>
 < | | DSML | | invokename="Bash">
 < | | DSML | | parametername="description"string="true">修正参数重新转写视频</| | DSML | | parameter>
-< | | DSML | | parametername="command"string="true">python3 ~/.codex/skills/transcribe/scripts/transcribe_diarize.py "/tmp/video.mp4" --model gpt-4o-mini-transcribe</| | DSML | | parameter>
+< | | DSML | | parametername="command"string="true">python3 ~/.codian/skills/transcribe/scripts/transcribe_diarize.py "/tmp/video.mp4" --model gpt-4o-mini-transcribe</| | DSML | | parameter>
 </| | DSML | | invoke>
 </| | DSML | | tool_calls>`;
 
@@ -47,7 +47,7 @@ describe('DeepSeekRuntime DSML fallback parsing', () => {
     expect(calls[0].function.name).toBe('Bash');
     expect(JSON.parse(calls[0].function.arguments)).toEqual({
       description: '修正参数重新转写视频',
-      command: 'python3 ~/.codex/skills/transcribe/scripts/transcribe_diarize.py "/tmp/video.mp4" --model gpt-4o-mini-transcribe',
+      command: 'python3 ~/.codian/skills/transcribe/scripts/transcribe_diarize.py "/tmp/video.mp4" --model gpt-4o-mini-transcribe',
     });
     expect(stripDeepSeekDSMLToolCallBlocks(compact)).toBe('');
   });

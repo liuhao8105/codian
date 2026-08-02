@@ -577,7 +577,7 @@ export class MentionDropdownController {
         this.callbacks.onAttachFile(normalizedPath);
       }
 
-      // Insert full path so what user sees is what Claude gets
+      // Insert the full path so the runtime receives exactly what the user sees.
       const replacement = `@${normalizedPath ?? selectedItem.name} `;
       this.inputEl.value = beforeAt + replacement + afterCursor;
       this.inputEl.selectionStart = this.inputEl.selectionEnd = beforeAt.length + replacement.length;

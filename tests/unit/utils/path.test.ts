@@ -1,10 +1,8 @@
-import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
 import {
   expandHomePath,
-  findClaudeCLIPath,
   getPathAccessType,
   isPathInAllowedExportPaths,
   isPathWithinVault,
@@ -376,25 +374,25 @@ describe('getPathAccessType', () => {
     expect(getPathAccessType(vaultPath, [], [], vaultPath)).toBe('vault');
   });
 
-  it('returns vault for ~/.claude safe subdirectory', () => {
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'settings.json'), [], [], vaultPath)).toBe('vault');
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'sessions', 'abc.jsonl'), [], [], vaultPath)).toBe('vault');
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'projects', 'test'), [], [], vaultPath)).toBe('vault');
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'commands', 'cmd.md'), [], [], vaultPath)).toBe('vault');
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'agents', 'agent.md'), [], [], vaultPath)).toBe('vault');
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'skills', 'skill'), [], [], vaultPath)).toBe('vault');
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'plans', 'plan.md'), [], [], vaultPath)).toBe('vault');
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'mcp.json'), [], [], vaultPath)).toBe('vault');
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'codian-settings.json'), [], [], vaultPath)).toBe('vault');
+  it('returns vault for ~/.codian safe subdirectory', () => {
+    expect(getPathAccessType(path.join(os.homedir(), '.codian', 'settings.json'), [], [], vaultPath)).toBe('vault');
+    expect(getPathAccessType(path.join(os.homedir(), '.codian', 'sessions', 'abc.jsonl'), [], [], vaultPath)).toBe('vault');
+    expect(getPathAccessType(path.join(os.homedir(), '.codian', 'projects', 'test'), [], [], vaultPath)).toBe('vault');
+    expect(getPathAccessType(path.join(os.homedir(), '.codian', 'commands', 'cmd.md'), [], [], vaultPath)).toBe('vault');
+    expect(getPathAccessType(path.join(os.homedir(), '.codian', 'agents', 'agent.md'), [], [], vaultPath)).toBe('vault');
+    expect(getPathAccessType(path.join(os.homedir(), '.codian', 'skills', 'skill'), [], [], vaultPath)).toBe('vault');
+    expect(getPathAccessType(path.join(os.homedir(), '.codian', 'plans', 'plan.md'), [], [], vaultPath)).toBe('vault');
+    expect(getPathAccessType(path.join(os.homedir(), '.codian', 'mcp.json'), [], [], vaultPath)).toBe('vault');
+    expect(getPathAccessType(path.join(os.homedir(), '.codian', 'codian-settings.json'), [], [], vaultPath)).toBe('vault');
   });
 
-  it('returns context (read-only) for unknown ~/.claude paths', () => {
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'credentials'), [], [], vaultPath)).toBe('context');
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'secrets.json'), [], [], vaultPath)).toBe('context');
+  it('returns context (read-only) for unknown ~/.codian paths', () => {
+    expect(getPathAccessType(path.join(os.homedir(), '.codian', 'credentials'), [], [], vaultPath)).toBe('context');
+    expect(getPathAccessType(path.join(os.homedir(), '.codian', 'secrets.json'), [], [], vaultPath)).toBe('context');
   });
 
-  it('returns context for ~/.claude directory itself', () => {
-    expect(getPathAccessType(path.join(os.homedir(), '.claude'), [], [], vaultPath)).toBe('context');
+  it('returns context for ~/.codian directory itself', () => {
+    expect(getPathAccessType(path.join(os.homedir(), '.codian'), [], [], vaultPath)).toBe('context');
   });
 
   it('returns context for path in context paths only', () => {
@@ -440,184 +438,6 @@ describe('getPathAccessType', () => {
   });
 });
 
-describe('findClaudeCLIPath', () => {
-  afterEach(() => {
-    jest.restoreAllMocks();
-  });
-
-  it('returns null when nothing found', () => {
-    jest.spyOn(fs, 'existsSync').mockReturnValue(false);
-    const result = findClaudeCLIPath('/nonexistent/path');
-    expect(result).toBeNull();
-  });
-
-  it('resolves from custom path entries', () => {
-    const claudePath = isWindows
-      ? 'C:\\custom\\bin\\claude.exe'
-      : '/custom/bin/claude';
-
-    jest.spyOn(fs, 'existsSync').mockImplementation(
-      p => String(p) === claudePath
-    );
-    jest.spyOn(fs, 'statSync').mockImplementation(
-      p => ({ isFile: () => String(p) === claudePath }) as fs.Stats
-    );
-
-    const result = findClaudeCLIPath(isWindows ? 'C:\\custom\\bin' : '/custom/bin');
-    expect(result).toBe(claudePath);
-  });
-
-  it('returns string or null', () => {
-    const result = findClaudeCLIPath();
-    expect(result === null || typeof result === 'string').toBe(true);
-  });
-
-  it('finds claude from common paths when no custom path provided', () => {
-    const commonPath = path.join(os.homedir(), '.claude', 'local', 'claude');
-
-    jest.spyOn(fs, 'existsSync').mockImplementation(
-      p => String(p) === commonPath
-    );
-    jest.spyOn(fs, 'statSync').mockImplementation(
-      p => ({ isFile: () => String(p) === commonPath }) as fs.Stats
-    );
-
-    const result = findClaudeCLIPath();
-    expect(result).toBe(commonPath);
-  });
-
-  it('falls back to npm cli.js paths when binary not found', () => {
-    const cliJsPath = path.join(
-      os.homedir(), '.npm-global', 'lib', 'node_modules',
-      '@anthropic-ai', 'claude-code', 'cli.js'
-    );
-
-    jest.spyOn(fs, 'existsSync').mockImplementation(
-      p => String(p) === cliJsPath
-    );
-    jest.spyOn(fs, 'statSync').mockImplementation(
-      p => ({ isFile: () => String(p) === cliJsPath }) as fs.Stats
-    );
-
-    const result = findClaudeCLIPath();
-    expect(result).toBe(cliJsPath);
-  });
-
-  it('falls back to PATH environment when common and npm paths fail', () => {
-    const envClaudePath = '/env/specific/bin/claude';
-    const originalPath = process.env.PATH;
-    process.env.PATH = `/env/specific/bin:${originalPath}`;
-
-    jest.spyOn(fs, 'existsSync').mockImplementation(
-      p => String(p) === envClaudePath
-    );
-    jest.spyOn(fs, 'statSync').mockImplementation(
-      p => ({ isFile: () => String(p) === envClaudePath }) as fs.Stats
-    );
-
-    try {
-      const result = findClaudeCLIPath();
-      expect(result).toBe(envClaudePath);
-    } finally {
-      process.env.PATH = originalPath;
-    }
-  });
-
-  it('returns null for custom path without claude binary on non-Windows', () => {
-    // On non-Windows, custom path resolution only looks for 'claude' binary
-    const customDir = '/custom/tools';
-
-    jest.spyOn(fs, 'existsSync').mockReturnValue(false);
-
-    const result = findClaudeCLIPath(customDir);
-    expect(result).toBeNull();
-  });
-
-  it('handles inaccessible filesystem paths gracefully', () => {
-    jest.spyOn(fs, 'existsSync').mockImplementation(() => {
-      throw new Error('Permission denied');
-    });
-
-    const result = findClaudeCLIPath('/some/path');
-    expect(result).toBeNull();
-  });
-
-  it('finds claude via nvm default version when NVM_BIN is not set (Unix)', () => {
-    if (isWindows) return;
-
-    const savedNvmBin = process.env.NVM_BIN;
-    const savedNvmDir = process.env.NVM_DIR;
-    delete process.env.NVM_BIN;
-    delete process.env.NVM_DIR;
-
-    const nvmDir = '/fake/home/.nvm';
-    const claudePath = path.join(nvmDir, 'versions', 'node', 'v22.18.0', 'bin', 'claude');
-    const binDir = path.join(nvmDir, 'versions', 'node', 'v22.18.0', 'bin');
-
-    jest.spyOn(os, 'homedir').mockReturnValue('/fake/home');
-    jest.spyOn(fs, 'existsSync').mockImplementation(p => {
-      const s = String(p);
-      return s === claudePath || s === binDir;
-    });
-    jest.spyOn(fs, 'readFileSync').mockImplementation(((p: string) => {
-      if (String(p) === path.join(nvmDir, 'alias', 'default')) return '22';
-      throw new Error('not found');
-    }) as typeof fs.readFileSync);
-    jest.spyOn(fs, 'readdirSync').mockImplementation(((p: string) => {
-      if (String(p) === path.join(nvmDir, 'versions', 'node')) return ['v22.18.0'];
-      return [];
-    }) as typeof fs.readdirSync);
-    jest.spyOn(fs, 'statSync').mockImplementation(
-      () => ({ isFile: () => true }) as fs.Stats
-    );
-
-    const result = findClaudeCLIPath();
-    expect(result).toBe(claudePath);
-
-    if (savedNvmBin !== undefined) process.env.NVM_BIN = savedNvmBin;
-    else delete process.env.NVM_BIN;
-    if (savedNvmDir !== undefined) process.env.NVM_DIR = savedNvmDir;
-    else delete process.env.NVM_DIR;
-  });
-
-  it('finds claude via built-in nvm node alias when NVM_BIN is not set (Unix)', () => {
-    if (isWindows) return;
-
-    const savedNvmBin = process.env.NVM_BIN;
-    const savedNvmDir = process.env.NVM_DIR;
-    delete process.env.NVM_BIN;
-    delete process.env.NVM_DIR;
-
-    const nvmDir = '/fake/home/.nvm';
-    const claudePath = path.join(nvmDir, 'versions', 'node', 'v22.18.0', 'bin', 'claude');
-    const binDir = path.join(nvmDir, 'versions', 'node', 'v22.18.0', 'bin');
-
-    jest.spyOn(os, 'homedir').mockReturnValue('/fake/home');
-    jest.spyOn(fs, 'existsSync').mockImplementation(p => {
-      const s = String(p);
-      return s === claudePath || s === binDir;
-    });
-    jest.spyOn(fs, 'readFileSync').mockImplementation(((p: string) => {
-      if (String(p) === path.join(nvmDir, 'alias', 'default')) return 'node';
-      throw new Error('not found');
-    }) as typeof fs.readFileSync);
-    jest.spyOn(fs, 'readdirSync').mockImplementation(((p: string) => {
-      if (String(p) === path.join(nvmDir, 'versions', 'node')) return ['v20.10.0', 'v22.18.0'];
-      return [];
-    }) as typeof fs.readdirSync);
-    jest.spyOn(fs, 'statSync').mockImplementation(
-      () => ({ isFile: () => true }) as fs.Stats
-    );
-
-    const result = findClaudeCLIPath();
-    expect(result).toBe(claudePath);
-
-    if (savedNvmBin !== undefined) process.env.NVM_BIN = savedNvmBin;
-    else delete process.env.NVM_BIN;
-    if (savedNvmDir !== undefined) process.env.NVM_DIR = savedNvmDir;
-    else delete process.env.NVM_DIR;
-  });
-});
 
 describe('expandHomePath - Windows environment variable formats', () => {
   const originalPlatform = process.platform;

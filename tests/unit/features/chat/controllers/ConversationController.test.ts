@@ -1633,7 +1633,7 @@ describe('ConversationController - Persistent External Context Paths', () => {
   });
 });
 
-describe('ConversationController - Previous SDK Session IDs', () => {
+describe('ConversationController - Previous Runtime Session IDs', () => {
   let controller: ConversationController;
   let deps: ConversationControllerDeps;
   let mockAgentService: any;
@@ -1652,17 +1652,17 @@ describe('ConversationController - Previous SDK Session IDs', () => {
   });
 
   describe('save - session change detection', () => {
-    it('should accumulate old sdkSessionId when SDK creates new session', async () => {
+    it('should accumulate old runtimeSessionId when Runtime creates new session', async () => {
       deps.state.currentConversationId = 'conv-1';
       deps.state.messages = [{ id: '1', role: 'user', content: 'test', timestamp: Date.now() }];
 
-      // Existing conversation has sdkSessionId 'session-A'
+      // Existing conversation has runtimeSessionId 'session-A'
       (deps.plugin.getConversationById as jest.Mock).mockResolvedValue({
         id: 'conv-1',
         messages: [],
-        sdkSessionId: 'session-A',
+        runtimeSessionId: 'session-A',
         isNative: true,
-        previousSdkSessionIds: undefined,
+        previousRuntimeSessionIds: undefined,
       });
 
       // Agent service reports new session 'session-B' (resume failed, new session created)
@@ -1673,13 +1673,13 @@ describe('ConversationController - Previous SDK Session IDs', () => {
       expect(deps.plugin.updateConversation).toHaveBeenCalledWith(
         'conv-1',
         expect.objectContaining({
-          sdkSessionId: 'session-B',
-          previousSdkSessionIds: ['session-A'],
+          runtimeSessionId: 'session-B',
+          previousRuntimeSessionIds: ['session-A'],
         })
       );
     });
 
-    it('should preserve existing previousSdkSessionIds when session changes again', async () => {
+    it('should preserve existing previousRuntimeSessionIds when session changes again', async () => {
       deps.state.currentConversationId = 'conv-1';
       deps.state.messages = [{ id: '1', role: 'user', content: 'test', timestamp: Date.now() }];
 
@@ -1687,9 +1687,9 @@ describe('ConversationController - Previous SDK Session IDs', () => {
       (deps.plugin.getConversationById as jest.Mock).mockResolvedValue({
         id: 'conv-1',
         messages: [],
-        sdkSessionId: 'session-B',
+        runtimeSessionId: 'session-B',
         isNative: true,
-        previousSdkSessionIds: ['session-A'],
+        previousRuntimeSessionIds: ['session-A'],
       });
 
       // Agent service reports new session 'session-C'
@@ -1700,22 +1700,22 @@ describe('ConversationController - Previous SDK Session IDs', () => {
       expect(deps.plugin.updateConversation).toHaveBeenCalledWith(
         'conv-1',
         expect.objectContaining({
-          sdkSessionId: 'session-C',
-          previousSdkSessionIds: ['session-A', 'session-B'],
+          runtimeSessionId: 'session-C',
+          previousRuntimeSessionIds: ['session-A', 'session-B'],
         })
       );
     });
 
-    it('should not modify previousSdkSessionIds when session has not changed', async () => {
+    it('should not modify previousRuntimeSessionIds when session has not changed', async () => {
       deps.state.currentConversationId = 'conv-1';
       deps.state.messages = [{ id: '1', role: 'user', content: 'test', timestamp: Date.now() }];
 
       (deps.plugin.getConversationById as jest.Mock).mockResolvedValue({
         id: 'conv-1',
         messages: [],
-        sdkSessionId: 'session-A',
+        runtimeSessionId: 'session-A',
         isNative: true,
-        previousSdkSessionIds: undefined,
+        previousRuntimeSessionIds: undefined,
       });
 
       mockAgentService.getSessionId.mockReturnValue('session-A');
@@ -1725,8 +1725,8 @@ describe('ConversationController - Previous SDK Session IDs', () => {
       expect(deps.plugin.updateConversation).toHaveBeenCalledWith(
         'conv-1',
         expect.objectContaining({
-          sdkSessionId: 'session-A',
-          previousSdkSessionIds: undefined,
+          runtimeSessionId: 'session-A',
+          previousRuntimeSessionIds: undefined,
         })
       );
     });
@@ -1735,14 +1735,14 @@ describe('ConversationController - Previous SDK Session IDs', () => {
       deps.state.currentConversationId = 'conv-1';
       deps.state.messages = [{ id: '1', role: 'user', content: 'test', timestamp: Date.now() }];
 
-      // Simulate a race condition where session-A is already in previousSdkSessionIds
-      // but sdkSessionId is still session-A (should not duplicate)
+      // Simulate a race condition where session-A is already in previousRuntimeSessionIds
+      // but runtimeSessionId is still session-A (should not duplicate)
       (deps.plugin.getConversationById as jest.Mock).mockResolvedValue({
         id: 'conv-1',
         messages: [],
-        sdkSessionId: 'session-A',
+        runtimeSessionId: 'session-A',
         isNative: true,
-        previousSdkSessionIds: ['session-A'], // Already contains A (from prior bug/race)
+        previousRuntimeSessionIds: ['session-A'], // Already contains A (from prior bug/race)
       });
 
       // Agent reports new session-B
@@ -1754,8 +1754,8 @@ describe('ConversationController - Previous SDK Session IDs', () => {
       expect(deps.plugin.updateConversation).toHaveBeenCalledWith(
         'conv-1',
         expect.objectContaining({
-          sdkSessionId: 'session-B',
-          previousSdkSessionIds: ['session-A'], // Deduplicated, not ['session-A', 'session-A']
+          runtimeSessionId: 'session-B',
+          previousRuntimeSessionIds: ['session-A'], // Deduplicated, not ['session-A', 'session-A']
         })
       );
     });
@@ -1780,16 +1780,16 @@ describe('ConversationController - Fork Session ID Isolation', () => {
     controller = new ConversationController(deps);
   });
 
-  it('should not persist fork source session ID as conversation own sessionId/sdkSessionId', async () => {
+  it('should not persist fork source session ID as conversation own sessionId/runtimeSessionId', async () => {
     deps.state.currentConversationId = 'fork-conv';
     deps.state.messages = [{ id: '1', role: 'user', content: 'test', timestamp: Date.now() }];
 
-    // Fork conversation: has forkSource but no own sdkSessionId yet
+    // Fork conversation: has forkSource but no own runtimeSessionId yet
     (deps.plugin.getConversationById as jest.Mock).mockResolvedValue({
       id: 'fork-conv',
       messages: [],
       sessionId: null,
-      sdkSessionId: undefined,
+      runtimeSessionId: undefined,
       isNative: true,
       forkSource: { sessionId: 'source-session-abc', resumeAt: 'assistant-uuid-1' },
     });
@@ -1803,12 +1803,12 @@ describe('ConversationController - Fork Session ID Isolation', () => {
       'fork-conv',
       expect.objectContaining({
         sessionId: null,
-        sdkSessionId: undefined,
+        runtimeSessionId: undefined,
       })
     );
   });
 
-  it('should persist new session ID after SDK captures a different session for fork', async () => {
+  it('should persist new session ID after Runtime captures a different session for fork', async () => {
     deps.state.currentConversationId = 'fork-conv';
     deps.state.messages = [{ id: '1', role: 'user', content: 'test', timestamp: Date.now() }];
 
@@ -1816,12 +1816,12 @@ describe('ConversationController - Fork Session ID Isolation', () => {
       id: 'fork-conv',
       messages: [],
       sessionId: null,
-      sdkSessionId: undefined,
+      runtimeSessionId: undefined,
       isNative: true,
       forkSource: { sessionId: 'source-session-abc', resumeAt: 'assistant-uuid-1' },
     });
 
-    // SDK captured a new session (different from fork source)
+    // Runtime captured a new session (different from fork source)
     mockAgentService.getSessionId.mockReturnValue('new-session-xyz');
 
     await controller.save();
@@ -1830,7 +1830,7 @@ describe('ConversationController - Fork Session ID Isolation', () => {
       'fork-conv',
       expect.objectContaining({
         sessionId: 'new-session-xyz',
-        sdkSessionId: 'new-session-xyz',
+        runtimeSessionId: 'new-session-xyz',
         forkSource: undefined,
       })
     );
@@ -1840,12 +1840,12 @@ describe('ConversationController - Fork Session ID Isolation', () => {
     deps.state.currentConversationId = 'fork-conv';
     deps.state.messages = [{ id: '1', role: 'user', content: 'test', timestamp: Date.now() }];
 
-    // Fork conversation after fork metadata was cleared (has its own sdkSessionId)
+    // Fork conversation after fork metadata was cleared (has its own runtimeSessionId)
     (deps.plugin.getConversationById as jest.Mock).mockResolvedValue({
       id: 'fork-conv',
       messages: [],
       sessionId: 'new-session-xyz',
-      sdkSessionId: 'new-session-xyz',
+      runtimeSessionId: 'new-session-xyz',
       isNative: true,
       forkSource: undefined,
     });
@@ -1858,7 +1858,7 @@ describe('ConversationController - Fork Session ID Isolation', () => {
       'fork-conv',
       expect.objectContaining({
         sessionId: 'new-session-xyz',
-        sdkSessionId: 'new-session-xyz',
+        runtimeSessionId: 'new-session-xyz',
       })
     );
   });
@@ -1890,7 +1890,7 @@ describe('ConversationController - switchTo fork path', () => {
       id: 'fork-conv',
       messages: [{ id: '1', role: 'user', content: 'forked msg', timestamp: Date.now() }],
       sessionId: null,
-      sdkSessionId: undefined,
+      runtimeSessionId: undefined,
       isNative: true,
       forkSource: { sessionId: 'source-session-abc', resumeAt: 'assistant-uuid-1' },
     };
@@ -1909,7 +1909,7 @@ describe('ConversationController - switchTo fork path', () => {
       id: 'fork-conv',
       messages: [{ id: '1', role: 'user', content: 'forked msg', timestamp: Date.now() }],
       sessionId: 'own-session-xyz',
-      sdkSessionId: 'own-session-xyz',
+      runtimeSessionId: 'own-session-xyz',
       isNative: true,
       forkSource: { sessionId: 'source-session-abc', resumeAt: 'assistant-uuid-1' },
     };
@@ -2068,11 +2068,11 @@ describe('ConversationController - Rewind', () => {
   it('should find prev/response assistants with bounded scan (skipping non-uuid messages)', async () => {
     deps.state.currentConversationId = 'conv-1';
     deps.state.messages = [
-      { id: 'm1', role: 'assistant', content: '', timestamp: 1, sdkAssistantUuid: 'prev-a' },
+      { id: 'm1', role: 'assistant', content: '', timestamp: 1, runtimeAssistantUuid: 'prev-a' },
       { id: 'm2', role: 'assistant', content: 'boundary', timestamp: 2 }, // No uuid
-      { id: 'm3', role: 'user', content: 'test', timestamp: 3, sdkUserUuid: 'user-uuid' },
+      { id: 'm3', role: 'user', content: 'test', timestamp: 3, runtimeUserUuid: 'user-uuid' },
       { id: 'm4', role: 'assistant', content: 'boundary2', timestamp: 4 }, // No uuid
-      { id: 'm5', role: 'assistant', content: 'resp', timestamp: 5, sdkAssistantUuid: 'resp-a' },
+      { id: 'm5', role: 'assistant', content: 'resp', timestamp: 5, runtimeAssistantUuid: 'resp-a' },
     ];
 
     await controller.rewind('m3');
@@ -2082,9 +2082,9 @@ describe('ConversationController - Rewind', () => {
 
   it('should show Notice when message ID not found', async () => {
     deps.state.messages = [
-      { id: 'm1', role: 'assistant', content: '', timestamp: 1, sdkAssistantUuid: 'a1' },
-      { id: 'm2', role: 'user', content: 'test', timestamp: 2, sdkUserUuid: 'u1' },
-      { id: 'm3', role: 'assistant', content: '', timestamp: 3, sdkAssistantUuid: 'a2' },
+      { id: 'm1', role: 'assistant', content: '', timestamp: 1, runtimeAssistantUuid: 'a1' },
+      { id: 'm2', role: 'user', content: 'test', timestamp: 2, runtimeUserUuid: 'u1' },
+      { id: 'm3', role: 'assistant', content: '', timestamp: 3, runtimeAssistantUuid: 'a2' },
     ];
 
     await controller.rewind('nonexistent');
@@ -2096,9 +2096,9 @@ describe('ConversationController - Rewind', () => {
   it('should show Notice when streaming', async () => {
     deps.state.isStreaming = true;
     deps.state.messages = [
-      { id: 'm1', role: 'assistant', content: '', timestamp: 1, sdkAssistantUuid: 'a1' },
-      { id: 'm2', role: 'user', content: 'test', timestamp: 2, sdkUserUuid: 'u1' },
-      { id: 'm3', role: 'assistant', content: '', timestamp: 3, sdkAssistantUuid: 'a2' },
+      { id: 'm1', role: 'assistant', content: '', timestamp: 1, runtimeAssistantUuid: 'a1' },
+      { id: 'm2', role: 'user', content: 'test', timestamp: 2, runtimeUserUuid: 'u1' },
+      { id: 'm3', role: 'assistant', content: '', timestamp: 3, runtimeAssistantUuid: 'a2' },
     ];
 
     await controller.rewind('m2');
@@ -2107,11 +2107,11 @@ describe('ConversationController - Rewind', () => {
     expect(mockAgentService.rewind).not.toHaveBeenCalled();
   });
 
-  it('should show Notice when user message has no sdkUserUuid', async () => {
+  it('should show Notice when user message has no runtimeUserUuid', async () => {
     deps.state.messages = [
-      { id: 'm1', role: 'assistant', content: '', timestamp: 1, sdkAssistantUuid: 'a1' },
-      { id: 'm2', role: 'user', content: 'test', timestamp: 2 }, // No sdkUserUuid
-      { id: 'm3', role: 'assistant', content: '', timestamp: 3, sdkAssistantUuid: 'a2' },
+      { id: 'm1', role: 'assistant', content: '', timestamp: 1, runtimeAssistantUuid: 'a1' },
+      { id: 'm2', role: 'user', content: 'test', timestamp: 2 }, // No runtimeUserUuid
+      { id: 'm3', role: 'assistant', content: '', timestamp: 3, runtimeAssistantUuid: 'a2' },
     ];
 
     await controller.rewind('m2');
@@ -2122,8 +2122,8 @@ describe('ConversationController - Rewind', () => {
 
   it('should show Notice when no previous assistant with uuid exists', async () => {
     deps.state.messages = [
-      { id: 'm1', role: 'user', content: 'test', timestamp: 1, sdkUserUuid: 'u1' },
-      { id: 'm2', role: 'assistant', content: '', timestamp: 2, sdkAssistantUuid: 'a1' },
+      { id: 'm1', role: 'user', content: 'test', timestamp: 1, runtimeUserUuid: 'u1' },
+      { id: 'm2', role: 'assistant', content: '', timestamp: 2, runtimeAssistantUuid: 'a1' },
     ];
 
     await controller.rewind('m1');
@@ -2134,8 +2134,8 @@ describe('ConversationController - Rewind', () => {
 
   it('should show Notice when no response assistant with uuid exists', async () => {
     deps.state.messages = [
-      { id: 'm1', role: 'assistant', content: '', timestamp: 1, sdkAssistantUuid: 'a1' },
-      { id: 'm2', role: 'user', content: 'test', timestamp: 2, sdkUserUuid: 'u1' },
+      { id: 'm1', role: 'assistant', content: '', timestamp: 1, runtimeAssistantUuid: 'a1' },
+      { id: 'm2', role: 'user', content: 'test', timestamp: 2, runtimeUserUuid: 'u1' },
     ];
 
     await controller.rewind('m2');
@@ -2144,28 +2144,28 @@ describe('ConversationController - Rewind', () => {
     expect(mockAgentService.rewind).not.toHaveBeenCalled();
   });
 
-  it('should show i18n Notice on SDK rewind exception', async () => {
+  it('should show i18n Notice on Runtime rewind exception', async () => {
     deps.state.currentConversationId = 'conv-1';
     deps.state.messages = [
-      { id: 'm1', role: 'assistant', content: '', timestamp: 1, sdkAssistantUuid: 'a1' },
-      { id: 'm2', role: 'user', content: 'test', timestamp: 2, sdkUserUuid: 'u1' },
-      { id: 'm3', role: 'assistant', content: '', timestamp: 3, sdkAssistantUuid: 'a2' },
+      { id: 'm1', role: 'assistant', content: '', timestamp: 1, runtimeAssistantUuid: 'a1' },
+      { id: 'm2', role: 'user', content: 'test', timestamp: 2, runtimeUserUuid: 'u1' },
+      { id: 'm3', role: 'assistant', content: '', timestamp: 3, runtimeAssistantUuid: 'a2' },
     ];
-    mockAgentService.rewind.mockRejectedValue(new Error('SDK error'));
+    mockAgentService.rewind.mockRejectedValue(new Error('Runtime error'));
 
     await controller.rewind('m2');
 
     expect(mockNotice).toHaveBeenCalled();
     const msg = mockNotice.mock.calls[0][0] as string;
-    expect(msg).toContain('SDK error');
+    expect(msg).toContain('Runtime error');
   });
 
   it('should show i18n Notice when canRewind is false', async () => {
     deps.state.currentConversationId = 'conv-1';
     deps.state.messages = [
-      { id: 'm1', role: 'assistant', content: '', timestamp: 1, sdkAssistantUuid: 'a1' },
-      { id: 'm2', role: 'user', content: 'test', timestamp: 2, sdkUserUuid: 'u1' },
-      { id: 'm3', role: 'assistant', content: '', timestamp: 3, sdkAssistantUuid: 'a2' },
+      { id: 'm1', role: 'assistant', content: '', timestamp: 1, runtimeAssistantUuid: 'a1' },
+      { id: 'm2', role: 'user', content: 'test', timestamp: 2, runtimeUserUuid: 'u1' },
+      { id: 'm3', role: 'assistant', content: '', timestamp: 3, runtimeAssistantUuid: 'a2' },
     ];
     mockAgentService.rewind.mockResolvedValue({ canRewind: false, error: 'No checkpoints' });
 
@@ -2179,9 +2179,9 @@ describe('ConversationController - Rewind', () => {
   it('should truncateAt, save with resumeSessionAt, and renderMessages on success', async () => {
     deps.state.currentConversationId = 'conv-1';
     deps.state.messages = [
-      { id: 'm1', role: 'assistant', content: '', timestamp: 1, sdkAssistantUuid: 'prev-a' },
-      { id: 'm2', role: 'user', content: 'test', timestamp: 2, sdkUserUuid: 'user-uuid' },
-      { id: 'm3', role: 'assistant', content: 'resp', timestamp: 3, sdkAssistantUuid: 'resp-a' },
+      { id: 'm1', role: 'assistant', content: '', timestamp: 1, runtimeAssistantUuid: 'prev-a' },
+      { id: 'm2', role: 'user', content: 'test', timestamp: 2, runtimeUserUuid: 'user-uuid' },
+      { id: 'm3', role: 'assistant', content: 'resp', timestamp: 3, runtimeAssistantUuid: 'resp-a' },
     ];
 
     const truncateSpy = jest.spyOn(deps.state, 'truncateAt');
@@ -2214,9 +2214,9 @@ describe('ConversationController - Rewind', () => {
   it('should abort when confirmation is declined', async () => {
     deps.state.currentConversationId = 'conv-1';
     deps.state.messages = [
-      { id: 'm1', role: 'assistant', content: '', timestamp: 1, sdkAssistantUuid: 'a1' },
-      { id: 'm2', role: 'user', content: 'test', timestamp: 2, sdkUserUuid: 'u1' },
-      { id: 'm3', role: 'assistant', content: '', timestamp: 3, sdkAssistantUuid: 'a2' },
+      { id: 'm1', role: 'assistant', content: '', timestamp: 1, runtimeAssistantUuid: 'a1' },
+      { id: 'm2', role: 'user', content: 'test', timestamp: 2, runtimeUserUuid: 'u1' },
+      { id: 'm3', role: 'assistant', content: '', timestamp: 3, runtimeAssistantUuid: 'a2' },
     ];
     (confirm as jest.Mock).mockResolvedValueOnce(false);
 
@@ -2229,9 +2229,9 @@ describe('ConversationController - Rewind', () => {
   it('should re-check streaming state after confirmation dialog', async () => {
     deps.state.currentConversationId = 'conv-1';
     deps.state.messages = [
-      { id: 'm1', role: 'assistant', content: '', timestamp: 1, sdkAssistantUuid: 'a1' },
-      { id: 'm2', role: 'user', content: 'test', timestamp: 2, sdkUserUuid: 'u1' },
-      { id: 'm3', role: 'assistant', content: '', timestamp: 3, sdkAssistantUuid: 'a2' },
+      { id: 'm1', role: 'assistant', content: '', timestamp: 1, runtimeAssistantUuid: 'a1' },
+      { id: 'm2', role: 'user', content: 'test', timestamp: 2, runtimeUserUuid: 'u1' },
+      { id: 'm3', role: 'assistant', content: '', timestamp: 3, runtimeAssistantUuid: 'a2' },
     ];
     (confirm as jest.Mock).mockImplementationOnce(async () => {
       deps.state.isStreaming = true;
@@ -2247,9 +2247,9 @@ describe('ConversationController - Rewind', () => {
   it('should show a warning notice when rewind succeeded but save failed', async () => {
     deps.state.currentConversationId = 'conv-1';
     deps.state.messages = [
-      { id: 'm1', role: 'assistant', content: '', timestamp: 1, sdkAssistantUuid: 'prev-a' },
-      { id: 'm2', role: 'user', content: 'test', timestamp: 2, sdkUserUuid: 'user-uuid' },
-      { id: 'm3', role: 'assistant', content: 'resp', timestamp: 3, sdkAssistantUuid: 'resp-a' },
+      { id: 'm1', role: 'assistant', content: '', timestamp: 1, runtimeAssistantUuid: 'prev-a' },
+      { id: 'm2', role: 'user', content: 'test', timestamp: 2, runtimeUserUuid: 'user-uuid' },
+      { id: 'm3', role: 'assistant', content: 'resp', timestamp: 3, runtimeAssistantUuid: 'resp-a' },
     ];
 
     (deps.plugin.updateConversation as jest.Mock).mockRejectedValueOnce(new Error('Save failed'));

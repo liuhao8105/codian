@@ -65,21 +65,16 @@ export function parsePermissionMode(mode?: string): AgentPermissionMode | undefi
   return undefined;
 }
 
-const VALID_MODELS = ['sonnet', 'opus', 'haiku', 'inherit'] as const;
-
-export function parseModel(model?: string): 'sonnet' | 'opus' | 'haiku' | 'inherit' {
-  if (!model) return 'inherit';
-  const normalized = model.toLowerCase().trim();
-  if (VALID_MODELS.includes(normalized as typeof VALID_MODELS[number])) {
-    return normalized as 'sonnet' | 'opus' | 'haiku' | 'inherit';
-  }
-  return 'inherit';
+export function parseModel(model?: string): string {
+  const trimmed = model?.trim();
+  if (!trimmed) return 'inherit';
+  return trimmed.toLowerCase() === 'inherit' ? 'inherit' : trimmed;
 }
 
 export function buildAgentFromFrontmatter(
   frontmatter: AgentFrontmatter,
   body: string,
-  meta: { id: string; source: AgentDefinition['source']; filePath?: string; pluginName?: string }
+  meta: { id: string; source: AgentDefinition['source']; filePath?: string }
 ): AgentDefinition {
   return {
     id: meta.id,
@@ -91,7 +86,6 @@ export function buildAgentFromFrontmatter(
     model: parseModel(frontmatter.model),
     source: meta.source,
     filePath: meta.filePath,
-    pluginName: meta.pluginName,
     skills: frontmatter.skills,
     permissionMode: parsePermissionMode(frontmatter.permissionMode),
     hooks: frontmatter.hooks,

@@ -33,7 +33,7 @@ export class McpServerManager {
   }
 
   /**
-   * Get servers to include in SDK options.
+   * Get servers to include in Runtime options.
    *
    * A server is included if:
    * - It is enabled AND
@@ -59,7 +59,7 @@ export class McpServerManager {
   }
 
   /**
-   * Get disabled MCP tools formatted for SDK disallowedTools option.
+   * Get disabled MCP tools formatted for Runtime disallowedTools option.
    *
    * Only returns disabled tools from servers that would be active (same filter as getActiveServers).
    *

@@ -1,8 +1,3 @@
-// eslint-disable-next-line jest/no-mocks-import
-import {
-  resetMockMessages,
-} from '@test/__mocks__/claude-agent-sdk';
-
 jest.mock('@/core/runtime/codexExec', () => ({
   execCodexPrompt: jest.fn(),
 }));
@@ -30,7 +25,7 @@ function getLastOptions(): Record<string, any> | undefined {
 function createMockPlugin(settings = {}) {
   return {
     settings: {
-      model: 'sonnet',
+      model: 'GPT-5.6-Sol',
       thinkingBudget: 'off',
       systemPrompt: '',
       memoryFilePath: '',
@@ -44,7 +39,7 @@ function createMockPlugin(settings = {}) {
       },
     },
     getActiveEnvironmentVariables: jest.fn().mockReturnValue(''),
-    getResolvedClaudeCliPath: jest.fn().mockReturnValue('/fake/claude'),
+    getResolvedCodexCliPath: jest.fn().mockReturnValue('/fake/codex'),
   } as any;
 }
 
@@ -54,7 +49,6 @@ describe('InstructionRefineService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    resetMockMessages();
     mockExecCodexPrompt.mockResolvedValue({ text: '<instruction>ok</instruction>' });
     mockPlugin = createMockPlugin();
     service = new InstructionRefineService(mockPlugin);
@@ -80,43 +74,7 @@ describe('InstructionRefineService', () => {
       expect(options?.permissionMode).toBe('read-only');
     });
 
-    it('should set settingSources to project only when loadUserClaudeSettings is false', async () => {
-      mockPlugin.settings.loadUserClaudeSettings = false;
-      setMockMessages([
-        { type: 'system', subtype: 'init', session_id: 'test-session' },
-        {
-          type: 'assistant',
-          message: {
-            content: [{ type: 'text', text: '<instruction>- Be concise.</instruction>' }],
-          },
-        },
-        { type: 'result' },
-      ]);
 
-      await service.refineInstruction('be concise', '');
-
-      const options = getLastOptions();
-      expect(options?.permissionMode).toBe('read-only');
-    });
-
-    it('should set settingSources to include user when loadUserClaudeSettings is true', async () => {
-      mockPlugin.settings.loadUserClaudeSettings = true;
-      setMockMessages([
-        { type: 'system', subtype: 'init', session_id: 'test-session' },
-        {
-          type: 'assistant',
-          message: {
-            content: [{ type: 'text', text: '<instruction>- Be concise.</instruction>' }],
-          },
-        },
-        { type: 'result' },
-      ]);
-
-      await service.refineInstruction('be concise', '');
-
-      const options = getLastOptions();
-      expect(options?.permissionMode).toBe('read-only');
-    });
 
     it('should include existing instructions and allow markdown blocks', async () => {
       setMockMessages([
@@ -215,7 +173,7 @@ describe('InstructionRefineService', () => {
 
       await service.refineInstruction('test', '');
       const options = getLastOptions();
-      expect(options?.model).toBe('sonnet');
+      expect(options?.model).toBe('GPT-5.6-Sol');
     });
 
     it('should ignore non-text content blocks', async () => {
@@ -279,7 +237,6 @@ describe('InstructionRefineService', () => {
       await service.refineInstruction('test', '');
 
       // Set up messages for the continuation
-      resetMockMessages();
       setMockMessages([
         {
           type: 'assistant',
@@ -356,7 +313,7 @@ describe('InstructionRefineService', () => {
     });
 
     it('should return error when Codex CLI is not found', async () => {
-      mockPlugin.getResolvedClaudeCliPath.mockReturnValue(null);
+      mockPlugin.getResolvedCodexCliPath.mockReturnValue(null);
       mockExecCodexPrompt.mockRejectedValue(
         new Error('找不到 Codex CLI。请在设置中填写 Codex CLI 路径，或安装 Codex 应用。')
       );

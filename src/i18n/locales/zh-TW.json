@@ -98,7 +98,7 @@
     "titleModel": {
       "name": "標題生成模型",
       "desc": "用於自動生成對話標題的模型。",
-      "auto": "自動 (Haiku)"
+      "auto": "自動 (GPT-5.6-Luna)"
     },
     "navMappings": {
       "name": "Vim 風格導航映射",
@@ -153,10 +153,6 @@
       "name": "MCP 伺服器",
       "desc": "設定模型上下文協定伺服器，透過外部工具和資料來源擴展 Codex 的能力。啟用上下文保存模式的伺服器需要 @ 提及才能啟用。"
     },
-    "plugins": {
-      "name": "遺留外掛程式",
-      "desc": "啟用或停用從 ~/.claude/plugins 發現的遺留外掛程式。已啟用的外掛程式按儲存庫儲存。"
-    },
     "subagents": {
       "name": "子代理",
       "desc": "設定 Codex 可委派的自訂子代理。",
@@ -196,10 +192,6 @@
       }
     },
     "safety": "安全",
-    "loadUserSettings": {
-      "name": "載入遺留使用者設定",
-      "desc": "為相容遷移載入 ~/.claude/settings.json。啟用後，這些遺留權限規則可能繞過安全模式。"
-    },
     "enableBlocklist": {
       "name": "啟用命令黑名單",
       "desc": "阻止潛在危險的 bash 命令"
@@ -244,14 +236,6 @@
       "invalid": "格式無效。使用：256k、1m 或精確數量（1000-10000000）。"
     },
     "advanced": "進階",
-    "show1MModel": {
-      "name": "啟用具有 1M 上下文視窗的 Sonnet",
-      "desc": "在模型選擇器中將標準 Sonnet 替換為 Sonnet (1M)。在 200k 權杖以下價格相同。需要 Max 訂閱。"
-    },
-    "enableChrome": {
-      "name": "啟用 Chrome 擴充功能",
-      "desc": "允許 Codian 透過 claude-in-chrome 擴充功能與 Chrome 互動。需要安裝該擴充功能。需要重新啟動工作階段。"
-    },
     "enableBangBash": {
       "name": "啟用 bash 模式 (!)",
       "desc": "在空白輸入框中輸入 ! 以進入 bash 模式。透過 Node.js child_process 直接執行指令。需要重新開啟檢視。",

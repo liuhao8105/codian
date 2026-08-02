@@ -1,4 +1,4 @@
-import type { HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk';
+import type { HookCallbackMatcher } from '../runtime/contracts';
 
 export interface SubagentHookState {
   hasRunning: boolean;

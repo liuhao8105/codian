@@ -1,3 +1,3 @@
 ## Agents
 
-Read CLAUDE.md for the agent overview and instructions.
+Read CODEX.md for the agent overview and instructions.

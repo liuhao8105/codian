@@ -437,7 +437,7 @@ describe('InputController - Message Queue', () => {
       expect(deps.state.messages[0].images).toBeUndefined();
       expect(imageContextManager.clearImages).toHaveBeenCalled();
       expect(deps.plugin.renameConversation).toHaveBeenCalledWith('conv-1', 'Test Title');
-      // No sdk_user_sent in stream → save without clearing resumeSessionAt
+      // No runtime_user_sent in stream → save without clearing resumeSessionAt
       expect(deps.conversationController.save).toHaveBeenCalledWith(true, undefined);
       expect((deps as any).mockAgentService.query).toHaveBeenCalled();
       expect(deps.state.isStreaming).toBe(false);
@@ -2359,10 +2359,10 @@ Other content`);
       mockAgentService.setPendingResumeAt = jest.fn();
       mockAgentService.query = jest.fn().mockReturnValue(createMockStream([{ type: 'done' }]));
 
-      // Pre-populate messages: user → assistant (with sdkAssistantUuid matching resumeSessionAt)
+      // Pre-populate messages: user → assistant (with runtimeAssistantUuid matching resumeSessionAt)
       deps.state.messages = [
-        { id: 'msg-u1', role: 'user', content: 'hello', timestamp: 1, sdkUserUuid: 'u1' },
-        { id: 'msg-a1', role: 'assistant', content: 'hi', timestamp: 2, sdkAssistantUuid: 'a1' },
+        { id: 'msg-u1', role: 'user', content: 'hello', timestamp: 1, runtimeUserUuid: 'u1' },
+        { id: 'msg-a1', role: 'assistant', content: 'hi', timestamp: 2, runtimeAssistantUuid: 'a1' },
       ];
 
       // Set conversation with resumeSessionAt
@@ -2391,10 +2391,10 @@ Other content`);
       // Messages: user → assistant(a1) → user(follow-up) → assistant
       // resumeSessionAt=a1 is stale because there's a follow-up after a1
       deps.state.messages = [
-        { id: 'msg-u1', role: 'user', content: 'hello', timestamp: 1, sdkUserUuid: 'u1' },
-        { id: 'msg-a1', role: 'assistant', content: 'hi', timestamp: 2, sdkAssistantUuid: 'a1' },
-        { id: 'msg-u2', role: 'user', content: 'follow up', timestamp: 3, sdkUserUuid: 'u2' },
-        { id: 'msg-a2', role: 'assistant', content: 'response', timestamp: 4, sdkAssistantUuid: 'a2' },
+        { id: 'msg-u1', role: 'user', content: 'hello', timestamp: 1, runtimeUserUuid: 'u1' },
+        { id: 'msg-a1', role: 'assistant', content: 'hi', timestamp: 2, runtimeAssistantUuid: 'a1' },
+        { id: 'msg-u2', role: 'user', content: 'follow up', timestamp: 3, runtimeUserUuid: 'u2' },
+        { id: 'msg-a2', role: 'assistant', content: 'response', timestamp: 4, runtimeAssistantUuid: 'a2' },
       ];
 
       (deps.plugin.getConversationSync as any) = jest.fn().mockReturnValue({
@@ -2413,22 +2413,22 @@ Other content`);
       expect(deps.plugin.updateConversation).toHaveBeenCalledWith('conv-1', { resumeSessionAt: undefined });
     });
 
-    it('should clear resumeSessionAt on save when sdk_user_sent is received', async () => {
+    it('should clear resumeSessionAt on save when runtime_user_sent is received', async () => {
       deps = createSendableDeps();
       const { mockAgentService } = deps as any;
       mockAgentService.setPendingResumeAt = jest.fn();
       mockAgentService.query = jest.fn().mockReturnValue(
         createMockStream([
-          { type: 'sdk_user_uuid', uuid: 'u-new' },
-          { type: 'sdk_user_sent', uuid: 'u-new' },
+          { type: 'runtime_user_uuid', uuid: 'u-new' },
+          { type: 'runtime_user_sent', uuid: 'u-new' },
           { type: 'text', content: 'hi' },
           { type: 'done' },
         ])
       );
 
       deps.state.messages = [
-        { id: 'msg-u1', role: 'user', content: 'hello', timestamp: 1, sdkUserUuid: 'u1' },
-        { id: 'msg-a1', role: 'assistant', content: 'hi', timestamp: 2, sdkAssistantUuid: 'a1' },
+        { id: 'msg-u1', role: 'user', content: 'hello', timestamp: 1, runtimeUserUuid: 'u1' },
+        { id: 'msg-a1', role: 'assistant', content: 'hi', timestamp: 2, runtimeAssistantUuid: 'a1' },
       ];
 
       (deps.plugin.getConversationSync as any) = jest.fn().mockReturnValue({
@@ -2442,7 +2442,7 @@ Other content`);
 
       await controller.sendMessage();
 
-      // save(true) should include { resumeSessionAt: undefined } because sdk_user_sent was received
+      // save(true) should include { resumeSessionAt: undefined } because runtime_user_sent was received
       expect(deps.conversationController.save).toHaveBeenCalledWith(true, { resumeSessionAt: undefined });
     });
 
@@ -2450,14 +2450,14 @@ Other content`);
       deps = createSendableDeps();
       const { mockAgentService } = deps as any;
       mockAgentService.setPendingResumeAt = jest.fn();
-      // Stream throws before yielding sdk_user_sent
+      // Stream throws before yielding runtime_user_sent
       mockAgentService.query = jest.fn().mockImplementation(() => {
         throw new Error('Connection failed');
       });
 
       deps.state.messages = [
-        { id: 'msg-u1', role: 'user', content: 'hello', timestamp: 1, sdkUserUuid: 'u1' },
-        { id: 'msg-a1', role: 'assistant', content: 'hi', timestamp: 2, sdkAssistantUuid: 'a1' },
+        { id: 'msg-u1', role: 'user', content: 'hello', timestamp: 1, runtimeUserUuid: 'u1' },
+        { id: 'msg-a1', role: 'assistant', content: 'hi', timestamp: 2, runtimeAssistantUuid: 'a1' },
       ];
 
       (deps.plugin.getConversationSync as any) = jest.fn().mockReturnValue({
@@ -2471,7 +2471,7 @@ Other content`);
 
       await controller.sendMessage();
 
-      // save(true) should NOT clear resumeSessionAt because sdk_user_sent was never received
+      // save(true) should NOT clear resumeSessionAt because runtime_user_sent was never received
       expect(deps.conversationController.save).toHaveBeenCalledWith(true, undefined);
     });
 
@@ -2482,10 +2482,10 @@ Other content`);
       mockAgentService.query = jest.fn().mockReturnValue(createMockStream([{ type: 'done' }]));
 
       deps.state.messages = [
-        { id: 'msg-u1', role: 'user', content: 'hello', timestamp: 1, sdkUserUuid: 'u1' },
-        { id: 'msg-a1', role: 'assistant', content: 'hi', timestamp: 2, sdkAssistantUuid: 'a1' },
-        { id: 'msg-u2', role: 'user', content: 'next', timestamp: 3, sdkUserUuid: 'u2' },
-        { id: 'msg-a2', role: 'assistant', content: 'resp', timestamp: 4, sdkAssistantUuid: 'a2' },
+        { id: 'msg-u1', role: 'user', content: 'hello', timestamp: 1, runtimeUserUuid: 'u1' },
+        { id: 'msg-a1', role: 'assistant', content: 'hi', timestamp: 2, runtimeAssistantUuid: 'a1' },
+        { id: 'msg-u2', role: 'user', content: 'next', timestamp: 3, runtimeUserUuid: 'u2' },
+        { id: 'msg-a2', role: 'assistant', content: 'resp', timestamp: 4, runtimeAssistantUuid: 'a2' },
       ];
 
       (deps.plugin.getConversationSync as any) = jest.fn().mockReturnValue({

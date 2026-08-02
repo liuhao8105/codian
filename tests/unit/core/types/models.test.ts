@@ -30,7 +30,7 @@ describe('Codex model catalog', () => {
 
   it('uses GPT-5.6-Sol for new Codian settings', () => {
     expect(DEFAULT_SETTINGS.model).toBe('gpt-5.6-sol');
-    expect(DEFAULT_SETTINGS.lastClaudeModel).toBe('gpt-5.6-sol');
+    expect(DEFAULT_SETTINGS.lastCodexModel).toBe('gpt-5.6-sol');
     expect(DEFAULT_SETTINGS.thinkingBudget).toBe('low');
   });
 

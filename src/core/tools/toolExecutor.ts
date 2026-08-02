@@ -10,8 +10,8 @@ import * as path from 'path';
 import type CodianPlugin from '../../main';
 import { getEnhancedPath } from '../../utils/env';
 import { getPathAccessType, getVaultPath, isPathWithinVault } from '../../utils/path';
-import type { ApprovalCallbackOptions } from '../agent';
 import type { McpServerManager } from '../mcp';
+import type { ApprovalCallbackOptions } from '../runtime/contracts';
 import { findBashCommandPathViolation } from '../security/BashPathValidator';
 import { isCommandBlocked } from '../security/BlocklistChecker';
 import {
@@ -192,7 +192,7 @@ async function executeBash(
 
   if (!plugin.settings.allowExternalAccess && !plugin.settings.temporaryExternalAccess) {
     const deepSeekBashContextPaths = [
-      '~/.codex/skills',
+      '~/.codian/skills',
       '~/.agents/skills',
     ];
     const violation = findBashCommandPathViolation(command, {
@@ -299,8 +299,8 @@ function validateWriteTarget(filePath: string, vaultPath: string): ValidationRes
     }
   }
 
-  // Block hidden directories (except .claude/)
-  const hiddenDirMatch = normalized.match(/(^|\/)\.(?!claude\/)([^/]+)/);
+  // Block hidden directories except Codian-owned storage.
+  const hiddenDirMatch = normalized.match(/(^|\/)\.(?!codian\/)([^/]+)/);
   if (hiddenDirMatch) {
     return { allowed: false, reason: `不允许写入隐藏目录 ".${hiddenDirMatch[2]}/"。` };
   }

@@ -174,7 +174,6 @@ describe('ModelSelector', () => {
       model: 'gpt-5',
       thinkingBudget: 'low',
       permissionMode: 'normal',
-      show1MModel: true,
     });
     selector.updateDisplay();
     const label = parentEl.querySelector('.codian-model-label');
@@ -183,11 +182,11 @@ describe('ModelSelector', () => {
 
   it('should use custom models from environment variables', () => {
     callbacks.getEnvironmentVariables.mockReturnValue(
-      'CLAUDE_CODE_USE_BEDROCK=1\nANTHROPIC_MODEL=us.anthropic.claude-sonnet-4-20250514-v1:0'
+      'CODEX_CODE_USE_BEDROCK=1\nOPENAI_MODEL=us.openai.gpt-5.6-sol-v1:0'
     );
     callbacks.getSettings.mockReturnValue({
       provider: 'codex',
-      model: 'us.anthropic.claude-sonnet-4-20250514-v1:0',
+      model: 'us.openai.gpt-5.6-sol-v1:0',
       thinkingBudget: 'low',
       permissionMode: 'normal',
     });

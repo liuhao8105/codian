@@ -133,8 +133,6 @@ export type TranslationKey =
   | 'settings.mcpServers.desc'
 
   // Settings - Plugins
-  | 'settings.plugins.name'
-  | 'settings.plugins.desc'
 
   // Settings - Subagents
   | 'settings.subagents.name'
@@ -174,8 +172,6 @@ export type TranslationKey =
 
   // Settings - Safety
   | 'settings.safety'
-  | 'settings.loadUserSettings.name'
-  | 'settings.loadUserSettings.desc'
   | 'settings.enableBlocklist.name'
   | 'settings.enableBlocklist.desc'
   | 'settings.blockedCommands.name'
@@ -212,10 +208,6 @@ export type TranslationKey =
 
   // Settings - Advanced
   | 'settings.advanced'
-  | 'settings.show1MModel.name'
-  | 'settings.show1MModel.desc'
-  | 'settings.enableChrome.name'
-  | 'settings.enableChrome.desc'
   | 'settings.enableBangBash.name'
   | 'settings.enableBangBash.desc'
   | 'settings.enableBangBash.validation.noNode'

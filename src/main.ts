@@ -11,7 +11,6 @@ import { Notice, Plugin } from 'obsidian';
 import { AgentManager } from './core/agents';
 import { CodianDiagnostics } from './core/diagnostics';
 import { McpServerManager } from './core/mcp';
-import { PluginManager } from './core/plugins';
 import { createAgentRuntime } from './core/runtime';
 import { CodexAppServerClient } from './core/runtime/CodexAppServerClient';
 // CODIAN_ICON_SVG kept in shared/icons.ts for reference
@@ -33,10 +32,8 @@ import {
   DEFAULT_CODEX_MODELS,
   DEFAULT_SETTINGS,
   DEFAULT_THINKING_BUDGET,
-  getCliPlatformKey,
-  getHostnameKey,
   type ThinkingBudget,
-  VIEW_TYPE_CLAUDIAN,
+  VIEW_TYPE_CODIAN,
 } from './core/types';
 import {
   fetchCodexModelCatalog,
@@ -47,7 +44,7 @@ import { setupServiceCallbacks } from './features/chat/tabs/Tab';
 import { type InlineEditContext, InlineEditModal } from './features/inline-edit/ui/InlineEditModal';
 import { CodianSettingTab } from './features/settings/CodianSettings';
 import { setLocale } from './i18n';
-import { ClaudeCliResolver } from './utils/claudeCli';
+import { CodexCliResolver } from './utils/codexCli';
 import { buildCursorContext } from './utils/editor';
 import {
   buildProviderEnvironmentText,
@@ -59,33 +56,32 @@ import {
 import { filterValidPaths } from './utils/externalContext';
 import { getVaultPath } from './utils/path';
 import {
-  deleteSDKSession,
-  loadSDKSessionMessages,
-  loadSubagentToolCalls,
-  sdkSessionExists,
-  type SDKSessionLoadResult,
-} from './utils/sdkSession';
+  deleteRuntimeSession,
+  loadRuntimeSessionMessages,
+  runtimeSessionExists,
+  type RuntimeSessionLoadResult,
+} from './utils/runtimeSession';
 
 // ============================================
 // Subagent data merge helpers (pure functions)
 // ============================================
 
-function chooseRicherResult(sdkResult?: string, cachedResult?: string): string | undefined {
-  const sdkText = typeof sdkResult === 'string' ? sdkResult.trim() : '';
+function chooseRicherResult(runtimeResult?: string, cachedResult?: string): string | undefined {
+  const runtimeText = typeof runtimeResult === 'string' ? runtimeResult.trim() : '';
   const cachedText = typeof cachedResult === 'string' ? cachedResult.trim() : '';
 
-  if (sdkText.length === 0 && cachedText.length === 0) return undefined;
-  if (sdkText.length === 0) return cachedResult;
-  if (cachedText.length === 0) return sdkResult;
+  if (runtimeText.length === 0 && cachedText.length === 0) return undefined;
+  if (runtimeText.length === 0) return cachedResult;
+  if (cachedText.length === 0) return runtimeResult;
 
-  return sdkText.length >= cachedText.length ? sdkResult : cachedResult;
+  return runtimeText.length >= cachedText.length ? runtimeResult : cachedResult;
 }
 
 function chooseRicherToolCalls(
-  sdkToolCalls: ToolCallInfo[] = [],
+  runtimeToolCalls: ToolCallInfo[] = [],
   cachedToolCalls: ToolCallInfo[] = []
 ): ToolCallInfo[] {
-  if (sdkToolCalls.length >= cachedToolCalls.length) return sdkToolCalls;
+  if (runtimeToolCalls.length >= cachedToolCalls.length) return runtimeToolCalls;
   return cachedToolCalls;
 }
 
@@ -109,9 +105,9 @@ function mergeSubagentInfo(
   taskToolCall: ToolCallInfo,
   cachedSubagent: SubagentInfo
 ): SubagentInfo {
-  const sdkSubagent = taskToolCall.subagent;
+  const runtimeSubagent = taskToolCall.subagent;
   const cachedAsyncStatus = normalizeAsyncStatus(cachedSubagent);
-  if (!sdkSubagent) {
+  if (!runtimeSubagent) {
     return {
       ...cachedSubagent,
       asyncStatus: cachedAsyncStatus,
@@ -119,18 +115,18 @@ function mergeSubagentInfo(
     };
   }
 
-  const sdkAsyncStatus = normalizeAsyncStatus(sdkSubagent);
-  const sdkIsTerminal = isTerminalAsyncStatus(sdkAsyncStatus);
+  const runtimeAsyncStatus = normalizeAsyncStatus(runtimeSubagent);
+  const runtimeIsTerminal = isTerminalAsyncStatus(runtimeAsyncStatus);
   const cachedIsTerminal = isTerminalAsyncStatus(cachedAsyncStatus);
-  const sdkResult = taskToolCall.result ?? sdkSubagent.result;
+  const runtimeResult = taskToolCall.result ?? runtimeSubagent.result;
 
-  // Prefer cached data only when it reached a terminal state but SDK hasn't yet
-  const preferred = (!sdkIsTerminal && cachedIsTerminal) ? cachedSubagent : sdkSubagent;
+  // Prefer cached data only when it reached a terminal state but Runtime hasn't yet
+  const preferred = (!runtimeIsTerminal && cachedIsTerminal) ? cachedSubagent : runtimeSubagent;
 
-  const mergedMode = sdkSubagent.mode
+  const mergedMode = runtimeSubagent.mode
     ?? cachedSubagent.mode
     ?? (taskToolCall.input?.run_in_background === true ? 'async' : undefined);
-  const fallbackResult = chooseRicherResult(sdkResult, cachedSubagent.result);
+  const fallbackResult = chooseRicherResult(runtimeResult, cachedSubagent.result);
   const mergedResult = preferred === cachedSubagent
     ? (cachedSubagent.result ?? fallbackResult)
     : fallbackResult;
@@ -138,19 +134,19 @@ function mergeSubagentInfo(
 
   return {
     ...cachedSubagent,
-    ...sdkSubagent,
-    description: sdkSubagent.description || cachedSubagent.description,
-    prompt: sdkSubagent.prompt || cachedSubagent.prompt,
+    ...runtimeSubagent,
+    description: runtimeSubagent.description || cachedSubagent.description,
+    prompt: runtimeSubagent.prompt || cachedSubagent.prompt,
     mode: mergedMode,
     status: preferred.status,
     asyncStatus: mergedAsyncStatus,
     result: mergedResult,
-    toolCalls: chooseRicherToolCalls(sdkSubagent.toolCalls, cachedSubagent.toolCalls),
-    agentId: sdkSubagent.agentId || cachedSubagent.agentId,
-    outputToolId: sdkSubagent.outputToolId || cachedSubagent.outputToolId,
-    startedAt: sdkSubagent.startedAt ?? cachedSubagent.startedAt,
-    completedAt: sdkSubagent.completedAt ?? cachedSubagent.completedAt,
-    isExpanded: sdkSubagent.isExpanded ?? cachedSubagent.isExpanded,
+    toolCalls: chooseRicherToolCalls(runtimeSubagent.toolCalls, cachedSubagent.toolCalls),
+    agentId: runtimeSubagent.agentId || cachedSubagent.agentId,
+    outputToolId: runtimeSubagent.outputToolId || cachedSubagent.outputToolId,
+    startedAt: runtimeSubagent.startedAt ?? cachedSubagent.startedAt,
+    completedAt: runtimeSubagent.completedAt ?? cachedSubagent.completedAt,
+    isExpanded: runtimeSubagent.isExpanded ?? cachedSubagent.isExpanded,
   };
 }
 
@@ -204,10 +200,9 @@ function ensureTaskToolCall(
 export default class CodianPlugin extends Plugin {
   settings: CodianSettings;
   mcpManager: McpServerManager;
-  pluginManager: PluginManager;
   agentManager: AgentManager;
   storage: StorageService;
-  cliResolver: ClaudeCliResolver;
+  cliResolver: CodexCliResolver;
   private conversations: Conversation[] = [];
   private runtimeEnvironmentVariables = '';
   private codexModels = [...DEFAULT_CODEX_MODELS];
@@ -216,25 +211,19 @@ export default class CodianPlugin extends Plugin {
   };
 
   async onload() {
+    this.cliResolver = new CodexCliResolver();
+    const vaultPath = (this.app.vault.adapter as any).basePath;
     await this.loadSettings();
-
-    this.cliResolver = new ClaudeCliResolver();
 
     // Initialize MCP manager (shared for agent + UI)
     this.mcpManager = new McpServerManager(this.storage.mcp);
     await this.mcpManager.loadServers();
 
-    // Initialize plugin manager (reads from installed_plugins.json + settings.json)
-    const vaultPath = (this.app.vault.adapter as any).basePath;
-    this.pluginManager = new PluginManager(vaultPath, this.storage.ccSettings);
-    await this.pluginManager.loadPlugins();
-
-    // Initialize agent manager (loads plugin agents from plugin install paths)
-    this.agentManager = new AgentManager(vaultPath, this.pluginManager);
+    this.agentManager = new AgentManager(vaultPath);
     await this.agentManager.loadAgents();
 
     this.registerView(
-      VIEW_TYPE_CLAUDIAN,
+      VIEW_TYPE_CODIAN,
       (leaf) => new CodianView(leaf, this)
     );
 
@@ -306,7 +295,7 @@ export default class CodianPlugin extends Plugin {
       id: 'new-tab',
       name: 'New tab',
       checkCallback: (checking: boolean) => {
-        const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_CLAUDIAN)[0];
+        const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_CODIAN)[0];
         if (!leaf) return false;
 
         const view = leaf.view as CodianView;
@@ -326,7 +315,7 @@ export default class CodianPlugin extends Plugin {
       id: 'new-session',
       name: 'New session (in current tab)',
       checkCallback: (checking: boolean) => {
-        const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_CLAUDIAN)[0];
+        const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_CODIAN)[0];
         if (!leaf) return false;
 
         const view = leaf.view as CodianView;
@@ -349,7 +338,7 @@ export default class CodianPlugin extends Plugin {
       id: 'close-current-tab',
       name: 'Close current tab',
       checkCallback: (checking: boolean) => {
-        const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_CLAUDIAN)[0];
+        const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_CODIAN)[0];
         if (!leaf) return false;
 
         const view = leaf.view as CodianView;
@@ -386,7 +375,7 @@ export default class CodianPlugin extends Plugin {
 
   async activateView() {
     const { workspace } = this.app;
-    let leaf = workspace.getLeavesOfType(VIEW_TYPE_CLAUDIAN)[0];
+    let leaf = workspace.getLeavesOfType(VIEW_TYPE_CODIAN)[0];
 
     if (!leaf) {
       const newLeaf = this.settings.openInMainTab
@@ -394,7 +383,7 @@ export default class CodianPlugin extends Plugin {
         : workspace.getRightLeaf(false);
       if (newLeaf) {
         await newLeaf.setViewState({
-          type: VIEW_TYPE_CLAUDIAN,
+          type: VIEW_TYPE_CODIAN,
           active: true,
         });
         leaf = newLeaf;
@@ -408,28 +397,29 @@ export default class CodianPlugin extends Plugin {
 
   /** Loads settings and conversations from persistent storage. */
   async loadSettings() {
+    this.cliResolver ??= new CodexCliResolver();
     // Initialize storage service (handles migration if needed)
     this.storage = new StorageService(this);
-    const { claudian } = await this.storage.initialize();
+    const { codian } = await this.storage.initialize();
 
     const slashCommands = await this.storage.loadAllSlashCommands();
 
     this.settings = {
       ...DEFAULT_SETTINGS,
-      ...claudian,
+      ...codian,
       slashCommands,
     };
     this.settings.currentProvider ??= DEFAULT_SETTINGS.currentProvider;
     this.settings.providerConfigs = {
       ...DEFAULT_SETTINGS.providerConfigs,
-      ...(claudian.providerConfigs || {}),
+      ...(codian.providerConfigs || {}),
       codex: {
         ...DEFAULT_SETTINGS.providerConfigs.codex,
-        ...(claudian.providerConfigs?.codex || {}),
+        ...(codian.providerConfigs?.codex || {}),
       },
       deepseek: {
         ...DEFAULT_SETTINGS.providerConfigs.deepseek,
-        ...(claudian.providerConfigs?.deepseek || {}),
+        ...(codian.providerConfigs?.deepseek || {}),
       },
     };
     const providerValidation = isProviderConfigured(this.settings, this.settings.currentProvider);
@@ -454,25 +444,8 @@ export default class CodianPlugin extends Plugin {
       this.settings.permissionMode = 'normal';
     }
 
-    // Initialize and migrate legacy CLI paths to hostname-based paths
-    this.settings.claudeCliPathsByHost ??= {};
-    const hostname = getHostnameKey();
-    let didMigrateCliPath = false;
-
-    if (!this.settings.claudeCliPathsByHost[hostname]) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const platformPaths = (this.settings as any).claudeCliPaths as Record<string, string> | undefined;
-      const migratedPath = platformPaths?.[getCliPlatformKey()]?.trim() || this.settings.claudeCliPath?.trim();
-
-      if (migratedPath) {
-        this.settings.claudeCliPathsByHost[hostname] = migratedPath;
-        this.settings.claudeCliPath = '';
-        didMigrateCliPath = true;
-      }
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    delete (this.settings as any).claudeCliPaths;
+    // Initialize hostname-based CLI paths.
+    this.settings.codexCliPathsByHost ??= {};
 
     // Load all conversations from session files (legacy JSONL + native metadata)
     const { conversations: legacyConversations, failedCount } = await this.storage.sessions.loadAllConversations();
@@ -497,12 +470,12 @@ export default class CodianPlugin extends Plugin {
       conversation.externalContextPaths = meta.externalContextPaths ?? conversation.externalContextPaths;
       conversation.enabledMcpServers = meta.enabledMcpServers ?? conversation.enabledMcpServers;
       conversation.usage = meta.usage ?? conversation.usage;
-      if (meta.sdkSessionId !== undefined) {
-        conversation.sdkSessionId = meta.sdkSessionId;
-      } else if (conversation.sdkSessionId === undefined && conversation.sessionId) {
-        conversation.sdkSessionId = conversation.sessionId;
+      if (meta.runtimeSessionId !== undefined) {
+        conversation.runtimeSessionId = meta.runtimeSessionId;
+      } else if (conversation.runtimeSessionId === undefined && conversation.sessionId) {
+        conversation.runtimeSessionId = conversation.sessionId;
       }
-      conversation.previousSdkSessionIds = meta.previousSdkSessionIds ?? conversation.previousSdkSessionIds;
+      conversation.previousRuntimeSessionIds = meta.previousRuntimeSessionIds ?? conversation.previousRuntimeSessionIds;
       conversation.legacyCutoffAt = meta.legacyCutoffAt ?? conversation.legacyCutoffAt;
       conversation.subagentData = meta.subagentData ?? conversation.subagentData;
       conversation.resumeSessionAt = meta.resumeSessionAt ?? conversation.resumeSessionAt;
@@ -515,8 +488,8 @@ export default class CodianPlugin extends Plugin {
       .filter(meta => !legacyIds.has(meta.id))
       .map(meta => {
         const resumeSessionId = meta.sessionId !== undefined ? meta.sessionId : meta.id;
-        const sdkSessionId = meta.sdkSessionId !== undefined
-          ? meta.sdkSessionId
+        const runtimeSessionId = meta.runtimeSessionId !== undefined
+          ? meta.runtimeSessionId
           : (resumeSessionId ?? undefined);
 
         return {
@@ -526,9 +499,9 @@ export default class CodianPlugin extends Plugin {
           updatedAt: meta.updatedAt,
           lastResponseAt: meta.lastResponseAt,
           sessionId: resumeSessionId,
-          sdkSessionId,
-          previousSdkSessionIds: meta.previousSdkSessionIds,
-          messages: [], // Messages are in SDK storage, loaded on demand
+          runtimeSessionId,
+          previousRuntimeSessionIds: meta.previousRuntimeSessionIds,
+          messages: [], // Messages are in Runtime storage, loaded on demand
           currentNote: meta.currentNote,
           attachedFiles: meta.attachedFiles,
           externalContextPaths: meta.externalContextPaths,
@@ -560,7 +533,7 @@ export default class CodianPlugin extends Plugin {
     this.runtimeEnvironmentVariables = this.computeRuntimeEnvironmentVariables();
     const { changed, invalidatedConversations } = this.reconcileModelWithEnvironment(this.runtimeEnvironmentVariables);
 
-    if (changed || didMigrateCliPath || didSanitizePersistentPaths || didFallbackProvider) {
+    if (changed || didSanitizePersistentPaths || didFallbackProvider) {
       await this.saveSettings();
     }
 
@@ -661,7 +634,7 @@ export default class CodianPlugin extends Plugin {
       if (selection.migrated) {
         this.settings.model = selection.model;
         this.settings.thinkingBudget = this.getDefaultThinkingBudgetForModel(selection.model) ?? 'off';
-        this.settings.lastClaudeModel = selection.model;
+        this.settings.lastCodexModel = selection.model;
         await this.saveSettings();
         new Notice(`原模型已不可用，已切换到 ${catalog.models.find((model) => model.value === selection.model)?.label ?? selection.model}。`);
       }
@@ -711,7 +684,7 @@ export default class CodianPlugin extends Plugin {
     const defaultThinkingBudget = this.getDefaultThinkingBudgetForModel(model);
     if (defaultThinkingBudget) {
       this.settings.thinkingBudget = defaultThinkingBudget;
-      this.settings.lastClaudeModel = model;
+      this.settings.lastCodexModel = model;
     } else {
       this.settings.lastCustomModel = model;
     }
@@ -740,10 +713,9 @@ export default class CodianPlugin extends Plugin {
     await this.applyRuntimeEnvironmentUpdate(baseNotice, changedNotice);
   }
 
-  getResolvedClaudeCliPath(): string | null {
+  getResolvedCodexCliPath(): string | null {
     return this.cliResolver.resolve(
-      this.settings.claudeCliPathsByHost,  // Per-device paths (preferred)
-      this.settings.claudeCliPath,          // Legacy path (fallback)
+      this.settings.codexCliPathsByHost,
       this.getActiveEnvironmentVariables()
     );
   }
@@ -865,15 +837,10 @@ export default class CodianPlugin extends Plugin {
   private computeEnvHash(envText: string): string {
     const envVars = parseEnvironmentVariables(envText || '');
     const modelKeys = [
-      'ANTHROPIC_MODEL',
       'OPENAI_MODEL',
       'CODEX_MODEL',
-      'ANTHROPIC_DEFAULT_OPUS_MODEL',
-      'ANTHROPIC_DEFAULT_SONNET_MODEL',
-      'ANTHROPIC_DEFAULT_HAIKU_MODEL',
     ];
     const providerKeys = [
-      'ANTHROPIC_BASE_URL',
       'OPENAI_BASE_URL',
     ];
     const allKeys = [...modelKeys, ...providerKeys];
@@ -911,7 +878,7 @@ export default class CodianPlugin extends Plugin {
     // Session invalidation is now handled per-tab by TabManager.
     // Clear resume sessionId from all conversations since they belong to the old provider.
     // Sessions are provider-specific (contain signed thinking blocks, etc.).
-    // NOTE: sdkSessionId is retained for loading SDK-stored history.
+    // NOTE: runtimeSessionId is retained for loading Runtime-stored history.
     const invalidatedConversations: Conversation[] = [];
     for (const conv of this.conversations) {
       if (conv.sessionId) {
@@ -945,7 +912,7 @@ export default class CodianPlugin extends Plugin {
     if (!firstUserMsg) {
       // For native sessions without loaded messages, indicate it's a persisted session
       // rather than "New conversation" which implies no content exists
-      return conv.isNative ? 'SDK session' : 'New conversation';
+      return conv.isNative ? 'Runtime session' : 'New conversation';
     }
     return firstUserMsg.content.substring(0, 50) + (firstUserMsg.content.length > 50 ? '...' : '');
   }
@@ -953,12 +920,12 @@ export default class CodianPlugin extends Plugin {
   /** Fork has no owned session yet; still referencing the source session for resume. */
   private isPendingFork(conversation: Conversation): boolean {
     return !!conversation.forkSource &&
-      !conversation.sdkSessionId &&
+      !conversation.runtimeSessionId &&
       !conversation.sessionId;
   }
 
-  private async loadSdkMessagesForConversation(conversation: Conversation): Promise<void> {
-    if (!conversation.isNative || conversation.sdkMessagesLoaded) return;
+  private async loadRuntimeMessagesForConversation(conversation: Conversation): Promise<void> {
+    if (!conversation.isNative || conversation.runtimeMessagesLoaded) return;
 
     const vaultPath = getVaultPath(this.app);
     if (!vaultPath) return;
@@ -968,23 +935,23 @@ export default class CodianPlugin extends Plugin {
     const allSessionIds: string[] = isPendingFork
       ? [conversation.forkSource!.sessionId]
       : [
-          ...(conversation.previousSdkSessionIds || []),
-          conversation.sdkSessionId ?? conversation.sessionId,
+          ...(conversation.previousRuntimeSessionIds || []),
+          conversation.runtimeSessionId ?? conversation.sessionId,
         ].filter((id): id is string => !!id);
 
     if (allSessionIds.length === 0) return;
 
-    const allSdkMessages: ChatMessage[] = [];
+    const allRuntimeMessages: ChatMessage[] = [];
     let missingSessionCount = 0;
     let errorCount = 0;
     let successCount = 0;
 
     const currentSessionId = isPendingFork
       ? conversation.forkSource!.sessionId
-      : (conversation.sdkSessionId ?? conversation.sessionId);
+      : (conversation.runtimeSessionId ?? conversation.sessionId);
 
     for (const sessionId of allSessionIds) {
-      if (!sdkSessionExists(vaultPath, sessionId)) {
+      if (!runtimeSessionExists(vaultPath, sessionId)) {
         missingSessionCount++;
         continue;
       }
@@ -993,7 +960,7 @@ export default class CodianPlugin extends Plugin {
       const truncateAt = isCurrentSession
         ? (isPendingFork ? conversation.forkSource!.resumeAt : conversation.resumeSessionAt)
         : undefined;
-      const result: SDKSessionLoadResult = await loadSDKSessionMessages(
+      const result: RuntimeSessionLoadResult = await loadRuntimeSessionMessages(
         vaultPath, sessionId, truncateAt
       );
 
@@ -1003,7 +970,7 @@ export default class CodianPlugin extends Plugin {
       }
 
       successCount++;
-      allSdkMessages.push(...result.messages);
+      allRuntimeMessages.push(...result.messages);
     }
 
     // Note: We intentionally don't notify users about missing session files.
@@ -1022,12 +989,12 @@ export default class CodianPlugin extends Plugin {
     }
 
     // Filter out rebuilt context messages (history blobs sent on session reset)
-    const filteredSdkMessages = allSdkMessages.filter(msg => !msg.isRebuiltContext);
+    const filteredRuntimeMessages = allRuntimeMessages.filter(msg => !msg.isRebuiltContext);
 
     // Apply legacy cutoff filter if needed
     const afterCutoff = conversation.legacyCutoffAt != null
-      ? filteredSdkMessages.filter(msg => msg.timestamp > conversation.legacyCutoffAt!)
-      : filteredSdkMessages;
+      ? filteredRuntimeMessages.filter(msg => msg.timestamp > conversation.legacyCutoffAt!)
+      : filteredRuntimeMessages;
 
     const merged = this.dedupeMessages([
       ...conversation.messages,
@@ -1036,11 +1003,6 @@ export default class CodianPlugin extends Plugin {
 
     // Apply cached subagentData to loaded messages (for Agent tool count and status)
     if (conversation.subagentData) {
-      await this.enrichAsyncSubagentToolCalls(
-        conversation.subagentData,
-        vaultPath,
-        allSessionIds
-      );
       this.applySubagentData(merged, conversation.subagentData);
     }
 
@@ -1053,43 +1015,7 @@ export default class CodianPlugin extends Plugin {
         conversation.currentNote = lastUserWithNote.currentNote;
       }
     }
-    conversation.sdkMessagesLoaded = true;
-  }
-
-  private async enrichAsyncSubagentToolCalls(
-    subagentData: Record<string, SubagentInfo>,
-    vaultPath: string,
-    sessionIds: string[]
-  ): Promise<void> {
-    const uniqueSessionIds = [...new Set(sessionIds)];
-    if (uniqueSessionIds.length === 0) return;
-
-    const loaderCache = new Map<string, ReturnType<typeof loadSubagentToolCalls>>();
-
-    for (const subagent of Object.values(subagentData)) {
-      if (subagent.mode !== 'async') continue;
-      if (!subagent.agentId) continue;
-      if ((subagent.toolCalls?.length ?? 0) > 0) continue;
-
-      for (const sessionId of uniqueSessionIds) {
-        const cacheKey = `${sessionId}:${subagent.agentId}`;
-
-        let loader = loaderCache.get(cacheKey);
-        if (!loader) {
-          loader = loadSubagentToolCalls(vaultPath, sessionId, subagent.agentId);
-          loaderCache.set(cacheKey, loader);
-        }
-
-        const recoveredToolCalls = await loader;
-        if (recoveredToolCalls.length === 0) continue;
-
-        subagent.toolCalls = recoveredToolCalls.map(toolCall => ({
-          ...toolCall,
-          input: { ...toolCall.input },
-        }));
-        break;
-      }
-    }
+    conversation.runtimeMessagesLoaded = true;
   }
 
   /**
@@ -1198,8 +1124,8 @@ export default class CodianPlugin extends Plugin {
   /**
    * Creates a new conversation and sets it as active.
    *
-   * New conversations always use SDK-native storage.
-   * The session ID may be captured after the first SDK response.
+   * New conversations always use Runtime-native storage.
+   * The session ID may be captured after the first Runtime response.
    */
   async createConversation(sessionId?: string): Promise<Conversation> {
     const conversationId = sessionId ?? this.generateConversationId();
@@ -1209,13 +1135,13 @@ export default class CodianPlugin extends Plugin {
       createdAt: Date.now(),
       updatedAt: Date.now(),
       sessionId: sessionId ?? null,
-      sdkSessionId: sessionId ?? undefined,
+      runtimeSessionId: sessionId ?? undefined,
       messages: [],
       isNative: true,
     };
 
     this.conversations.unshift(conversation);
-    // Save new conversation (metadata only - SDK handles messages)
+    // Save new conversation (metadata only - Runtime handles messages)
     await this.storage.sessions.saveMetadata(
       this.storage.sessions.toSessionMetadata(conversation)
     );
@@ -1226,13 +1152,13 @@ export default class CodianPlugin extends Plugin {
   /**
    * Switches to an existing conversation by ID.
    *
-   * For native sessions, loads messages from SDK storage if not already loaded.
+   * For native sessions, loads messages from Runtime storage if not already loaded.
    */
   async switchConversation(id: string): Promise<Conversation | null> {
     const conversation = this.conversations.find(c => c.id === id);
     if (!conversation) return null;
 
-    await this.loadSdkMessagesForConversation(conversation);
+    await this.loadRuntimeMessagesForConversation(conversation);
 
     return conversation;
   }
@@ -1240,7 +1166,7 @@ export default class CodianPlugin extends Plugin {
   /**
    * Deletes a conversation and resets any tabs using it.
    *
-   * For native sessions, deletes the metadata file and SDK session file.
+   * For native sessions, deletes the metadata file and Runtime session file.
    * For legacy sessions, deletes the JSONL file.
    */
   async deleteConversation(id: string): Promise<void> {
@@ -1251,9 +1177,9 @@ export default class CodianPlugin extends Plugin {
     this.conversations.splice(index, 1);
 
     const vaultPath = getVaultPath(this.app);
-    const sdkSessionId = conversation.sdkSessionId ?? conversation.sessionId;
-    if (vaultPath && sdkSessionId) {
-      await deleteSDKSession(vaultPath, sdkSessionId);
+    const runtimeSessionId = conversation.runtimeSessionId ?? conversation.sessionId;
+    if (vaultPath && runtimeSessionId) {
+      await deleteRuntimeSession(vaultPath, runtimeSessionId);
     }
 
     if (conversation.isNative) {
@@ -1300,11 +1226,11 @@ export default class CodianPlugin extends Plugin {
   /**
    * Updates conversation properties.
    *
-   * For native sessions, saves metadata only (SDK handles messages including images).
+   * For native sessions, saves metadata only (Runtime handles messages including images).
    * For legacy sessions, saves full JSONL.
    *
-   * Image data is cleared from memory after save (SDK/JSONL has persisted it),
-   * except for pending fork conversations whose images aren't yet in SDK storage.
+   * Image data is cleared from memory after save (Runtime/JSONL has persisted it),
+   * except for pending fork conversations whose images aren't yet in Runtime storage.
    */
   async updateConversation(id: string, updates: Partial<Conversation>): Promise<void> {
     const conversation = this.conversations.find(c => c.id === id);
@@ -1313,7 +1239,7 @@ export default class CodianPlugin extends Plugin {
     Object.assign(conversation, updates, { updatedAt: Date.now() });
 
     if (conversation.isNative) {
-      // Native session: save metadata only (SDK handles messages including images)
+      // Native session: save metadata only (Runtime handles messages including images)
       await this.storage.sessions.saveMetadata(
         this.storage.sessions.toSessionMetadata(conversation)
       );
@@ -1322,8 +1248,8 @@ export default class CodianPlugin extends Plugin {
       await this.storage.sessions.saveConversation(conversation);
     }
 
-    // Clear image data from memory after save (data is persisted by SDK or JSONL).
-    // Skip for pending forks: their deep-cloned images aren't in SDK storage yet.
+    // Clear image data from memory after save (data is persisted by Runtime or JSONL).
+    // Skip for pending forks: their deep-cloned images aren't in Runtime storage yet.
     if (!this.isPendingFork(conversation)) {
       for (const msg of conversation.messages) {
         if (msg.images) {
@@ -1338,20 +1264,20 @@ export default class CodianPlugin extends Plugin {
   /**
    * Gets a conversation by ID from the in-memory cache.
    *
-   * For native sessions, loads messages from SDK storage if not already loaded.
+   * For native sessions, loads messages from Runtime storage if not already loaded.
    */
   async getConversationById(id: string): Promise<Conversation | null> {
     const conversation = this.conversations.find(c => c.id === id) || null;
 
     if (conversation) {
-      await this.loadSdkMessagesForConversation(conversation);
+      await this.loadRuntimeMessagesForConversation(conversation);
     }
 
     return conversation;
   }
 
   /**
-   * Gets a conversation by ID without loading SDK messages.
+   * Gets a conversation by ID without loading Runtime messages.
    * Use this for UI code that only needs metadata (title, etc.).
    */
   getConversationSync(id: string): Conversation | null {
@@ -1380,7 +1306,7 @@ export default class CodianPlugin extends Plugin {
 
   /** Returns the active Codian view from workspace, if open. */
   getView(): CodianView | null {
-    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CLAUDIAN);
+    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CODIAN);
     if (leaves.length > 0) {
       return leaves[0].view as CodianView;
     }
@@ -1389,7 +1315,7 @@ export default class CodianPlugin extends Plugin {
 
   /** Returns all open Codian views in the workspace. */
   getAllViews(): CodianView[] {
-    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CLAUDIAN);
+    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CODIAN);
     return leaves.map(leaf => leaf.view as CodianView);
   }
 
@@ -1413,7 +1339,7 @@ export default class CodianPlugin extends Plugin {
   }
 
   /**
-   * Gets SDK supported commands from any ready service.
+   * Gets Runtime supported commands from any ready service.
    * The command list is the same for all services, so we just need one ready.
    * Used by inline edit and other contexts that don't have direct TabManager access.
    */

@@ -3,7 +3,7 @@ export type AgentPermissionMode = typeof AGENT_PERMISSION_MODES[number];
 
 /**
  * Agent definition loaded from markdown files with YAML frontmatter.
- * Matches Claude Code's agent format for compatibility.
+ * Matches Codex's agent format for compatibility.
  */
 export interface AgentDefinition {
   /** Unique identifier. Namespaced for plugins: "plugin-name:agent-name" */
@@ -24,25 +24,22 @@ export interface AgentDefinition {
   disallowedTools?: string[];
 
   /** Model override. 'inherit' (default) uses parent's model */
-  model?: 'sonnet' | 'opus' | 'haiku' | 'inherit';
+  model?: string;
 
-  source: 'plugin' | 'vault' | 'global' | 'builtin';
-
-  /** Plugin name (only for plugin-sourced agents) */
-  pluginName?: string;
+  source: 'vault' | 'global' | 'builtin';
 
   /** Absolute path to the source .md file (undefined for built-in agents) */
   filePath?: string;
 
-  /** Skills available to this agent (pass-through to SDK) */
+  /** Skills available to this agent (pass-through to Runtime) */
   skills?: string[];
 
   permissionMode?: AgentPermissionMode;
 
-  /** Parsed from frontmatter; round-tripped on save so the SDK reads hooks from the agent file */
+  /** Parsed from frontmatter; round-tripped on save so the Runtime reads hooks from the agent file */
   hooks?: Record<string, unknown>;
 
-  /** Frontmatter keys not recognized by Claudian, preserved on round-trip */
+  /** Frontmatter keys not recognized by Codian, preserved on round-trip */
   extraFrontmatter?: Record<string, unknown>;
 }
 

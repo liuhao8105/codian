@@ -1,8 +1,3 @@
-// eslint-disable-next-line jest/no-mocks-import
-import {
-  resetMockMessages,
-} from '@test/__mocks__/claude-agent-sdk';
-
 jest.mock('@/core/runtime/codexExec', () => ({
   execCodexPrompt: jest.fn(),
 }));
@@ -29,7 +24,7 @@ function getLastOptions(): Record<string, any> | undefined {
 function createMockPlugin(settings = {}) {
   return {
     settings: {
-      model: 'sonnet',
+      model: 'GPT-5.6-Sol',
       titleGenerationModel: '',
       thinkingBudget: 'off',
       ...settings,
@@ -42,7 +37,7 @@ function createMockPlugin(settings = {}) {
       },
     },
     getActiveEnvironmentVariables: jest.fn().mockReturnValue(''),
-    getResolvedClaudeCliPath: jest.fn().mockReturnValue('/fake/claude'),
+    getResolvedCodexCliPath: jest.fn().mockReturnValue('/fake/codex'),
   } as any;
 }
 
@@ -52,7 +47,6 @@ describe('TitleGenerationService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    resetMockMessages();
     mockExecCodexPrompt.mockResolvedValue({ text: 'Title' });
     mockPlugin = createMockPlugin();
     service = new TitleGenerationService(mockPlugin);
@@ -104,7 +98,7 @@ describe('TitleGenerationService', () => {
     });
 
     it('should use titleGenerationModel setting when set', async () => {
-      mockPlugin.settings.titleGenerationModel = 'opus';
+      mockPlugin.settings.titleGenerationModel = 'GPT-5.6-Terra';
 
       setMockMessages([
         { type: 'system', subtype: 'init', session_id: 'test-session' },
@@ -121,11 +115,11 @@ describe('TitleGenerationService', () => {
       await service.generateTitle('conv-123', 'test', callback);
 
       const options = getLastOptions();
-      expect(options?.model).toBe('opus');
+      expect(options?.model).toBe('GPT-5.6-Terra');
     });
 
     it('should prioritize setting over env var', async () => {
-      mockPlugin.settings.titleGenerationModel = 'sonnet';
+      mockPlugin.settings.titleGenerationModel = 'GPT-5.6-Sol';
       mockPlugin.getActiveEnvironmentVariables.mockReturnValue(
         'OPENAI_MODEL=custom-openai-model'
       );
@@ -145,7 +139,7 @@ describe('TitleGenerationService', () => {
       await service.generateTitle('conv-123', 'test', callback);
 
       const options = getLastOptions();
-      expect(options?.model).toBe('sonnet');
+      expect(options?.model).toBe('GPT-5.6-Sol');
     });
 
     it('should use OPENAI_MODEL when setting is empty', async () => {
@@ -289,7 +283,7 @@ describe('TitleGenerationService', () => {
     });
 
     it('should fail when Codex CLI is not found', async () => {
-      mockPlugin.getResolvedClaudeCliPath.mockReturnValue(null);
+      mockPlugin.getResolvedCodexCliPath.mockReturnValue(null);
       mockExecCodexPrompt.mockRejectedValue(
         new Error('找不到 Codex CLI。请在设置中填写 Codex CLI 路径，或安装 Codex 应用。')
       );
@@ -303,47 +297,7 @@ describe('TitleGenerationService', () => {
       });
     });
 
-    it('should set settingSources to project only when loadUserClaudeSettings is false', async () => {
-      mockPlugin.settings.loadUserClaudeSettings = false;
 
-      setMockMessages([
-        { type: 'system', subtype: 'init', session_id: 'test-session' },
-        {
-          type: 'assistant',
-          message: {
-            content: [{ type: 'text', text: 'Title' }],
-          },
-        },
-        { type: 'result' },
-      ]);
-
-      const callback = jest.fn();
-      await service.generateTitle('conv-123', 'test', callback);
-
-      const options = getLastOptions();
-      expect(options?.permissionMode).toBe('read-only');
-    });
-
-    it('should set settingSources to include user when loadUserClaudeSettings is true', async () => {
-      mockPlugin.settings.loadUserClaudeSettings = true;
-
-      setMockMessages([
-        { type: 'system', subtype: 'init', session_id: 'test-session' },
-        {
-          type: 'assistant',
-          message: {
-            content: [{ type: 'text', text: 'Title' }],
-          },
-        },
-        { type: 'result' },
-      ]);
-
-      const callback = jest.fn();
-      await service.generateTitle('conv-123', 'test', callback);
-
-      const options = getLastOptions();
-      expect(options?.permissionMode).toBe('read-only');
-    });
 
     it('should truncate long user messages', async () => {
       const longMessage = 'x'.repeat(1000);

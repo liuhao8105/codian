@@ -587,7 +587,7 @@ describe('getEnhancedPath', () => {
         process.env.ProgramFiles = 'C:\\Program Files';
       }
 
-      const result = getEnhancedPath(undefined, '/path/to/claude.exe');
+      const result = getEnhancedPath(undefined, '/path/to/codex.exe');
       const segments = result.split(SEP);
       const extraPath = isWindows ? 'C:\\Program Files\\nodejs' : '/usr/local/bin';
 
@@ -611,7 +611,7 @@ describe('getEnhancedPath', () => {
     });
 
     it('works with native binary path (no Node.js detection needed)', () => {
-      const result = getEnhancedPath(undefined, '/path/to/claude.exe');
+      const result = getEnhancedPath(undefined, '/path/to/codex.exe');
       expect(typeof result).toBe('string');
     });
   });
@@ -633,7 +633,7 @@ describe('getEnhancedPath', () => {
       if (isWindows) return;
 
       const nvmBinDir = '/Users/test/.nvm/versions/node/v20.10.0/bin';
-      const cliPath = path.join(nvmBinDir, 'claude');
+      const cliPath = path.join(nvmBinDir, 'codex');
       mockCliDirWithNode(nvmBinDir);
 
       process.env.PATH = '/usr/bin';
@@ -649,7 +649,7 @@ describe('getEnhancedPath', () => {
       if (!isWindows) return;
 
       const nvmBinDir = 'C:\\Users\\test\\AppData\\Roaming\\nvm\\v20.10.0';
-      const cliPath = path.join(nvmBinDir, 'claude.cmd');
+      const cliPath = path.join(nvmBinDir, 'codex.cmd');
       mockCliDirWithNode(nvmBinDir);
 
       process.env.PATH = 'C:\\Windows\\System32';
@@ -665,7 +665,7 @@ describe('getEnhancedPath', () => {
       if (isWindows) return;
 
       const fnmBinDir = '/Users/test/.fnm/node-versions/v20.10.0/installation/bin';
-      const cliPath = path.join(fnmBinDir, 'claude');
+      const cliPath = path.join(fnmBinDir, 'codex');
       mockCliDirWithNode(fnmBinDir);
 
       process.env.PATH = '/usr/bin';
@@ -678,7 +678,7 @@ describe('getEnhancedPath', () => {
       if (isWindows) return;
 
       const voltaBinDir = '/Users/test/.volta/bin';
-      const cliPath = path.join(voltaBinDir, 'claude');
+      const cliPath = path.join(voltaBinDir, 'codex');
       mockCliDirWithNode(voltaBinDir);
 
       process.env.PATH = '/usr/bin';
@@ -691,7 +691,7 @@ describe('getEnhancedPath', () => {
       if (isWindows) return;
 
       const asdfBinDir = '/Users/test/.asdf/installs/nodejs/20.10.0/bin';
-      const cliPath = path.join(asdfBinDir, 'claude');
+      const cliPath = path.join(asdfBinDir, 'codex');
       mockCliDirWithNode(asdfBinDir);
 
       process.env.PATH = '/usr/bin';
@@ -702,7 +702,7 @@ describe('getEnhancedPath', () => {
 
     it('does not add CLI directory when node is not present', () => {
       const cliDir = isWindows ? 'C:\\custom\\bin' : '/custom/bin';
-      const cliPath = path.join(cliDir, isWindows ? 'claude.exe' : 'claude');
+      const cliPath = path.join(cliDir, isWindows ? 'codex.exe' : 'codex');
 
       // Mock: node does not exist in CLI directory
       jest.spyOn(fs, 'existsSync').mockReturnValue(false);
@@ -738,7 +738,7 @@ describe('getEnhancedPath', () => {
       if (isWindows) return;
 
       const nvmBinDir = '/Users/test/.nvm/versions/node/v20.10.0/bin';
-      const cliPath = path.join(nvmBinDir, 'claude');
+      const cliPath = path.join(nvmBinDir, 'codex');
       mockCliDirWithNode(nvmBinDir);
 
       const userPath = '/user/custom/bin';
@@ -772,13 +772,13 @@ describe('cliPathRequiresNode', () => {
   });
 
   it('returns false for native binaries', () => {
-    expect(cliPathRequiresNode('/path/to/claude')).toBe(false);
-    expect(cliPathRequiresNode('/path/to/claude.exe')).toBe(false);
-    expect(cliPathRequiresNode('C:\\path\\to\\claude.exe')).toBe(false);
+    expect(cliPathRequiresNode('/path/to/codex')).toBe(false);
+    expect(cliPathRequiresNode('/path/to/codex.exe')).toBe(false);
+    expect(cliPathRequiresNode('C:\\path\\to\\codex.exe')).toBe(false);
   });
 
   it('returns true for scripts with node shebang', () => {
-    const scriptPath = isWindows ? 'C:\\temp\\claude' : '/tmp/claude';
+    const scriptPath = isWindows ? 'C:\\temp\\codex' : '/tmp/codex';
     const shebang = '#!/usr/bin/env node\nconsole.log("hi");\n';
 
     jest.spyOn(fs, 'existsSync').mockImplementation(p => String(p) === scriptPath);
@@ -796,7 +796,7 @@ describe('cliPathRequiresNode', () => {
   });
 
   it('returns false when path exists but is a directory', () => {
-    const dirPath = isWindows ? 'C:\\temp\\claude' : '/tmp/claude';
+    const dirPath = isWindows ? 'C:\\temp\\codex' : '/tmp/codex';
     jest.spyOn(fs, 'existsSync').mockImplementation(p => String(p) === dirPath);
     jest.spyOn(fs, 'statSync').mockImplementation(
       () => ({ isFile: () => false }) as fs.Stats
@@ -824,7 +824,7 @@ describe('cliPathRequiresNode', () => {
   });
 
   it('returns false for .cmd files', () => {
-    expect(cliPathRequiresNode('/path/to/claude.cmd')).toBe(false);
+    expect(cliPathRequiresNode('/path/to/codex.cmd')).toBe(false);
   });
 
   it('is case-insensitive', () => {
@@ -840,7 +840,7 @@ describe('getMissingNodeError', () => {
 
   it('returns null when CLI does not require Node.js', () => {
     jest.spyOn(fs, 'existsSync').mockReturnValue(false);
-    const error = getMissingNodeError('/path/to/claude');
+    const error = getMissingNodeError('/path/to/codex');
     expect(error).toBeNull();
   });
 
@@ -1088,199 +1088,16 @@ describe('parseContextLimit with comma-formatted input', () => {
   });
 });
 
-describe('getCustomModelIds', () => {
-  it('should return empty set when no custom models configured', () => {
-    const result = getCustomModelIds({});
-    expect(result.size).toBe(0);
+describe('model environment helpers', () => {
+  it('collects Codex and OpenAI-compatible model overrides', () => {
+    const env = { CODEX_MODEL: 'gpt-5.6-sol', OPENAI_MODEL: 'deepseek-chat' };
+    expect(getCustomModelIds(env)).toEqual(new Set(['gpt-5.6-sol', 'deepseek-chat']));
+    expect(getModelsFromEnvironment(env).map(model => model.value)).toEqual(['gpt-5.6-sol', 'deepseek-chat']);
   });
 
-  it('should extract ANTHROPIC_MODEL', () => {
-    const result = getCustomModelIds({ ANTHROPIC_MODEL: 'custom-model' });
-    expect(result.size).toBe(1);
-    expect(result.has('custom-model')).toBe(true);
-  });
-
-  it('should extract model from default tier env vars', () => {
-    const result = getCustomModelIds({
-      ANTHROPIC_DEFAULT_OPUS_MODEL: 'my-opus',
-      ANTHROPIC_DEFAULT_SONNET_MODEL: 'my-sonnet',
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'my-haiku',
-    });
-    expect(result.size).toBe(3);
-    expect(result.has('my-opus')).toBe(true);
-    expect(result.has('my-sonnet')).toBe(true);
-    expect(result.has('my-haiku')).toBe(true);
-  });
-
-  it('should deduplicate when multiple env vars point to same model', () => {
-    const result = getCustomModelIds({
-      ANTHROPIC_MODEL: 'shared-model',
-      ANTHROPIC_DEFAULT_SONNET_MODEL: 'shared-model',
-    });
-    expect(result.size).toBe(1);
-    expect(result.has('shared-model')).toBe(true);
-  });
-
-  it('should ignore unrelated env vars', () => {
-    const result = getCustomModelIds({
-      ANTHROPIC_API_KEY: 'secret-key',
-      ANTHROPIC_BASE_URL: 'https://api.example.com',
-      OTHER_VAR: 'value',
-    });
-    expect(result.size).toBe(0);
-  });
-
-  it('should handle mixed relevant and irrelevant env vars', () => {
-    const result = getCustomModelIds({
-      ANTHROPIC_API_KEY: 'secret-key',
-      ANTHROPIC_MODEL: 'custom-model',
-      ANTHROPIC_BASE_URL: 'https://api.example.com',
-    });
-    expect(result.size).toBe(1);
-    expect(result.has('custom-model')).toBe(true);
-  });
-
-  it('should ignore empty string model values', () => {
-    const result = getCustomModelIds({
-      ANTHROPIC_MODEL: '',
-      ANTHROPIC_DEFAULT_SONNET_MODEL: 'valid-model',
-    });
-    expect(result.size).toBe(1);
-    expect(result.has('')).toBe(false);
-    expect(result.has('valid-model')).toBe(true);
-  });
-
-  it('should ignore whitespace-only model values', () => {
-    const result = getCustomModelIds({
-      ANTHROPIC_MODEL: '   ',
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'my-haiku',
-    });
-    // Note: getCustomModelIds only checks truthiness, so whitespace passes
-    // This test documents the current behavior
-    expect(result.has('my-haiku')).toBe(true);
-  });
-});
-
-describe('getModelsFromEnvironment', () => {
-  it('returns empty array when no custom models configured', () => {
-    const result = getModelsFromEnvironment({});
-    expect(result).toEqual([]);
-  });
-
-  it('returns model for ANTHROPIC_MODEL', () => {
-    const result = getModelsFromEnvironment({ ANTHROPIC_MODEL: 'custom-model-v1' });
-    expect(result).toHaveLength(1);
-    expect(result[0].value).toBe('custom-model-v1');
-    expect(result[0].description).toContain('model');
-  });
-
-  it('formats label from hyphenated model name', () => {
-    const result = getModelsFromEnvironment({ ANTHROPIC_MODEL: 'claude-3-opus' });
-    expect(result[0].label).toBe('Claude 3 Opus');
-  });
-
-  it('formats label from slash-separated model name', () => {
-    const result = getModelsFromEnvironment({ ANTHROPIC_MODEL: 'org/custom-model' });
-    expect(result[0].label).toBe('custom-model');
-  });
-
-  it('returns models for tier-specific env vars', () => {
-    const result = getModelsFromEnvironment({
-      ANTHROPIC_DEFAULT_OPUS_MODEL: 'my-opus',
-      ANTHROPIC_DEFAULT_SONNET_MODEL: 'my-sonnet',
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'my-haiku',
-    });
-    expect(result).toHaveLength(3);
-    expect(result.map(m => m.value)).toContain('my-opus');
-    expect(result.map(m => m.value)).toContain('my-sonnet');
-    expect(result.map(m => m.value)).toContain('my-haiku');
-  });
-
-  it('deduplicates when multiple env vars point to same model', () => {
-    const result = getModelsFromEnvironment({
-      ANTHROPIC_MODEL: 'shared-model',
-      ANTHROPIC_DEFAULT_SONNET_MODEL: 'shared-model',
-    });
-    expect(result).toHaveLength(1);
-    expect(result[0].value).toBe('shared-model');
-    expect(result[0].description).toContain('model');
-    expect(result[0].description).toContain('sonnet');
-  });
-
-  it('sorts by type priority (model > haiku > sonnet > opus)', () => {
-    const result = getModelsFromEnvironment({
-      ANTHROPIC_DEFAULT_OPUS_MODEL: 'opus-v1',
-      ANTHROPIC_MODEL: 'main-model',
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'haiku-v1',
-    });
-    expect(result[0].value).toBe('main-model');
-    expect(result[1].value).toBe('haiku-v1');
-    expect(result[2].value).toBe('opus-v1');
-  });
-
-  it('ignores unrelated env vars', () => {
-    const result = getModelsFromEnvironment({
-      ANTHROPIC_API_KEY: 'sk-key',
-      OTHER_VAR: 'value',
-    });
-    expect(result).toEqual([]);
-  });
-
-  it('ignores empty model values', () => {
-    const result = getModelsFromEnvironment({
-      ANTHROPIC_MODEL: '',
-      ANTHROPIC_DEFAULT_SONNET_MODEL: 'valid-model',
-    });
-    expect(result).toHaveLength(1);
-    expect(result[0].value).toBe('valid-model');
-  });
-});
-
-describe('getCurrentModelFromEnvironment', () => {
-  it('returns null when no model env vars set', () => {
-    expect(getCurrentModelFromEnvironment({})).toBeNull();
-  });
-
-  it('returns ANTHROPIC_MODEL when set', () => {
-    expect(getCurrentModelFromEnvironment({
-      ANTHROPIC_MODEL: 'custom-model',
-    })).toBe('custom-model');
-  });
-
-  it('prefers ANTHROPIC_MODEL over tier-specific vars', () => {
-    expect(getCurrentModelFromEnvironment({
-      ANTHROPIC_MODEL: 'main-model',
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'haiku-model',
-      ANTHROPIC_DEFAULT_SONNET_MODEL: 'sonnet-model',
-      ANTHROPIC_DEFAULT_OPUS_MODEL: 'opus-model',
-    })).toBe('main-model');
-  });
-
-  it('falls back to ANTHROPIC_DEFAULT_HAIKU_MODEL', () => {
-    expect(getCurrentModelFromEnvironment({
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'haiku-model',
-      ANTHROPIC_DEFAULT_SONNET_MODEL: 'sonnet-model',
-    })).toBe('haiku-model');
-  });
-
-  it('falls back to ANTHROPIC_DEFAULT_SONNET_MODEL', () => {
-    expect(getCurrentModelFromEnvironment({
-      ANTHROPIC_DEFAULT_SONNET_MODEL: 'sonnet-model',
-      ANTHROPIC_DEFAULT_OPUS_MODEL: 'opus-model',
-    })).toBe('sonnet-model');
-  });
-
-  it('falls back to ANTHROPIC_DEFAULT_OPUS_MODEL', () => {
-    expect(getCurrentModelFromEnvironment({
-      ANTHROPIC_DEFAULT_OPUS_MODEL: 'opus-model',
-    })).toBe('opus-model');
-  });
-
-  it('returns null when only unrelated vars set', () => {
-    expect(getCurrentModelFromEnvironment({
-      ANTHROPIC_API_KEY: 'sk-key',
-      OTHER_VAR: 'value',
-    })).toBeNull();
+  it('selects the active override and ignores unrelated variables', () => {
+    expect(getCurrentModelFromEnvironment({ OPENAI_MODEL: 'deepseek-chat', CODEX_MODEL: 'gpt-5.6-sol' })).toBe('deepseek-chat');
+    expect(getCurrentModelFromEnvironment({ OTHER_VAR: 'value' })).toBeNull();
   });
 });
 

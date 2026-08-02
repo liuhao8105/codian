@@ -1,9 +1,6 @@
-import type { RewindFilesResult } from '@anthropic-ai/claude-agent-sdk';
-
 import type CodianPlugin from '../../main';
 import { isProviderConfigured } from '../../utils/env';
 import { getVaultPath } from '../../utils/path';
-import type { ApprovalCallback, QueryOptions } from '../agent';
 import type { McpServerManager } from '../mcp';
 import { buildSystemPrompt } from '../prompts/mainAgent';
 import { classifyMcpToolRisk, enumerateMcpToolsForDeepSeek } from '../tools/mcpBridge';
@@ -20,6 +17,7 @@ import type {
   ImageAttachment,
   StreamChunk,
 } from '../types';
+import type { ApprovalCallback, QueryOptions, RewindFilesResult } from './contracts';
 import type { AgentRuntime } from './index';
 
 /** Maximum tool-calling rounds per user message (final safety net). */
@@ -647,7 +645,7 @@ export class DeepSeekRuntime implements AgentRuntime {
     messages.push({ role: 'user', content: prompt });
 
     const turnId = `deepseek-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    yield { type: 'sdk_user_sent', uuid: turnId };
+    yield { type: 'runtime_user_sent', uuid: turnId };
 
     this.activeAbortController = new AbortController();
 
@@ -951,7 +949,7 @@ export class DeepSeekRuntime implements AgentRuntime {
   setApprovalDismisser(_dismisser: (() => void) | null): void {}
   setAskUserQuestionCallback(_callback: ((input: Record<string, unknown>, signal?: AbortSignal) => Promise<Record<string, string> | null>) | null): void {}
   setExitPlanModeCallback(_callback: ((input: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown> | null) | null): void {}
-  setPermissionModeSyncCallback(_callback: ((sdkMode: string) => void) | null): void {}
+  setPermissionModeSyncCallback(_callback: ((runtimeMode: string) => void) | null): void {}
   setSubagentHookProvider(_getState: () => unknown): void {}
   setAutoTurnCallback(_callback: ((chunks: StreamChunk[]) => void) | null): void {}
 }

@@ -1,17 +1,16 @@
-import * as os from 'os';
-
 import { TOOL_SUBAGENT } from '@/core/tools';
-import { DEFAULT_SETTINGS, VIEW_TYPE_CLAUDIAN } from '@/core/types';
-import * as sdkSession from '@/utils/sdkSession';
+import { DEFAULT_SETTINGS, VIEW_TYPE_CODIAN } from '@/core/types';
+import * as runtimeSession from '@/utils/runtimeSession';
 
-// Mock fs for ClaudianService
+// Mock filesystem access used by the plugin.
 jest.mock('fs');
 
 // Now import the plugin after mocking
-import ClaudianPlugin from '@/main';
+import CodianPlugin from '@/main';
 
-describe('ClaudianPlugin', () => {
-  let plugin: ClaudianPlugin;
+
+describe('CodianPlugin', () => {
+  let plugin: CodianPlugin;
   let mockApp: any;
   let mockManifest: any;
   let mockFiles: Map<string, string>;
@@ -59,13 +58,13 @@ describe('ClaudianPlugin', () => {
     };
 
     mockManifest = {
-      id: 'claudian',
-      name: 'Claudian',
+      id: 'codian',
+      name: 'Codian',
       version: '0.1.0',
     };
 
     // Create plugin instance with mocked app
-    plugin = new ClaudianPlugin(mockApp, mockManifest);
+    plugin = new CodianPlugin(mockApp, mockManifest);
     (plugin.loadData as jest.Mock).mockResolvedValue({});
   });
 
@@ -78,13 +77,14 @@ describe('ClaudianPlugin', () => {
       expect(plugin.settings.blockedCommands).toEqual(DEFAULT_SETTINGS.blockedCommands);
     });
 
+
     // Note: With multi-tab, agentService is per-tab via TabManager, not on plugin
 
     it('should register the view', async () => {
       await plugin.onload();
 
       expect((plugin.registerView as jest.Mock)).toHaveBeenCalledWith(
-        VIEW_TYPE_CLAUDIAN,
+        VIEW_TYPE_CODIAN,
         expect.any(Function)
       );
     });
@@ -119,42 +119,10 @@ describe('ClaudianPlugin', () => {
       });
     });
 
-    it('should migrate legacy cli path to hostname-based paths and clear old field', async () => {
-      const legacyPath = '/legacy/claude';
-      mockFiles.set(
-        '.claude/codian-settings.json',
-        JSON.stringify({ claudeCliPath: legacyPath })
-      );
-      mockApp.vault.adapter.exists.mockImplementation(async (path: string) => {
-        // claudeCliPath is now in codian-settings.json
-        return mockFiles.has(path) || path === '.claude/codian-settings.json';
-      });
-      mockApp.vault.adapter.read.mockImplementation(async (path: string) => {
-        if (mockFiles.has(path)) {
-          return mockFiles.get(path);
-        }
-        if (path === '.claude/codian-settings.json') {
-          return JSON.stringify({ claudeCliPath: legacyPath });
-        }
-        return '';
-      });
-
-      await plugin.onload();
-
-      const hostname = os.hostname();
-      // Should migrate to hostname-based path
-      expect(plugin.settings.claudeCliPathsByHost[hostname]).toBe(legacyPath);
-      // Should clear legacy field after migration
-      expect(plugin.settings.claudeCliPath).toBe('');
-      // Should save settings with migrated path and cleared legacy field
-      const savedSettings = JSON.parse(mockFiles.get('.claude/codian-settings.json') ?? '{}');
-      expect(savedSettings.claudeCliPathsByHost[hostname]).toBe(legacyPath);
-      expect(savedSettings.claudeCliPath).toBe('');
-    });
   });
 
   describe('onunload', () => {
-    // Note: With multi-tab, cleanup is handled per-tab via ClaudianView.onClose()
+    // Note: With multi-tab, cleanup is handled per-tab via CodianView.onClose()
     it('should complete without error', async () => {
       await plugin.onload();
 
@@ -185,7 +153,7 @@ describe('ClaudianPlugin', () => {
 
       expect(mockApp.workspace.getRightLeaf).toHaveBeenCalledWith(false);
       expect(mockRightLeaf.setViewState).toHaveBeenCalledWith({
-        type: VIEW_TYPE_CLAUDIAN,
+        type: VIEW_TYPE_CODIAN,
         active: true,
       });
     });
@@ -214,7 +182,7 @@ describe('ClaudianPlugin', () => {
       expect(mockApp.workspace.getLeaf).toHaveBeenCalledWith('tab');
       expect(mockApp.workspace.getRightLeaf).not.toHaveBeenCalled();
       expect(mockMainLeaf.setViewState).toHaveBeenCalledWith({
-        type: VIEW_TYPE_CLAUDIAN,
+        type: VIEW_TYPE_CODIAN,
         active: true,
       });
     });
@@ -232,19 +200,19 @@ describe('ClaudianPlugin', () => {
 
   describe('loadSettings', () => {
     it('should merge saved data with defaults', async () => {
-      // Mock codian-settings.json exists with custom values (Claudian-specific settings)
+      // Mock codian-settings.json exists with custom values (Codian-specific settings)
       mockFiles.set(
-        '.claude/codian-settings.json',
+        '.codian/codian-settings.json',
         JSON.stringify({ enableBlocklist: false })
       );
       mockApp.vault.adapter.exists.mockImplementation(async (path: string) => {
-        return mockFiles.has(path) || path === '.claude/codian-settings.json';
+        return mockFiles.has(path) || path === '.codian/codian-settings.json';
       });
       mockApp.vault.adapter.read.mockImplementation(async (path: string) => {
         if (mockFiles.has(path)) {
           return mockFiles.get(path);
         }
-        if (path === '.claude/codian-settings.json') {
+        if (path === '.codian/codian-settings.json') {
           return JSON.stringify({
             enableBlocklist: false,
           });
@@ -262,17 +230,17 @@ describe('ClaudianPlugin', () => {
     it('should normalize blockedCommands when stored value is partial', async () => {
       // Mock codian-settings.json exists with partial blockedCommands
       mockFiles.set(
-        '.claude/codian-settings.json',
+        '.codian/codian-settings.json',
         JSON.stringify({ blockedCommands: { unix: ['rm -rf', '  '] } })
       );
       mockApp.vault.adapter.exists.mockImplementation(async (path: string) => {
-        return mockFiles.has(path) || path === '.claude/codian-settings.json';
+        return mockFiles.has(path) || path === '.codian/codian-settings.json';
       });
       mockApp.vault.adapter.read.mockImplementation(async (path: string) => {
         if (mockFiles.has(path)) {
           return mockFiles.get(path);
         }
-        if (path === '.claude/codian-settings.json') {
+        if (path === '.codian/codian-settings.json') {
           return JSON.stringify({
             blockedCommands: { unix: ['rm -rf', '  '] },
           });
@@ -309,22 +277,22 @@ describe('ClaudianPlugin', () => {
     it('should reconcile model from environment and persist when changed', async () => {
       // Mock codian-settings.json with environment variables
       mockFiles.set(
-        '.claude/codian-settings.json',
+        '.codian/codian-settings.json',
         JSON.stringify({
-          environmentVariables: 'ANTHROPIC_MODEL=custom-model',
+          environmentVariables: 'OPENAI_MODEL=custom-model',
           lastEnvHash: '',
         })
       );
       mockApp.vault.adapter.exists.mockImplementation(async (path: string) => {
-        return mockFiles.has(path) || path === '.claude/codian-settings.json';
+        return mockFiles.has(path) || path === '.codian/codian-settings.json';
       });
       mockApp.vault.adapter.read.mockImplementation(async (path: string) => {
         if (mockFiles.has(path)) {
           return mockFiles.get(path);
         }
-        if (path === '.claude/codian-settings.json') {
+        if (path === '.codian/codian-settings.json') {
           return JSON.stringify({
-            environmentVariables: 'ANTHROPIC_MODEL=custom-model',
+            environmentVariables: 'OPENAI_MODEL=custom-model',
             lastEnvHash: '',
           });
         }
@@ -347,15 +315,15 @@ describe('ClaudianPlugin', () => {
 
       await plugin.saveSettings();
 
-      // Claudian-specific settings should be written to .claude/codian-settings.json
+      // Codian-specific settings should be written to .codian/codian-settings.json
       // The written content should include state fields
-      const content = JSON.parse(mockFiles.get('.claude/codian-settings.json') ?? '{}');
+      const content = JSON.parse(mockFiles.get('.codian/codian-settings.json') ?? '{}');
       expect(content.enableBlocklist).toBe(false);
       expect(content).not.toHaveProperty('activeConversationId');
       expect(content).toHaveProperty('lastEnvHash');
-      expect(content).toHaveProperty('lastClaudeModel');
+      expect(content).toHaveProperty('lastCodexModel');
       expect(content).toHaveProperty('lastCustomModel');
-      // Permissions are now in .claude/settings.json (CC format), not codian-settings.json
+      // Permissions are now in .codian/settings.json (runtime format), not codian-settings.json
       expect(content).not.toHaveProperty('permissions');
     });
   });
@@ -384,7 +352,7 @@ describe('ClaudianPlugin', () => {
       const saveMetadataSpy = jest.spyOn(plugin.storage.sessions, 'saveMetadata');
       saveMetadataSpy.mockClear();
 
-      await plugin.applyEnvironmentVariables('ANTHROPIC_MODEL=claude-sonnet-4-5');
+      await plugin.applyEnvironmentVariables('OPENAI_MODEL=gpt-5.6-sol');
 
       const updated = await plugin.getConversationById(conv.id);
       expect(updated?.sessionId).toBeNull();
@@ -676,14 +644,14 @@ describe('ClaudianPlugin', () => {
       const conv = await plugin.createConversation();
       await plugin.updateConversation(conv.id, {
         messages: [
-          { id: 'msg-1', role: 'user', content: 'Hello Claude', timestamp: Date.now() },
+          { id: 'msg-1', role: 'user', content: 'Hello Codex', timestamp: Date.now() },
         ],
       });
 
       const list = plugin.getConversationList();
       const meta = list.find(c => c.id === conv.id);
 
-      expect(meta?.preview).toContain('Hello Claude');
+      expect(meta?.preview).toContain('Hello Codex');
     });
   });
 
@@ -698,8 +666,8 @@ describe('ClaudianPlugin', () => {
         updatedAt: timestamp,
         sessionId: 'saved-session',
       });
-      mockFiles.set('.claude/codian-settings.json', JSON.stringify({}));
-      mockFiles.set('.claude/sessions/conv-saved-1.jsonl', sessionJsonl);
+      mockFiles.set('.codian/codian-settings.json', JSON.stringify({}));
+      mockFiles.set('.codian/sessions/conv-saved-1.jsonl', sessionJsonl);
 
       // Mock files exist
       mockApp.vault.adapter.exists.mockImplementation(async (path: string) => {
@@ -707,18 +675,18 @@ describe('ClaudianPlugin', () => {
           return true;
         }
         // Session files
-        if (path === '.claude/sessions' || path === '.claude/sessions/conv-saved-1.jsonl') {
+        if (path === '.codian/sessions' || path === '.codian/sessions/conv-saved-1.jsonl') {
           return true;
         }
         // codian-settings.json exists
-        if (path === '.claude/codian-settings.json') {
+        if (path === '.codian/codian-settings.json') {
           return true;
         }
         return false;
       });
       mockApp.vault.adapter.list.mockImplementation(async (path: string) => {
-        if (path === '.claude/sessions') {
-          return { files: ['.claude/sessions/conv-saved-1.jsonl'], folders: [] };
+        if (path === '.codian/sessions') {
+          return { files: ['.codian/sessions/conv-saved-1.jsonl'], folders: [] };
         }
         return { files: [], folders: [] };
       });
@@ -726,10 +694,10 @@ describe('ClaudianPlugin', () => {
         if (mockFiles.has(path)) {
           return mockFiles.get(path);
         }
-        if (path === '.claude/sessions/conv-saved-1.jsonl') {
+        if (path === '.codian/sessions/conv-saved-1.jsonl') {
           return sessionJsonl;
         }
-        if (path === '.claude/codian-settings.json') {
+        if (path === '.codian/codian-settings.json') {
           return JSON.stringify({});
         }
         return '';
@@ -756,23 +724,23 @@ describe('ClaudianPlugin', () => {
         sessionId: 'saved-session',
       });
       mockFiles.set(
-        '.claude/codian-settings.json',
+        '.codian/codian-settings.json',
         JSON.stringify({
           lastEnvHash: 'old-hash',
-          environmentVariables: 'ANTHROPIC_BASE_URL=https://api.example.com',
+          environmentVariables: 'OPENAI_BASE_URL=https://api.example.com',
         })
       );
-      mockFiles.set('.claude/sessions/conv-saved-1.jsonl', sessionJsonl);
+      mockFiles.set('.codian/sessions/conv-saved-1.jsonl', sessionJsonl);
 
       mockApp.vault.adapter.exists.mockImplementation(async (path: string) => {
         return mockFiles.has(path) ||
-          path === '.claude/codian-settings.json' ||
-          path === '.claude/sessions' ||
-          path === '.claude/sessions/conv-saved-1.jsonl';
+          path === '.codian/codian-settings.json' ||
+          path === '.codian/sessions' ||
+          path === '.codian/sessions/conv-saved-1.jsonl';
       });
       mockApp.vault.adapter.list.mockImplementation(async (path: string) => {
-        if (path === '.claude/sessions') {
-          return { files: ['.claude/sessions/conv-saved-1.jsonl'], folders: [] };
+        if (path === '.codian/sessions') {
+          return { files: ['.codian/sessions/conv-saved-1.jsonl'], folders: [] };
         }
         return { files: [], folders: [] };
       });
@@ -780,14 +748,14 @@ describe('ClaudianPlugin', () => {
         if (mockFiles.has(path)) {
           return mockFiles.get(path);
         }
-        if (path === '.claude/codian-settings.json') {
+        if (path === '.codian/codian-settings.json') {
           // All these fields are now in codian-settings.json
           return JSON.stringify({
             lastEnvHash: 'old-hash',
-            environmentVariables: 'ANTHROPIC_BASE_URL=https://api.example.com',
+            environmentVariables: 'OPENAI_BASE_URL=https://api.example.com',
           });
         }
-        if (path === '.claude/sessions/conv-saved-1.jsonl') {
+        if (path === '.codian/sessions/conv-saved-1.jsonl') {
           return sessionJsonl;
         }
         return '';
@@ -801,7 +769,7 @@ describe('ClaudianPlugin', () => {
       const loaded = await plugin.getConversationById('conv-saved-1');
       expect(loaded?.sessionId).toBeNull();
 
-      const savedSession = mockFiles.get('.claude/sessions/conv-saved-1.jsonl');
+      const savedSession = mockFiles.get('.codian/sessions/conv-saved-1.jsonl');
       expect(savedSession).toBeDefined();
       const metaLine = (savedSession as string).split(/\r?\n/)[0];
       const meta = JSON.parse(metaLine);
@@ -825,32 +793,32 @@ describe('ClaudianPlugin', () => {
   });
 
   describe('Multi-session message loading', () => {
-    it('should load messages from previousSdkSessionIds when present', async () => {
+    it('should load messages from previousRuntimeSessionIds when present', async () => {
       const timestamp = Date.now();
 
-      // Setup conversation with previousSdkSessionIds
+      // Setup conversation with previousRuntimeSessionIds
       const sessionMeta = JSON.stringify({
         type: 'meta',
         id: 'conv-multi-session',
         title: 'Multi Session Chat',
         createdAt: timestamp,
         updatedAt: timestamp,
-        sdkSessionId: 'session-B',
-        previousSdkSessionIds: ['session-A'],
+        runtimeSessionId: 'session-B',
+        previousRuntimeSessionIds: ['session-A'],
         isNative: true,
       });
-      mockFiles.set('.claude/codian-settings.json', JSON.stringify({}));
-      mockFiles.set('.claude/sessions/conv-multi-session.meta.json', sessionMeta);
+      mockFiles.set('.codian/codian-settings.json', JSON.stringify({}));
+      mockFiles.set('.codian/sessions/conv-multi-session.meta.json', sessionMeta);
 
       mockApp.vault.adapter.exists.mockImplementation(async (path: string) => {
         return mockFiles.has(path) ||
-          path === '.claude/codian-settings.json' ||
-          path === '.claude/sessions' ||
-          path === '.claude/sessions/conv-multi-session.meta.json';
+          path === '.codian/codian-settings.json' ||
+          path === '.codian/sessions' ||
+          path === '.codian/sessions/conv-multi-session.meta.json';
       });
       mockApp.vault.adapter.list.mockImplementation(async (path: string) => {
-        if (path === '.claude/sessions') {
-          return { files: ['.claude/sessions/conv-multi-session.meta.json'], folders: [] };
+        if (path === '.codian/sessions') {
+          return { files: ['.codian/sessions/conv-multi-session.meta.json'], folders: [] };
         }
         return { files: [], folders: [] };
       });
@@ -858,10 +826,10 @@ describe('ClaudianPlugin', () => {
         if (mockFiles.has(path)) {
           return mockFiles.get(path);
         }
-        if (path === '.claude/sessions/conv-multi-session.meta.json') {
+        if (path === '.codian/sessions/conv-multi-session.meta.json') {
           return sessionMeta;
         }
-        if (path === '.claude/codian-settings.json') {
+        if (path === '.codian/codian-settings.json') {
           return JSON.stringify({});
         }
         return '';
@@ -872,45 +840,45 @@ describe('ClaudianPlugin', () => {
       await plugin.loadSettings();
 
       const loaded = await plugin.getConversationById('conv-multi-session');
-      expect(loaded?.previousSdkSessionIds).toEqual(['session-A']);
-      expect(loaded?.sdkSessionId).toBe('session-B');
+      expect(loaded?.previousRuntimeSessionIds).toEqual(['session-A']);
+      expect(loaded?.runtimeSessionId).toBe('session-B');
     });
 
-    it('should preserve previousSdkSessionIds through conversation updates', async () => {
+    it('should preserve previousRuntimeSessionIds through conversation updates', async () => {
       await plugin.onload();
 
       const conv = await plugin.createConversation();
       await plugin.updateConversation(conv.id, {
-        sdkSessionId: 'session-B',
-        previousSdkSessionIds: ['session-A'],
+        runtimeSessionId: 'session-B',
+        previousRuntimeSessionIds: ['session-A'],
         isNative: true,
       });
 
       const updated = await plugin.getConversationById(conv.id);
-      expect(updated?.previousSdkSessionIds).toEqual(['session-A']);
-      expect(updated?.sdkSessionId).toBe('session-B');
+      expect(updated?.previousRuntimeSessionIds).toEqual(['session-A']);
+      expect(updated?.runtimeSessionId).toBe('session-B');
 
-      // Further update should preserve previousSdkSessionIds
+      // Further update should preserve previousRuntimeSessionIds
       await plugin.updateConversation(conv.id, {
         title: 'Updated Title',
       });
 
       const afterTitleUpdate = await plugin.getConversationById(conv.id);
-      expect(afterTitleUpdate?.previousSdkSessionIds).toEqual(['session-A']);
+      expect(afterTitleUpdate?.previousRuntimeSessionIds).toEqual(['session-A']);
     });
 
-    it('should handle empty previousSdkSessionIds array', async () => {
+    it('should handle empty previousRuntimeSessionIds array', async () => {
       await plugin.onload();
 
       const conv = await plugin.createConversation();
       await plugin.updateConversation(conv.id, {
-        sdkSessionId: 'session-A',
-        previousSdkSessionIds: [],
+        runtimeSessionId: 'session-A',
+        previousRuntimeSessionIds: [],
         isNative: true,
       });
 
       const updated = await plugin.getConversationById(conv.id);
-      expect(updated?.previousSdkSessionIds).toEqual([]);
+      expect(updated?.previousRuntimeSessionIds).toEqual([]);
     });
   });
 
@@ -922,18 +890,18 @@ describe('ClaudianPlugin', () => {
       await plugin.updateConversation(conv.id, {
         isNative: true,
         forkSource: { sessionId: 'source-session-abc', resumeAt: 'asst-uuid-cutoff' },
-        // No sessionId or sdkSessionId → isPendingFork returns true
+        // No sessionId or runtimeSessionId → isPendingFork returns true
         sessionId: null,
-        sdkSessionId: undefined,
-        // Reset sdkMessagesLoaded to simulate plugin restart
-        sdkMessagesLoaded: false,
+        runtimeSessionId: undefined,
+        // Reset runtimeMessagesLoaded to simulate plugin restart
+        runtimeMessagesLoaded: false,
       });
 
-      const existsSpy = jest.spyOn(sdkSession, 'sdkSessionExists').mockReturnValue(true);
-      const loadSpy = jest.spyOn(sdkSession, 'loadSDKSessionMessages').mockResolvedValue({
+      const existsSpy = jest.spyOn(runtimeSession, 'runtimeSessionExists').mockReturnValue(true);
+      const loadSpy = jest.spyOn(runtimeSession, 'loadRuntimeSessionMessages').mockResolvedValue({
         messages: [
-          { id: 'sdk-msg-1', role: 'user', content: 'Hello', timestamp: 1000 },
-          { id: 'sdk-msg-2', role: 'assistant', content: 'Hi', timestamp: 1001 },
+          { id: 'runtime-msg-1', role: 'user', content: 'Hello', timestamp: 1000 },
+          { id: 'runtime-msg-2', role: 'assistant', content: 'Hi', timestamp: 1001 },
         ],
         skippedLines: 0,
       });
@@ -955,25 +923,25 @@ describe('ClaudianPlugin', () => {
       );
 
       // Messages should be loaded
-      expect(loaded?.sdkMessagesLoaded).toBe(true);
+      expect(loaded?.runtimeMessagesLoaded).toBe(true);
 
       existsSpy.mockRestore();
       loadSpy.mockRestore();
     });
 
-    it('should NOT use fork path when conversation has its own sdkSessionId', async () => {
+    it('should NOT use fork path when conversation has its own runtimeSessionId', async () => {
       await plugin.onload();
 
       const conv = await plugin.createConversation();
       await plugin.updateConversation(conv.id, {
         isNative: true,
         forkSource: { sessionId: 'source-session', resumeAt: 'asst-uuid' },
-        sdkSessionId: 'own-session-id',
-        sdkMessagesLoaded: false,
+        runtimeSessionId: 'own-session-id',
+        runtimeMessagesLoaded: false,
       });
 
-      const existsSpy = jest.spyOn(sdkSession, 'sdkSessionExists').mockReturnValue(true);
-      const loadSpy = jest.spyOn(sdkSession, 'loadSDKSessionMessages').mockResolvedValue({
+      const existsSpy = jest.spyOn(runtimeSession, 'runtimeSessionExists').mockReturnValue(true);
+      const loadSpy = jest.spyOn(runtimeSession, 'loadRuntimeSessionMessages').mockResolvedValue({
         messages: [],
         skippedLines: 0,
       });
@@ -998,8 +966,8 @@ describe('ClaudianPlugin', () => {
       const conv = await plugin.createConversation();
       await plugin.updateConversation(conv.id, {
         isNative: true,
-        sdkSessionId: 'session-subagent-recovery',
-        sdkMessagesLoaded: false,
+        runtimeSessionId: 'session-subagent-recovery',
+        runtimeMessagesLoaded: false,
         messages: [
           {
             id: 'assistant-1',
@@ -1039,8 +1007,8 @@ describe('ClaudianPlugin', () => {
         },
       });
 
-      const existsSpy = jest.spyOn(sdkSession, 'sdkSessionExists').mockReturnValue(true);
-      const loadSpy = jest.spyOn(sdkSession, 'loadSDKSessionMessages').mockResolvedValue({
+      const existsSpy = jest.spyOn(runtimeSession, 'runtimeSessionExists').mockReturnValue(true);
+      const loadSpy = jest.spyOn(runtimeSession, 'loadRuntimeSessionMessages').mockResolvedValue({
         messages: [],
         skippedLines: 0,
       });
@@ -1070,14 +1038,14 @@ describe('ClaudianPlugin', () => {
       loadSpy.mockRestore();
     });
 
-    it('prefers richer SDK task result over stale cached subagent result', async () => {
+    it('prefers the richer task result over stale cached subagent data', async () => {
       await plugin.onload();
 
       const conv = await plugin.createConversation();
       await plugin.updateConversation(conv.id, {
         isNative: true,
-        sdkSessionId: 'session-subagent-merge',
-        sdkMessagesLoaded: false,
+        runtimeSessionId: 'session-subagent-merge',
+        runtimeMessagesLoaded: false,
         messages: [
           {
             id: 'assistant-merge',
@@ -1090,7 +1058,7 @@ describe('ClaudianPlugin', () => {
                 name: 'Task',
                 input: { description: 'Do sub task', run_in_background: true },
                 status: 'completed',
-                result: 'Full SDK result from queue-operation',
+                result: 'Full task result from the active session',
               } as any,
             ],
             contentBlocks: [{ type: 'subagent', subagentId: 'task-merge-1', mode: 'async' }] as any,
@@ -1110,8 +1078,8 @@ describe('ClaudianPlugin', () => {
         },
       });
 
-      const existsSpy = jest.spyOn(sdkSession, 'sdkSessionExists').mockReturnValue(true);
-      const loadSpy = jest.spyOn(sdkSession, 'loadSDKSessionMessages').mockResolvedValue({
+      const existsSpy = jest.spyOn(runtimeSession, 'runtimeSessionExists').mockReturnValue(true);
+      const loadSpy = jest.spyOn(runtimeSession, 'loadRuntimeSessionMessages').mockResolvedValue({
         messages: [],
         skippedLines: 0,
       });
@@ -1124,21 +1092,21 @@ describe('ClaudianPlugin', () => {
         'session-subagent-merge',
         undefined
       );
-      expect(taskTool?.result).toBe('Full SDK result from queue-operation');
-      expect(taskTool?.subagent?.result).toBe('Full SDK result from queue-operation');
+      expect(taskTool?.result).toBe('Full task result from the active session');
+      expect(taskTool?.subagent?.result).toBe('Full task result from the active session');
 
       existsSpy.mockRestore();
       loadSpy.mockRestore();
     });
 
-    it('keeps the richer cached async result when both SDK and cache are terminal', async () => {
+    it('keeps the richer cached async result when both Runtime and cache are terminal', async () => {
       await plugin.onload();
 
       const conv = await plugin.createConversation();
       await plugin.updateConversation(conv.id, {
         isNative: true,
-        sdkSessionId: 'session-subagent-cache-richer',
-        sdkMessagesLoaded: false,
+        runtimeSessionId: 'session-subagent-cache-richer',
+        runtimeMessagesLoaded: false,
         messages: [],
         subagentData: {
           'task-merge-2': {
@@ -1155,8 +1123,8 @@ describe('ClaudianPlugin', () => {
         },
       });
 
-      const existsSpy = jest.spyOn(sdkSession, 'sdkSessionExists').mockReturnValue(true);
-      const loadSpy = jest.spyOn(sdkSession, 'loadSDKSessionMessages').mockResolvedValue({
+      const existsSpy = jest.spyOn(runtimeSession, 'runtimeSessionExists').mockReturnValue(true);
+      const loadSpy = jest.spyOn(runtimeSession, 'loadRuntimeSessionMessages').mockResolvedValue({
         messages: [
           {
             id: 'assistant-cache-richer',
@@ -1167,16 +1135,16 @@ describe('ClaudianPlugin', () => {
               {
                 id: 'task-merge-2',
                 name: 'Task',
-                input: { description: 'SDK async subagent', run_in_background: true },
+                input: { description: 'Runtime async subagent', run_in_background: true },
                 status: 'completed',
-                result: 'Short SDK result',
+                result: 'Short Runtime result',
                 subagent: {
                   id: 'task-merge-2',
-                  description: 'SDK async subagent',
+                  description: 'Runtime async subagent',
                   mode: 'async',
                   asyncStatus: 'completed',
                   status: 'completed',
-                  result: 'Short SDK result',
+                  result: 'Short Runtime result',
                   toolCalls: [],
                   isExpanded: false,
                   agentId: 'agent-cache-richer',
@@ -1206,8 +1174,8 @@ describe('ClaudianPlugin', () => {
       const conv = await plugin.createConversation();
       await plugin.updateConversation(conv.id, {
         isNative: true,
-        sdkSessionId: 'session-sync-subagent-cleanup',
-        sdkMessagesLoaded: false,
+        runtimeSessionId: 'session-sync-subagent-cleanup',
+        runtimeMessagesLoaded: false,
         messages: [
           {
             id: 'assistant-sync',
@@ -1240,8 +1208,8 @@ describe('ClaudianPlugin', () => {
         },
       });
 
-      const existsSpy = jest.spyOn(sdkSession, 'sdkSessionExists').mockReturnValue(true);
-      const loadSpy = jest.spyOn(sdkSession, 'loadSDKSessionMessages').mockResolvedValue({
+      const existsSpy = jest.spyOn(runtimeSession, 'runtimeSessionExists').mockReturnValue(true);
+      const loadSpy = jest.spyOn(runtimeSession, 'loadRuntimeSessionMessages').mockResolvedValue({
         messages: [],
         skippedLines: 0,
       });
@@ -1256,18 +1224,18 @@ describe('ClaudianPlugin', () => {
       loadSpy.mockRestore();
     });
 
-    it('prefers terminal SDK async status over stale cached running state', async () => {
+    it('prefers terminal Runtime async status over stale cached running state', async () => {
       await plugin.onload();
 
       const conv = await plugin.createConversation();
       await plugin.updateConversation(conv.id, {
         isNative: true,
-        sdkSessionId: 'session-async-sdk-terminal',
-        sdkMessagesLoaded: false,
+        runtimeSessionId: 'session-async-runtime-terminal',
+        runtimeMessagesLoaded: false,
         messages: [],
         subagentData: {
-          'task-async-sdk-terminal': {
-            id: 'task-async-sdk-terminal',
+          'task-async-runtime-terminal': {
+            id: 'task-async-runtime-terminal',
             description: 'Cached async subagent',
             mode: 'async',
             asyncStatus: 'running',
@@ -1279,61 +1247,61 @@ describe('ClaudianPlugin', () => {
         },
       });
 
-      const existsSpy = jest.spyOn(sdkSession, 'sdkSessionExists').mockReturnValue(true);
-      const loadSpy = jest.spyOn(sdkSession, 'loadSDKSessionMessages').mockResolvedValue({
+      const existsSpy = jest.spyOn(runtimeSession, 'runtimeSessionExists').mockReturnValue(true);
+      const loadSpy = jest.spyOn(runtimeSession, 'loadRuntimeSessionMessages').mockResolvedValue({
         messages: [
           {
-            id: 'assistant-sdk-terminal',
+            id: 'assistant-runtime-terminal',
             role: 'assistant',
             content: '',
             timestamp: 1000,
             toolCalls: [
               {
-                id: 'task-async-sdk-terminal',
+                id: 'task-async-runtime-terminal',
                 name: 'Task',
-                input: { description: 'SDK async subagent', run_in_background: true },
+                input: { description: 'Runtime async subagent', run_in_background: true },
                 status: 'completed',
-                result: 'Full SDK final result',
+                result: 'Full Runtime final result',
                 subagent: {
-                  id: 'task-async-sdk-terminal',
-                  description: 'SDK async subagent',
+                  id: 'task-async-runtime-terminal',
+                  description: 'Runtime async subagent',
                   mode: 'async',
                   asyncStatus: 'completed',
                   status: 'completed',
-                  result: 'Full SDK final result',
+                  result: 'Full Runtime final result',
                   toolCalls: [],
                   isExpanded: false,
-                  agentId: 'agent-sdk-terminal',
+                  agentId: 'agent-runtime-terminal',
                 },
               } as any,
             ],
-            contentBlocks: [{ type: 'subagent', subagentId: 'task-async-sdk-terminal', mode: 'async' }] as any,
+            contentBlocks: [{ type: 'subagent', subagentId: 'task-async-runtime-terminal', mode: 'async' }] as any,
           } as any,
         ],
         skippedLines: 0,
       });
 
       const loaded = await plugin.getConversationById(conv.id);
-      const taskTool = loaded?.messages[0].toolCalls?.find(tc => tc.id === 'task-async-sdk-terminal');
+      const taskTool = loaded?.messages[0].toolCalls?.find(tc => tc.id === 'task-async-runtime-terminal');
 
       expect(taskTool?.status).toBe('completed');
-      expect(taskTool?.result).toBe('Full SDK final result');
+      expect(taskTool?.result).toBe('Full Runtime final result');
       expect(taskTool?.subagent?.status).toBe('completed');
       expect(taskTool?.subagent?.asyncStatus).toBe('completed');
-      expect(taskTool?.subagent?.result).toBe('Full SDK final result');
+      expect(taskTool?.subagent?.result).toBe('Full Runtime final result');
 
       existsSpy.mockRestore();
       loadSpy.mockRestore();
     });
 
-    it('prefers cached terminal async status over SDK launch-only running state', async () => {
+    it('prefers cached terminal async status over Runtime launch-only running state', async () => {
       await plugin.onload();
 
       const conv = await plugin.createConversation();
       await plugin.updateConversation(conv.id, {
         isNative: true,
-        sdkSessionId: 'session-async-cache-terminal',
-        sdkMessagesLoaded: false,
+        runtimeSessionId: 'session-async-cache-terminal',
+        runtimeMessagesLoaded: false,
         messages: [],
         subagentData: {
           'task-async-cache-terminal': {
@@ -1350,11 +1318,11 @@ describe('ClaudianPlugin', () => {
         },
       });
 
-      const existsSpy = jest.spyOn(sdkSession, 'sdkSessionExists').mockReturnValue(true);
-      const loadSpy = jest.spyOn(sdkSession, 'loadSDKSessionMessages').mockResolvedValue({
+      const existsSpy = jest.spyOn(runtimeSession, 'runtimeSessionExists').mockReturnValue(true);
+      const loadSpy = jest.spyOn(runtimeSession, 'loadRuntimeSessionMessages').mockResolvedValue({
         messages: [
           {
-            id: 'assistant-sdk-running',
+            id: 'assistant-runtime-running',
             role: 'assistant',
             content: '',
             timestamp: 1000,
@@ -1362,12 +1330,12 @@ describe('ClaudianPlugin', () => {
               {
                 id: 'task-async-cache-terminal',
                 name: 'Task',
-                input: { description: 'SDK async subagent', run_in_background: true },
+                input: { description: 'Runtime async subagent', run_in_background: true },
                 status: 'running',
                 result: 'Task launched in background.',
                 subagent: {
                   id: 'task-async-cache-terminal',
-                  description: 'SDK async subagent',
+                  description: 'Runtime async subagent',
                   mode: 'async',
                   asyncStatus: 'running',
                   status: 'running',
@@ -1403,8 +1371,8 @@ describe('ClaudianPlugin', () => {
       const conv = await plugin.createConversation();
       await plugin.updateConversation(conv.id, {
         isNative: true,
-        sdkSessionId: 'session-async-subagent-recovery',
-        sdkMessagesLoaded: false,
+        runtimeSessionId: 'session-async-subagent-recovery',
+        runtimeMessagesLoaded: false,
         messages: [
           {
             id: 'assistant-1',
@@ -1437,8 +1405,8 @@ describe('ClaudianPlugin', () => {
         },
       });
 
-      const existsSpy = jest.spyOn(sdkSession, 'sdkSessionExists').mockReturnValue(true);
-      const loadSpy = jest.spyOn(sdkSession, 'loadSDKSessionMessages').mockResolvedValue({
+      const existsSpy = jest.spyOn(runtimeSession, 'runtimeSessionExists').mockReturnValue(true);
+      const loadSpy = jest.spyOn(runtimeSession, 'loadRuntimeSessionMessages').mockResolvedValue({
         messages: [],
         skippedLines: 0,
       });
@@ -1466,94 +1434,14 @@ describe('ClaudianPlugin', () => {
       loadSpy.mockRestore();
     });
 
-    it('hydrates async subagent tool calls from SDK subagent files on reload', async () => {
-      await plugin.onload();
-
-      const conv = await plugin.createConversation();
-      await plugin.updateConversation(conv.id, {
-        isNative: true,
-        sdkSessionId: 'session-async-subagent-tools',
-        sdkMessagesLoaded: false,
-        messages: [
-          {
-            id: 'assistant-1',
-            role: 'assistant',
-            content: '',
-            timestamp: 1000,
-            toolCalls: [
-              {
-                id: 'task-async-tools',
-                name: 'Task',
-                input: { description: 'Do background task', run_in_background: true },
-                status: 'completed',
-                result: 'Task started',
-              } as any,
-            ],
-            contentBlocks: [{ type: 'subagent', subagentId: 'task-async-tools', mode: 'async' }] as any,
-          } as any,
-        ],
-        subagentData: {
-          'task-async-tools': {
-            id: 'task-async-tools',
-            description: 'Recovered async subagent',
-            mode: 'async',
-            asyncStatus: 'completed',
-            status: 'completed',
-            result: 'Recovered async result',
-            agentId: 'agent-a123',
-            toolCalls: [],
-            isExpanded: false,
-          } as any,
-        },
-      });
-
-      const existsSpy = jest.spyOn(sdkSession, 'sdkSessionExists').mockReturnValue(true);
-      const loadSpy = jest.spyOn(sdkSession, 'loadSDKSessionMessages').mockResolvedValue({
-        messages: [],
-        skippedLines: 0,
-      });
-      const loadSubagentToolsSpy = jest.spyOn(sdkSession, 'loadSubagentToolCalls').mockResolvedValue([
-        {
-          id: 'sub-tool-1',
-          name: 'Bash',
-          input: { command: 'ls' },
-          status: 'completed',
-          result: 'ok',
-          isExpanded: false,
-        } as any,
-      ]);
-
-      const loaded = await plugin.getConversationById(conv.id);
-      const taskTool = loaded?.messages[0].toolCalls?.find(tc => tc.id === 'task-async-tools');
-
-      expect(loadSubagentToolsSpy).toHaveBeenCalledWith(
-        expect.any(String),
-        'session-async-subagent-tools',
-        'agent-a123'
-      );
-      expect(taskTool?.subagent?.toolCalls).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            id: 'sub-tool-1',
-            name: 'Bash',
-            result: 'ok',
-          }),
-        ])
-      );
-
-      existsSpy.mockRestore();
-      loadSpy.mockRestore();
-      loadSubagentToolsSpy.mockRestore();
-    });
-
     it('keeps async subagent renderer visible when task block and task tool call are both missing', async () => {
       await plugin.onload();
 
       const conv = await plugin.createConversation();
       await plugin.updateConversation(conv.id, {
         isNative: true,
-        sdkSessionId: 'session-async-subagent-fallback',
-        sdkMessagesLoaded: false,
+        runtimeSessionId: 'session-async-subagent-fallback',
+        runtimeMessagesLoaded: false,
         messages: [
           {
             id: 'assistant-1',
@@ -1577,8 +1465,8 @@ describe('ClaudianPlugin', () => {
         },
       });
 
-      const existsSpy = jest.spyOn(sdkSession, 'sdkSessionExists').mockReturnValue(true);
-      const loadSpy = jest.spyOn(sdkSession, 'loadSDKSessionMessages').mockResolvedValue({
+      const existsSpy = jest.spyOn(runtimeSession, 'runtimeSessionExists').mockReturnValue(true);
+      const loadSpy = jest.spyOn(runtimeSession, 'loadRuntimeSessionMessages').mockResolvedValue({
         messages: [],
         skippedLines: 0,
       });

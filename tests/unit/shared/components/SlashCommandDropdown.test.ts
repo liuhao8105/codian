@@ -58,22 +58,22 @@ function getRenderedCommandNames(containerEl: any): string[] {
   return getRenderedItems(containerEl).map(i => i.name);
 }
 
-// SDK commands for testing
-const SDK_COMMANDS: SlashCommand[] = [
-  { id: 'sdk:commit', name: 'commit', description: 'Create a git commit', content: '', source: 'sdk' },
-  { id: 'sdk:pr', name: 'pr', description: 'Create a pull request', content: '', source: 'sdk' },
-  { id: 'sdk:review', name: 'review', description: 'Review code', content: '', source: 'sdk' },
-  { id: 'sdk:my-custom', name: 'my-custom', description: 'Custom command', content: '', source: 'sdk' },
-  { id: 'sdk:compact', name: 'compact', description: 'Compact context', content: '', source: 'sdk' },
+// Runtime commands for testing
+const Runtime_COMMANDS: SlashCommand[] = [
+  { id: 'runtime:commit', name: 'commit', description: 'Create a git commit', content: '', source: 'runtime' },
+  { id: 'runtime:pr', name: 'pr', description: 'Create a pull request', content: '', source: 'runtime' },
+  { id: 'runtime:review', name: 'review', description: 'Review code', content: '', source: 'runtime' },
+  { id: 'runtime:my-custom', name: 'my-custom', description: 'Custom command', content: '', source: 'runtime' },
+  { id: 'runtime:compact', name: 'compact', description: 'Compact context', content: '', source: 'runtime' },
 ];
 
-// Commands that should be filtered out (not shown in Claudian)
-const FILTERED_SDK_COMMANDS_LIST: SlashCommand[] = [
-  { id: 'sdk:context', name: 'context', description: 'Show context', content: '', source: 'sdk' },
-  { id: 'sdk:cost', name: 'cost', description: 'Show cost', content: '', source: 'sdk' },
-  { id: 'sdk:init', name: 'init', description: 'Initialize project', content: '', source: 'sdk' },
-  { id: 'sdk:release-notes', name: 'release-notes', description: 'Release notes', content: '', source: 'sdk' },
-  { id: 'sdk:security-review', name: 'security-review', description: 'Security review', content: '', source: 'sdk' },
+// Commands that should be filtered out (not shown in Codian)
+const FILTERED_Runtime_COMMANDS_LIST: SlashCommand[] = [
+  { id: 'runtime:context', name: 'context', description: 'Show context', content: '', source: 'runtime' },
+  { id: 'runtime:cost', name: 'cost', description: 'Show cost', content: '', source: 'runtime' },
+  { id: 'runtime:init', name: 'init', description: 'Initialize project', content: '', source: 'runtime' },
+  { id: 'runtime:release-notes', name: 'release-notes', description: 'Release notes', content: '', source: 'runtime' },
+  { id: 'runtime:security-review', name: 'security-review', description: 'Security review', content: '', source: 'runtime' },
 ];
 
 describe('SlashCommandDropdown', () => {
@@ -142,9 +142,9 @@ describe('SlashCommandDropdown', () => {
     });
   });
 
-  describe('FILTERED_SDK_COMMANDS filtering', () => {
+  describe('FILTERED_Runtime_COMMANDS filtering', () => {
     it('should filter out context, cost, init, release-notes, security-review', async () => {
-      const allSdkCommands = [...SDK_COMMANDS, ...FILTERED_SDK_COMMANDS_LIST];
+      const allSdkCommands = [...Runtime_COMMANDS, ...FILTERED_Runtime_COMMANDS_LIST];
       const getSdkCommands = jest.fn().mockResolvedValue(allSdkCommands);
 
       const dropdownWithSdk = new SlashCommandDropdown(
@@ -158,7 +158,7 @@ describe('SlashCommandDropdown', () => {
       inputEl.selectionStart = 1;
       dropdownWithSdk.handleInputChange();
 
-      // Wait for async SDK fetch
+      // Wait for async Runtime fetch
       await new Promise(resolve => setTimeout(resolve, 10));
 
       const commandNames = getRenderedCommandNames(containerEl);
@@ -170,7 +170,7 @@ describe('SlashCommandDropdown', () => {
       expect(commandNames).not.toContain('release-notes');
       expect(commandNames).not.toContain('security-review');
 
-      // Should include other SDK commands
+      // Should include other Runtime commands
       expect(commandNames).toContain('commit');
       expect(commandNames).toContain('compact');
       expect(commandNames).toContain('pr');
@@ -182,8 +182,8 @@ describe('SlashCommandDropdown', () => {
   });
 
   describe('hidden commands filtering', () => {
-    it('should filter out user-hidden commands from SDK commands', async () => {
-      const getSdkCommands = jest.fn().mockResolvedValue(SDK_COMMANDS);
+    it('should filter out user-hidden commands from Runtime commands', async () => {
+      const getSdkCommands = jest.fn().mockResolvedValue(Runtime_COMMANDS);
       const hiddenCommands = new Set(['commit', 'pr']);
 
       const dropdownWithHidden = new SlashCommandDropdown(
@@ -201,11 +201,11 @@ describe('SlashCommandDropdown', () => {
 
       const commandNames = getRenderedCommandNames(containerEl);
 
-      // Hidden SDK commands should not appear
+      // Hidden Runtime commands should not appear
       expect(commandNames).not.toContain('commit');
       expect(commandNames).not.toContain('pr');
 
-      // Non-hidden SDK commands should appear
+      // Non-hidden Runtime commands should appear
       expect(commandNames).toContain('review');
       expect(commandNames).toContain('my-custom');
 
@@ -213,7 +213,7 @@ describe('SlashCommandDropdown', () => {
     });
 
     it('should NOT filter out built-in commands even if in hiddenCommands', async () => {
-      const getSdkCommands = jest.fn().mockResolvedValue(SDK_COMMANDS);
+      const getSdkCommands = jest.fn().mockResolvedValue(Runtime_COMMANDS);
       // Try to hide built-in command 'clear'
       const hiddenCommands = new Set(['clear', 'add-dir']);
 
@@ -242,12 +242,12 @@ describe('SlashCommandDropdown', () => {
 
   describe('deduplication', () => {
     it('should deduplicate commands by name (built-in takes priority)', async () => {
-      // SDK has a command with same name as built-in
-      const sdkWithDuplicate: SlashCommand[] = [
-        { id: 'sdk:clear', name: 'clear', description: 'SDK clear command', content: '', source: 'sdk' },
-        { id: 'sdk:commit', name: 'commit', description: 'Create commit', content: '', source: 'sdk' },
+      // Runtime has a command with same name as built-in
+      const runtimeWithDuplicate: SlashCommand[] = [
+        { id: 'runtime:clear', name: 'clear', description: 'Runtime clear command', content: '', source: 'runtime' },
+        { id: 'runtime:commit', name: 'commit', description: 'Create commit', content: '', source: 'runtime' },
       ];
-      const getSdkCommands = jest.fn().mockResolvedValue(sdkWithDuplicate);
+      const getSdkCommands = jest.fn().mockResolvedValue(runtimeWithDuplicate);
 
       const dropdownWithSdk = new SlashCommandDropdown(
         containerEl,
@@ -273,9 +273,9 @@ describe('SlashCommandDropdown', () => {
     });
   });
 
-  describe('SDK command caching', () => {
-    it('should cache SDK commands after first successful fetch', async () => {
-      const getSdkCommands = jest.fn().mockResolvedValue(SDK_COMMANDS);
+  describe('Runtime command caching', () => {
+    it('should cache Runtime commands after first successful fetch', async () => {
+      const getSdkCommands = jest.fn().mockResolvedValue(Runtime_COMMANDS);
 
       const dropdownWithSdk = new SlashCommandDropdown(
         containerEl,
@@ -304,7 +304,7 @@ describe('SlashCommandDropdown', () => {
     it('should retry fetch when previous result was empty', async () => {
       const getSdkCommands = jest.fn()
         .mockResolvedValueOnce([]) // First call returns empty
-        .mockResolvedValueOnce(SDK_COMMANDS); // Second call returns commands
+        .mockResolvedValueOnce(Runtime_COMMANDS); // Second call returns commands
 
       const dropdownWithSdk = new SlashCommandDropdown(
         containerEl,
@@ -332,8 +332,8 @@ describe('SlashCommandDropdown', () => {
 
     it('should retry fetch when previous call threw error', async () => {
       const getSdkCommands = jest.fn()
-        .mockRejectedValueOnce(new Error('SDK not ready'))
-        .mockResolvedValueOnce(SDK_COMMANDS);
+        .mockRejectedValueOnce(new Error('Runtime not ready'))
+        .mockResolvedValueOnce(Runtime_COMMANDS);
 
       const dropdownWithSdk = new SlashCommandDropdown(
         containerEl,
@@ -368,7 +368,7 @@ describe('SlashCommandDropdown', () => {
       const getSdkCommands = jest.fn()
         .mockReturnValueOnce(firstPromise)
         .mockResolvedValueOnce([
-          { id: 'sdk:new', name: 'new-command', description: 'New', content: '', source: 'sdk' },
+          { id: 'runtime:new', name: 'new-command', description: 'New', content: '', source: 'runtime' },
         ]);
 
       const dropdownWithSdk = new SlashCommandDropdown(
@@ -389,7 +389,7 @@ describe('SlashCommandDropdown', () => {
       await new Promise(resolve => setTimeout(resolve, 10));
 
       // Now resolve the first (stale) request
-      resolveFirst!(SDK_COMMANDS);
+      resolveFirst!(Runtime_COMMANDS);
       await new Promise(resolve => setTimeout(resolve, 10));
 
       // Render dropdown with cached commands to verify stale results were discarded
@@ -410,7 +410,7 @@ describe('SlashCommandDropdown', () => {
 
   describe('setHiddenCommands', () => {
     it('should update hidden commands set', async () => {
-      const getSdkCommands = jest.fn().mockResolvedValue(SDK_COMMANDS);
+      const getSdkCommands = jest.fn().mockResolvedValue(Runtime_COMMANDS);
 
       const dropdownWithSdk = new SlashCommandDropdown(
         containerEl,
@@ -442,8 +442,8 @@ describe('SlashCommandDropdown', () => {
   });
 
   describe('resetSdkSkillsCache', () => {
-    it('should clear cached SDK skills and allow refetch', async () => {
-      const getSdkCommands = jest.fn().mockResolvedValue(SDK_COMMANDS);
+    it('should clear cached Runtime skills and allow refetch', async () => {
+      const getSdkCommands = jest.fn().mockResolvedValue(Runtime_COMMANDS);
 
       const dropdownWithSdk = new SlashCommandDropdown(
         containerEl,
@@ -535,7 +535,7 @@ describe('SlashCommandDropdown', () => {
 
   describe('search filtering', () => {
     it('should filter commands by name', async () => {
-      const getSdkCommands = jest.fn().mockResolvedValue(SDK_COMMANDS);
+      const getSdkCommands = jest.fn().mockResolvedValue(Runtime_COMMANDS);
 
       const dropdownWithSdk = new SlashCommandDropdown(
         containerEl,
@@ -557,7 +557,7 @@ describe('SlashCommandDropdown', () => {
     });
 
     it('should filter commands by description', async () => {
-      const getSdkCommands = jest.fn().mockResolvedValue(SDK_COMMANDS);
+      const getSdkCommands = jest.fn().mockResolvedValue(Runtime_COMMANDS);
 
       const dropdownWithSdk = new SlashCommandDropdown(
         containerEl,
@@ -588,7 +588,7 @@ describe('SlashCommandDropdown', () => {
     });
 
     it('should sort results alphabetically', async () => {
-      const getSdkCommands = jest.fn().mockResolvedValue(SDK_COMMANDS);
+      const getSdkCommands = jest.fn().mockResolvedValue(Runtime_COMMANDS);
 
       const dropdownWithSdk = new SlashCommandDropdown(
         containerEl,

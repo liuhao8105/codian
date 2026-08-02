@@ -42,7 +42,7 @@ export interface AgentMentionItem {
   /** Brief description */
   description?: string;
   /** Source of the agent */
-  source: 'plugin' | 'vault' | 'global' | 'builtin';
+  source: 'vault' | 'global' | 'builtin';
 }
 
 export interface AgentFolderMentionItem {
@@ -55,7 +55,7 @@ export interface AgentMentionProvider {
     id: string;
     name: string;
     description?: string;
-    source: 'plugin' | 'vault' | 'global' | 'builtin';
+    source: 'vault' | 'global' | 'builtin';
   }>;
 }
 

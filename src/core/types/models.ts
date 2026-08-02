@@ -2,12 +2,10 @@
  * Model type definitions and constants.
  */
 
-import type { SdkBeta } from '@anthropic-ai/claude-agent-sdk';
-
 /** Model identifier (string to support custom models via environment variables). */
-export type ClaudeModel = string;
+export type AgentModel = string;
 
-export const DEFAULT_CODEX_MODELS: { value: ClaudeModel; label: string; description: string }[] = [
+export const DEFAULT_CODEX_MODELS: { value: AgentModel; label: string; description: string }[] = [
   { value: 'gpt-5.6-sol', label: 'GPT-5.6-Sol', description: '最新旗舰 Agent 编码模型' },
   { value: 'gpt-5.6-terra', label: 'GPT-5.6-Terra', description: '适合日常工作的均衡 Agent 编码模型' },
   { value: 'gpt-5.6-luna', label: 'GPT-5.6-Luna', description: '快速且经济的 Agent 编码模型' },
@@ -16,13 +14,11 @@ export const DEFAULT_CODEX_MODELS: { value: ClaudeModel; label: string; descript
   { value: 'gpt-5.4-mini', label: 'GPT-5.4-Mini', description: '适合简单编码任务的轻量模型' },
 ];
 
-export const DEFAULT_CLAUDE_MODELS = DEFAULT_CODEX_MODELS;
-
 const RETIRED_CODEX_MODELS = new Set(['gpt-5.2', 'gpt-5.3-codex']);
 
 export interface CodexModelCatalog {
-  models: { value: ClaudeModel; label: string; description: string }[];
-  defaultModel: ClaudeModel;
+  models: { value: AgentModel; label: string; description: string }[];
+  defaultModel: AgentModel;
   thinkingBudgets: Record<string, ThinkingBudget>;
 }
 
@@ -132,35 +128,6 @@ export function reconcileCodexModelSelection(
   return { model: defaultModel, migrated: true };
 }
 
-export const BETA_1M_CONTEXT: SdkBeta = 'context-1m-2025-08-07';
-
-export interface ModelWithBetas {
-  model: string;
-  betas: SdkBeta[];
-}
-
-export interface ModelWithoutBetas {
-  model: string;
-  betas?: undefined;
-}
-
-/** Resolves a model to its base model and optional beta flags. */
-export function resolveModelWithBetas(model: string, include1MBeta: true): ModelWithBetas;
-export function resolveModelWithBetas(model: string, include1MBeta?: false): ModelWithoutBetas;
-export function resolveModelWithBetas(model: string, include1MBeta: boolean): ModelWithBetas | ModelWithoutBetas;
-export function resolveModelWithBetas(model: string, include1MBeta = false): ModelWithBetas | ModelWithoutBetas {
-  if (!model || typeof model !== 'string') {
-    throw new Error('resolveModelWithBetas: model is required and must be a non-empty string');
-  }
-  if (include1MBeta) {
-    return {
-      model,
-      betas: [BETA_1M_CONTEXT],
-    };
-  }
-  return { model };
-}
-
 export type ThinkingBudget = 'off' | 'low' | 'medium' | 'high' | 'xhigh';
 
 export const THINKING_BUDGETS: { value: ThinkingBudget; label: string; tokens: number }[] = [
@@ -182,11 +149,8 @@ export const DEFAULT_THINKING_BUDGET: Record<string, ThinkingBudget> = {
 };
 
 export const CONTEXT_WINDOW_STANDARD = 200_000;
-export const CONTEXT_WINDOW_1M = 1_000_000;
-
 export function getContextWindowSize(
   model: string,
-  is1MEnabled = false,
   customLimits?: Record<string, number>
 ): number {
   if (customLimits && model in customLimits) {
@@ -196,9 +160,5 @@ export function getContextWindowSize(
     }
   }
 
-  // Legacy 1M handling is retained only for backward compatibility.
-  if (is1MEnabled && model.includes('sonnet')) {
-    return CONTEXT_WINDOW_1M;
-  }
   return CONTEXT_WINDOW_STANDARD;
 }

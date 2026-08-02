@@ -1,7 +1,6 @@
-import type { HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk';
-
 import { getInlineEditSystemPrompt } from '../../core/prompts/inlineEdit';
 import { execCodexPrompt } from '../../core/runtime/codexExec';
+import type { HookCallbackMatcher } from '../../core/runtime/contracts';
 import { getPathFromToolInput } from '../../core/tools/toolInput';
 import {
   isReadOnlyTool,
@@ -191,7 +190,7 @@ export function createVaultRestrictionHook(vaultPath: string): HookCallbackMatch
           hookSpecificOutput: {
             hookEventName: 'PreToolUse' as const,
             permissionDecision: 'deny' as const,
-            permissionDecisionReason: `Access denied: Path "${filePath}" is outside allowed paths. Inline edit is restricted to vault and ~/.claude/ directories.`,
+            permissionDecisionReason: `Access denied: Path "${filePath}" is outside allowed paths. Inline edit is restricted to vault and ~/.codian/ directories.`,
           },
         };
       },

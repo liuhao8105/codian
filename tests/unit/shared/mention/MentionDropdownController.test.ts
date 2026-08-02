@@ -79,7 +79,7 @@ function createMockMcpService(servers: Array<{ name: string }> = []): McpMention
 function createMockAgentService(agents: Array<{
   id: string;
   name: string;
-  source: 'plugin' | 'vault' | 'global' | 'builtin';
+  source: 'vault' | 'global' | 'builtin';
 }> = []): AgentMentionProvider {
   return {
     searchAgents: jest.fn((query: string) => {

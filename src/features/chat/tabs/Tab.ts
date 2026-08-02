@@ -8,7 +8,7 @@ import {
   createInstructionRuntime,
   createTitleRuntime,
 } from '../../../core/runtime';
-import type { ChatMessage, ClaudeModel, Conversation, PermissionMode, SlashCommand, StreamChunk, ThinkingBudget } from '../../../core/types';
+import type { AgentModel, ChatMessage, Conversation, PermissionMode, SlashCommand, StreamChunk, ThinkingBudget } from '../../../core/types';
 import { getContextWindowSize } from '../../../core/types';
 import { t } from '../../../i18n';
 import type CodianPlugin from '../../../main';
@@ -227,7 +227,7 @@ function buildTabDOM(contentEl: HTMLElement): TabDOMElements {
 }
 
 /**
- * Initializes the tab's CodianService (lazy initialization).
+ * Initializes the tab's agent runtime (lazy initialization).
  * Call this when the tab becomes active or when the first message is sent.
  *
  * Session ID resolution:
@@ -276,7 +276,7 @@ export async function initializeTabService(
       }
     }
 
-    // Ensure SDK process is ready
+    // Ensure Runtime process is ready
     // - Existing chat: with sessionId for resume
     // - New chat: without sessionId
     service.ensureReady({
@@ -348,7 +348,7 @@ function initializeContextManagers(tab: TabData, plugin: CodianPlugin): void {
 
 /**
  * Initializes slash command dropdown for a tab.
- * @param getSdkCommands Callback to get SDK commands from any ready service (shared across tabs).
+ * @param getSdkCommands Callback to get Runtime commands from any ready service (shared across tabs).
  * @param getHiddenCommands Callback to get current hidden commands from settings.
  */
 function initializeSlashCommands(
@@ -457,7 +457,7 @@ function initializeInputToolbar(tab: TabData, plugin: CodianPlugin): void {
         tab.ui.thinkingBudgetSelector?.updateDisplay();
       }
     },
-    onModelChange: async (model: ClaudeModel) => {
+    onModelChange: async (model: AgentModel) => {
       await plugin.setCurrentModel(model);
       tab.ui.thinkingBudgetSelector?.updateDisplay();
       tab.ui.modelSelector?.updateDisplay();
@@ -466,7 +466,7 @@ function initializeInputToolbar(tab: TabData, plugin: CodianPlugin): void {
       // Recalculate context usage percentage for the new model's context window
       const currentUsage = tab.state.usage;
       if (currentUsage) {
-        const newContextWindow = getContextWindowSize(model, plugin.settings.show1MModel, plugin.settings.customContextLimits);
+        const newContextWindow = getContextWindowSize(model, plugin.settings.customContextLimits);
         const newPercentage = Math.min(100, Math.max(0, Math.round((currentUsage.contextTokens / newContextWindow) * 100)));
         tab.state.usage = {
           ...currentUsage,
@@ -551,7 +551,7 @@ export function initializeTabUI(
   dom.canvasIndicatorEl = dom.contextRowEl.createDiv({ cls: 'codian-canvas-indicator' });
   dom.canvasIndicatorEl.style.display = 'none';
 
-  // Initialize slash commands with shared SDK commands callback and hidden commands
+  // Initialize slash commands with shared Runtime commands callback and hidden commands
   initializeSlashCommands(
     tab,
     options.getSdkCommands,
@@ -627,7 +627,7 @@ function resolveForkSource(tab: TabData, plugin: CodianPlugin): ForkSource | nul
 
   if (!sourceSessionId && tab.conversationId) {
     const conversation = plugin.getConversationSync(tab.conversationId);
-    sourceSessionId = conversation?.sdkSessionId ?? conversation?.sessionId ?? conversation?.forkSource?.sessionId ?? null;
+    sourceSessionId = conversation?.runtimeSessionId ?? conversation?.sessionId ?? conversation?.forkSource?.sessionId ?? null;
   }
 
   if (!sourceSessionId) {
@@ -666,7 +666,7 @@ async function handleForkRequest(
     return;
   }
 
-  if (!msgs[userIdx].sdkUserUuid) {
+  if (!msgs[userIdx].runtimeUserUuid) {
     new Notice(t('chat.fork.unavailableNoUuid'));
     return;
   }
@@ -710,8 +710,8 @@ async function handleForkAll(
 
   let lastAssistantUuid: string | undefined;
   for (let i = msgs.length - 1; i >= 0; i--) {
-    if (msgs[i].role === 'assistant' && msgs[i].sdkAssistantUuid) {
-      lastAssistantUuid = msgs[i].sdkAssistantUuid;
+    if (msgs[i].role === 'assistant' && msgs[i].runtimeAssistantUuid) {
+      lastAssistantUuid = msgs[i].runtimeAssistantUuid;
       break;
     }
   }
@@ -1193,10 +1193,10 @@ export function setupServiceCallbacks(tab: TabData, plugin: CodianPlugin): void 
     tab.service.setAutoTurnCallback((chunks: StreamChunk[]) => {
       renderAutoTriggeredTurn(tab, chunks);
     });
-    tab.service.setPermissionModeSyncCallback((sdkMode) => {
+    tab.service.setPermissionModeSyncCallback((runtimeMode) => {
       let mode: PermissionMode;
-      if (sdkMode === 'bypassPermissions') mode = 'yolo';
-      else if (sdkMode === 'plan') mode = 'plan';
+      if (runtimeMode === 'bypassPermissions') mode = 'yolo';
+      else if (runtimeMode === 'plan') mode = 'plan';
       else mode = 'normal';
 
       if (plugin.settings.permissionMode !== mode) {
@@ -1227,13 +1227,13 @@ function renderAutoTriggeredTurn(tab: TabData, chunks: StreamChunk[]): void {
     chunk => chunk.type === 'tool_use' || chunk.type === 'tool_result'
   );
   let textContent = '';
-  let sdkAssistantUuid: string | undefined;
+  let runtimeAssistantUuid: string | undefined;
 
   for (const chunk of chunks) {
     if (chunk.type === 'text') {
       textContent += chunk.content;
-    } else if (chunk.type === 'sdk_assistant_uuid') {
-      sdkAssistantUuid = chunk.uuid;
+    } else if (chunk.type === 'runtime_assistant_uuid') {
+      runtimeAssistantUuid = chunk.uuid;
     }
   }
 
@@ -1242,12 +1242,12 @@ function renderAutoTriggeredTurn(tab: TabData, chunks: StreamChunk[]): void {
   const content = textContent.trim() || '(background task completed)';
 
   const assistantMsg: ChatMessage = {
-    id: sdkAssistantUuid ?? generateMessageId(),
+    id: runtimeAssistantUuid ?? generateMessageId(),
     role: 'assistant',
     content,
     timestamp: Date.now(),
     contentBlocks: [{ type: 'text', content }],
-    ...(sdkAssistantUuid && { sdkAssistantUuid }),
+    ...(runtimeAssistantUuid && { runtimeAssistantUuid }),
   };
 
   tab.state.addMessage(assistantMsg);

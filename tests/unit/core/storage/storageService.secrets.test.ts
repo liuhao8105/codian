@@ -17,9 +17,9 @@ function createBackend(available = true): SecretStorageBackend {
 
 function createPlugin(initialSettings: Record<string, unknown>) {
   const files = new Map<string, string>([
-    ['.claude/codian-settings.json', JSON.stringify(initialSettings)],
+    ['.codian/codian-settings.json', JSON.stringify(initialSettings)],
   ]);
-  const folders = new Set<string>(['.claude']);
+  const folders = new Set<string>(['.codex']);
   let pluginData: Record<string, unknown> = {};
   const adapter = {
     exists: jest.fn(async (path: string) => files.has(path) || folders.has(path)),
@@ -86,15 +86,15 @@ describe('StorageService secure settings', () => {
 
     const initialized = await storage.initialize();
 
-    expect(initialized.claudian.providerConfigs.deepseek.apiKey).toBe('sk-legacy');
-    expect(initialized.claudian.environmentVariables).toBe('TOKEN=legacy-token');
-    const vaultSettings = JSON.parse(files.get('.claude/codian-settings.json')!);
+    expect(initialized.codian.providerConfigs.deepseek.apiKey).toBe('sk-legacy');
+    expect(initialized.codian.environmentVariables).toBe('TOKEN=legacy-token');
+    const vaultSettings = JSON.parse(files.get('.codian/codian-settings.json')!);
     expect(vaultSettings.providerConfigs.deepseek.apiKey).toBe('');
     expect(vaultSettings.environmentVariables).toBe('');
     expect(vaultSettings.envSnippets[0].envVars).toBe('');
-    expect(files.get('.claude/codian-settings.json.bak')).not.toContain('sk-legacy');
-    expect(files.get('.claude/codian-settings.json.bak')).not.toContain('legacy-token');
-    expect(files.get('.claude/codian-settings.json.bak')).not.toContain('legacy-snippet');
+    expect(files.get('.codian/codian-settings.json.bak')).not.toContain('sk-legacy');
+    expect(files.get('.codian/codian-settings.json.bak')).not.toContain('legacy-token');
+    expect(files.get('.codian/codian-settings.json.bak')).not.toContain('legacy-snippet');
     expect(JSON.stringify(getPluginData())).not.toContain('sk-legacy');
     expect(JSON.stringify(getPluginData())).not.toContain('legacy-token');
   });
@@ -106,11 +106,11 @@ describe('StorageService secure settings', () => {
       new SecureSecretStorage(plugin, createBackend()),
     );
     const initialized = await storage.initialize();
-    initialized.claudian.environmentVariables = 'NEW_TOKEN=new-secret';
+    initialized.codian.environmentVariables = 'NEW_TOKEN=new-secret';
 
-    await storage.saveCodianSettings(initialized.claudian);
+    await storage.saveCodianSettings(initialized.codian);
 
-    expect(files.get('.claude/codian-settings.json')).not.toContain('new-secret');
+    expect(files.get('.codian/codian-settings.json')).not.toContain('new-secret');
     await expect(storage.loadCodianSettings()).resolves.toEqual(
       expect.objectContaining({ environmentVariables: 'NEW_TOKEN=new-secret' })
     );
@@ -125,7 +125,7 @@ describe('StorageService secure settings', () => {
 
     const initialized = await storage.initialize();
 
-    expect(initialized.claudian.environmentVariables).toBe('TOKEN=legacy-token');
-    expect(files.get('.claude/codian-settings.json')).toContain('legacy-token');
+    expect(initialized.codian.environmentVariables).toBe('TOKEN=legacy-token');
+    expect(files.get('.codian/codian-settings.json')).toContain('legacy-token');
   });
 });

@@ -98,7 +98,7 @@
     "titleModel": {
       "name": "Modèle de génération de titre",
       "desc": "Modèle utilisé pour générer automatiquement les titres de conversation.",
-      "auto": "Automatique (Haiku)"
+      "auto": "Automatique (GPT-5.6-Luna)"
     },
     "navMappings": {
       "name": "Mappages de navigation style Vim",
@@ -153,10 +153,6 @@
       "name": "Serveurs MCP",
       "desc": "Configurez les serveurs Model Context Protocol pour étendre les capacités de Codex avec des outils et sources de données externes. Les serveurs avec mode de sauvegarde de contexte nécessitent une @mention pour s'activer."
     },
-    "plugins": {
-      "name": "Plugins hérités",
-      "desc": "Activez ou désactivez les plugins hérités découverts dans ~/.claude/plugins. Les plugins activés sont stockés par coffre."
-    },
     "subagents": {
       "name": "Sous-agents",
       "desc": "Configurez des sous-agents personnalisés auxquels Codex peut déléguer.",
@@ -196,10 +192,6 @@
       }
     },
     "safety": "Sécurité",
-    "loadUserSettings": {
-      "name": "Charger les paramètres utilisateur hérités",
-      "desc": "Charge ~/.claude/settings.json pour assurer la compatibilité pendant la migration. Lorsqu'activé, ces règles de permission héritées peuvent contourner le mode sécurisé."
-    },
     "enableBlocklist": {
       "name": "Activer la liste noire de commandes",
       "desc": "Bloque les commandes bash potentiellement dangereuses"
@@ -244,14 +236,6 @@
       "invalid": "Format invalide. Utilisez : 256k, 1m ou nombre exact (1000-10000000)."
     },
     "advanced": "Avancé",
-    "show1MModel": {
-      "name": "Activer Sonnet avec fenêtre de contexte de 1M",
-      "desc": "Remplacer Sonnet standard par Sonnet (1M) dans le sélecteur de modèles. Même tarif sous 200k tokens. Nécessite un abonnement Max."
-    },
-    "enableChrome": {
-      "name": "Activer l'extension Chrome",
-      "desc": "Permettre à Codian d'interagir avec Chrome via l'extension claude-in-chrome. L'extension doit être installée. Nécessite un redémarrage de session."
-    },
     "enableBangBash": {
       "name": "Activer le mode bash (!)",
       "desc": "Saisissez ! dans un champ vide pour passer en mode bash. Exécute les commandes directement via le child_process de Node.js. Nécessite de rouvrir la vue.",

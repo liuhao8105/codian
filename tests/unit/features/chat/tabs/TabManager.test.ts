@@ -1525,7 +1525,7 @@ describe('TabManager - forkToNewTab at max tabs', () => {
 });
 
 describe('TabManager - createForkConversation', () => {
-  it('should set sdkMessagesLoaded to true on fork conversation', async () => {
+  it('should set runtimeMessagesLoaded to true on fork conversation', async () => {
     const mockCreateConversation = jest.fn().mockResolvedValue({ id: 'fork-conv-1' });
     const mockUpdateConversation = jest.fn().mockResolvedValue(undefined);
 
@@ -1545,7 +1545,7 @@ describe('TabManager - createForkConversation', () => {
     });
 
     expect(mockUpdateConversation).toHaveBeenCalledWith('fork-conv-1', expect.objectContaining({
-      sdkMessagesLoaded: true,
+      runtimeMessagesLoaded: true,
     }));
   });
 

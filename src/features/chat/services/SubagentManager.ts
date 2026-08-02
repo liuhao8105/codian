@@ -12,7 +12,7 @@ import {
   extractAgentIdFromToolUseResult,
   extractXmlTag,
   resolveToolUseResultStatus,
-} from '../../../utils/sdkSession';
+} from '../../../utils/runtimeSession';
 import { extractFinalResultFromSubagentJsonl } from '../../../utils/subagentJsonl';
 import {
   addSubagentToolCall,
@@ -373,7 +373,7 @@ export class SubagentManager {
     const extractedResult = this.extractAgentResult(result, agentId ?? '', toolUseResult);
 
     // The chunk's is_error flag can be unreliable for async subagent results
-    // (SDK may set is_error on the content block even when the agent succeeded).
+    // (Runtime may set is_error on the content block even when the agent succeeded).
     // Prefer the structured toolUseResult to determine actual error status.
     const resolvedStatus = resolveToolUseResultStatus(
       toolUseResult,
@@ -412,15 +412,6 @@ export class SubagentManager {
     }
 
     return undefined;
-  }
-
-  /**
-   * Re-renders an async subagent after data-only updates (for example,
-   * hydrating tool calls from SDK sidecar files) without changing lifecycle state.
-   */
-  public refreshAsyncSubagent(subagent: SubagentInfo): void {
-    this.updateAsyncDomState(subagent);
-    this.onStateChange(subagent);
   }
 
   // ============================================
@@ -879,7 +870,7 @@ export class SubagentManager {
       ?? this.extractResultFromCandidateString(record.output);
     if (result) return result;
 
-    // SDK subagent format: { status, content: [{type:"text",text:"..."}], agentId, ... }
+    // Runtime subagent format: { status, content: [{type:"text",text:"..."}], agentId, ... }
     if (Array.isArray(record.content)) {
       const firstText = (record.content as Array<Record<string, unknown>>)
         .find((b) => b && typeof b === 'object' && b.type === 'text' && typeof b.text === 'string');

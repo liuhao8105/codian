@@ -3,7 +3,7 @@ const os = require('os');
 const path = require('path');
 
 const jestPath = require.resolve('jest/bin/jest');
-const localStorageFile = path.join(os.tmpdir(), 'claudian-localstorage');
+const localStorageFile = path.join(os.tmpdir(), 'codian-localstorage');
 const forwardedArgs = process.argv.slice(2);
 const localStorageArgs = process.allowedNodeEnvironmentFlags?.has(
   '--localstorage-file'

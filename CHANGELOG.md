@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.86-provider-cleanup
+
+- Consolidated execution on the Codex App Server and the optional DeepSeek provider.
+- Moved all plugin-owned vault data under `.codian/` with verified, recoverable migration.
+- Removed retired compatibility settings, dependencies, UI controls, runtime adapters, and documentation.
+- Added release checks that reject retired provider markers from source, filenames, dependencies, and the production bundle.
+
 ## Unreleased
 
 ### What changed
@@ -14,12 +21,12 @@
 - Added a startup watchdog that rebuilds a turn once when an MCP remains stuck before any model or tool activity, then returns an actionable error instead of waiting forever if recovery also stalls.
 - MCP discovery reads only sanitized section names from the local Codex configuration; transport configuration, environment variables, headers, and credentials are never persisted or logged by Codian.
 - Added a local-memory system inspired by [`supermemoryai/supermemory`](https://github.com/supermemoryai/supermemory)'s `memory / recall / context / profile` model, implemented entirely inside the local Obsidian vault.
-- Added `.claude/local-memory/memories.jsonl` for structured local memories and `.claude/local-memory/profile.md` as a stable profile placeholder.
+- Added `.codian/local-memory/memories.jsonl` for structured local memories and `.codian/local-memory/profile.md` as a stable profile placeholder.
 - Added `/remember [要记住的内容]` to save a local memory and `/recall [搜索关键词]` to search local memories.
 - Added automatic local-memory recall during normal chat turns, injecting relevant memories as hidden background context.
 - Added settings for enabling local memory and configuring the vault-relative local-memory directory.
 - Localized built-in slash command descriptions and argument hints to Chinese.
-- Clarified that this feature is built in `liuhao8105/codian`, which is derived from [`YishenTu/claudian`](https://github.com/YishenTu/claudian), and only references Supermemory's product logic.
+- Clarified that the local-memory implementation only references Supermemory's product logic.
 - No Supermemory cloud API, MCP endpoint, API key, remote database, or third-party cloud memory service is used by this local implementation.
 - Fixed streamed reply rendering so multi-part Codex answers are separated into visible paragraphs instead of being merged into one long block.
 - Fixed image input for the `Codex App Server` adapter by sending the correct `localImage` item type.
@@ -48,8 +55,7 @@ Initial public Codian release.
 
 ### What changed
 
-- Forked and adapted the open-source [`YishenTu/claudian`](https://github.com/YishenTu/claudian) project for `Codex`.
-- Reworked the Obsidian plugin identity from `Claudian / Claude` to `Codian / Codex`.
+- Established the `Codian` plugin identity and integrated the Codex runtime.
 - Switched the main chat runtime to `Codex App Server` with real streaming output.
 - Added image understanding for pasted, dropped, and embedded note images.
 - Fixed conversation recovery, current-note context restore, and history reload after restarting Obsidian.
@@ -57,5 +63,5 @@ Initial public Codian release.
 
 ### Notes
 
-- This repository preserves the original upstream MIT license notice.
+- The repository license notice is preserved.
 - GitHub Actions workflow files are not included in this initial push because the current GitHub token does not have `workflow` scope.

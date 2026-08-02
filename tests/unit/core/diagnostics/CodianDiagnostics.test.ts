@@ -3,7 +3,7 @@ import type CodianPlugin from '@/main';
 
 describe('CodianDiagnostics', () => {
   it('builds a bounded local snapshot without paths, usernames, or secrets', async () => {
-    const secretPath = '/Users/private-person/Vault/.claude/sessions/session-1.jsonl';
+    const secretPath = '/Users/private-person/Vault/.codian/sessions/session-1.jsonl';
     const plugin = {
       manifest: { version: '1.3.84-test' },
       settings: {
@@ -29,7 +29,7 @@ describe('CodianDiagnostics', () => {
         vault: {
           adapter: {
             exists: jest.fn(async () => true),
-            list: jest.fn(async (folder: string) => folder === '.claude'
+            list: jest.fn(async (folder: string) => folder === '.codian'
               ? { files: [secretPath], folders: [] }
               : { files: [], folders: [] }),
             stat: jest.fn(async () => ({ type: 'file', ctime: 0, mtime: 0, size: 123 })),
@@ -46,7 +46,8 @@ describe('CodianDiagnostics', () => {
       plugin: { version: '1.3.84-test' },
       runtime: { provider: 'deepseek', permissionMode: 'normal' },
       storage: {
-        claude: { files: 1, bytes: 123, truncated: false },
+        root: '.codian',
+        codian: { files: 1, bytes: 123, truncated: false },
         recovery: { total: 2, pending: 1, reverted: 1 },
       },
     });

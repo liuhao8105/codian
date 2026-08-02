@@ -1,7 +1,6 @@
 /** Permission utilities for tool action approval. */
 
-import type { PermissionUpdate, PermissionUpdateDestination } from '@anthropic-ai/claude-agent-sdk';
-
+import type { PermissionUpdate, PermissionUpdateDestination } from '../runtime/contracts';
 import {
   TOOL_BASH,
   TOOL_EDIT,
@@ -83,9 +82,9 @@ export function matchesRulePattern(
   // This is intentional - Bash commands require explicit wildcards for security.
   // Supported formats:
   //   - "git *" matches "git status", "git commit", etc.
-  //   - "npm:*" matches "npm install", "npm run", etc. (CC format)
+  //   - "npm:*" matches "npm install", "npm run", etc. (runtime format)
   if (toolName === TOOL_BASH) {
-    // CC format "npm:*" — colon is a separator, not part of the prefix
+    // runtime format "npm:*" — colon is a separator, not part of the prefix
     if (normalizedRule.endsWith(':*')) {
       const prefix = normalizedRule.slice(0, -2);
       return matchesBashPrefix(normalizedAction, prefix);
@@ -144,9 +143,9 @@ function matchesBashPrefix(action: string, prefix: string): boolean {
 }
 
 /**
- * Convert a user allow decision + SDK suggestions into PermissionUpdate[].
+ * Convert a user allow decision + Runtime suggestions into PermissionUpdate[].
  *
- * Only handles allow decisions — deny results use the SDK's bare deny path
+ * Only handles allow decisions — deny results use the Runtime's bare deny path
  * (PermissionResult deny variant has no updatedPermissions field).
  *
  * Overrides destination on addRules/replaceRules suggestions to match the user's choice.

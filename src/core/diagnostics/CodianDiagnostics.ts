@@ -34,7 +34,12 @@ export interface CodianDiagnosticsSnapshot {
     retainedLegacyPlaintext: boolean;
   };
   storage: {
-    claude: StorageTotals;
+    root: '.codian';
+    codian: StorageTotals;
+    migration: {
+      status: 'verified' | 'not-needed' | 'unknown';
+      fileCount: number;
+    };
     recovery: RecoveryTotals;
   };
   warnings: string[];
@@ -62,9 +67,10 @@ export class CodianDiagnostics {
   constructor(private readonly plugin: CodianPlugin) {}
 
   async buildSnapshot(): Promise<CodianDiagnosticsSnapshot> {
-    const [secureStorage, claude, recoveryEntries] = await Promise.all([
+    const [secureStorage, codian, migration, recoveryEntries] = await Promise.all([
       this.plugin.storage.getSecretStorageStatus(),
-      this.scanClaudeStorage(),
+      this.scanCodianStorage(),
+      this.readMigrationStatus(),
       this.plugin.storage.recovery.getAll(),
     ]);
     const recovery = countRecoveryStates(recoveryEntries.map(entry => entry.state));
@@ -73,7 +79,7 @@ export class CodianDiagnostics {
     if (!secureStorage.available) warnings.push('secure-storage-unavailable');
     if (secureStorage.stored && !secureStorage.readable) warnings.push('secure-record-unreadable');
     if (secureStorage.retainedLegacyPlaintext) warnings.push('legacy-plaintext-retained');
-    if (claude.truncated) warnings.push('storage-scan-truncated');
+    if (codian.truncated) warnings.push('storage-scan-truncated');
     if (recovery.pending > 0) warnings.push('recovery-pending');
 
     return {
@@ -88,20 +94,42 @@ export class CodianDiagnostics {
       },
       secureStorage,
       storage: {
-        claude,
+        root: '.codian',
+        codian,
+        migration,
         recovery,
       },
       warnings,
     };
   }
 
-  private async scanClaudeStorage(): Promise<StorageTotals> {
+  private async readMigrationStatus(): Promise<CodianDiagnosticsSnapshot['storage']['migration']> {
+    const adapter = this.plugin.app.vault.adapter;
+    const receiptPath = '.codian/.migration-receipt.json';
+    try {
+      if (await adapter.exists(receiptPath)) {
+        const receipt = JSON.parse(await adapter.read(receiptPath)) as { fileCount?: unknown };
+        return {
+          status: 'verified',
+          fileCount: typeof receipt.fileCount === 'number' ? receipt.fileCount : 0,
+        };
+      }
+      return {
+        status: await adapter.exists('.codian') ? 'not-needed' : 'unknown',
+        fileCount: 0,
+      };
+    } catch {
+      return { status: 'unknown', fileCount: 0 };
+    }
+  }
+
+  private async scanCodianStorage(): Promise<StorageTotals> {
     const adapter = this.plugin.app.vault.adapter;
     try {
-      if (!(await adapter.exists('.claude'))) return emptyStorageTotals();
+      if (!(await adapter.exists('.codian'))) return emptyStorageTotals();
 
       const totals = emptyStorageTotals();
-      const folders = ['.claude'];
+      const folders = ['.codian'];
       let visitedEntries = 0;
 
       while (folders.length > 0 && !totals.truncated) {

@@ -98,7 +98,7 @@
     "titleModel": {
       "name": "Titel-Generierungsmodell",
       "desc": "Modell zur automatischen Generierung von Konversationstiteln.",
-      "auto": "Automatisch (Haiku)"
+      "auto": "Automatisch (GPT-5.6-Luna)"
     },
     "navMappings": {
       "name": "Vim-Style Navigationszuordnungen",
@@ -153,10 +153,6 @@
       "name": "MCP-Server",
       "desc": "Konfiguriere Model Context Protocol Server, um Codex mit externen Tools und Datenquellen zu erweitern. Server mit Kontext-Speichermodus benötigen @mention zur Aktivierung."
     },
-    "plugins": {
-      "name": "Legacy-Plugins",
-      "desc": "Aktiviere oder deaktiviere Legacy-Plugins aus ~/.claude/plugins. Aktivierte Plugins werden pro Vault gespeichert."
-    },
     "subagents": {
       "name": "Sub-Agenten",
       "desc": "Konfiguriere benutzerdefinierte Sub-Agenten, an die Codex delegieren kann.",
@@ -196,10 +192,6 @@
       }
     },
     "safety": "Sicherheit",
-    "loadUserSettings": {
-      "name": "Legacy-Benutzereinstellungen laden",
-      "desc": "Lädt ~/.claude/settings.json für die Kompatibilität während der Migration. Wenn aktiviert, können diese Legacy-Berechtigungsregeln den Sicherheitsmodus umgehen."
-    },
     "enableBlocklist": {
       "name": "Befehlsblockliste aktivieren",
       "desc": "Blockiert potenziell gefährliche Bash-Befehle"
@@ -244,14 +236,6 @@
       "invalid": "Ungültiges Format. Verwenden Sie: 256k, 1m oder exakte Anzahl (1000-10000000)."
     },
     "advanced": "Erweitert",
-    "show1MModel": {
-      "name": "Sonnet mit 1M-Kontextfenster aktivieren",
-      "desc": "Standard-Sonnet durch Sonnet (1M) in der Modellauswahl ersetzen. Gleiche Preise unter 200k Token. Erfordert Max-Abonnement."
-    },
-    "enableChrome": {
-      "name": "Chrome-Erweiterung aktivieren",
-      "desc": "Erlaubt Codian die Interaktion mit Chrome über die claude-in-chrome-Erweiterung. Die Erweiterung muss installiert sein. Erfordert Neustart der Sitzung."
-    },
     "enableBangBash": {
       "name": "Bash-Modus (!) aktivieren",
       "desc": "Gib ! in ein leeres Eingabefeld ein, um den Bash-Modus zu starten. Führt Befehle direkt über Node.js child_process aus. Die Ansicht muss neu geöffnet werden.",

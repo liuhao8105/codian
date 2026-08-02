@@ -12,14 +12,13 @@ Core modules have **no feature dependencies**. Features depend on core, never th
 | `hooks/` | Security hooks | `SecurityHooks` |
 | `images/` | Image caching | SHA-256 dedup, base64 encoding |
 | `mcp/` | Model Context Protocol | `McpServerManager`, `McpTester` |
-| `plugins/` | Upstream plugin compatibility | `PluginManager` |
 | `prompts/` | System prompts | `mainAgent`, `inlineEdit`, `instructionRefine`, `titleGeneration` |
 | `runtime/` | Codex execution runtime | `CodexAgentRuntime`, `CodexAppServerClient`, `codexExec` |
-| `sdk/` | Legacy session parsing / compatibility transforms | `transformSDKMessage`, `typeGuards`, `types` |
+| `runtime/` | Legacy session parsing / compatibility transforms | `transformRuntimeMessage`, `typeGuards`, `types` |
 | `security/` | Access control | `ApprovalManager` (permission utilities), `BashPathValidator`, `BlocklistChecker` |
-| `storage/` | Persistence layer | `StorageService`, `SessionStorage`, `CCSettingsStorage`, `CodianSettingsStorage`, `McpStorage`, `SkillStorage`, `SlashCommandStorage`, `VaultFileAdapter` |
+| `storage/` | Persistence layer | `StorageService`, `SessionStorage`, `RuntimeSettingsStorage`, `CodianSettingsStorage`, `McpStorage`, `SkillStorage`, `SlashCommandStorage`, `VaultFileAdapter` |
 | `tools/` | Tool utilities | `toolNames` (incl. plan mode tools), `toolIcons`, `toolInput`, `todo` |
-| `types/` | Type definitions | `settings`, `agent`, `mcp`, `chat`, `tools`, `models`, `sdk`, `plugins`, `diff` |
+| `types/` | Type definitions | `settings`, `agent`, `mcp`, `chat`, `tools`, `models`, `runtime`, `plugins`, `diff` |
 
 ## Dependency Rules
 
@@ -27,7 +26,7 @@ Core modules have **no feature dependencies**. Features depend on core, never th
 types/ ← (all modules can import)
 storage/ ← security/, agent/, mcp/
 security/ ← agent/
-sdk/ ← agent/
+runtime/ ← agent/
 hooks/ ← agent/
 prompts/ ← runtime/
 runtime/ ← prompts/, mcp/, storage helper types
@@ -55,9 +54,9 @@ await client.request('turn/start', params);
 
 ### Storage
 ```typescript
-// Settings in vault/.claude/settings.json and .claude/claudian-settings.json
-await CCSettingsStorage.load(vaultPath);
-await CCSettingsStorage.save(vaultPath, settings);
+// Settings in vault/.codian/settings.json and .codian/codian-settings.json
+await RuntimeSettingsStorage.load(vaultPath);
+await RuntimeSettingsStorage.save(vaultPath, settings);
 
 // Conversation metadata overlay
 await SessionStorage.loadSession(vaultPath, sessionId);

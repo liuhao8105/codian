@@ -25,10 +25,10 @@ describe('extractDiffData', () => {
     expect(result!.stats).toEqual({ added: 1, removed: 1 });
   });
 
-  it('uses SDK filePath when present in toolUseResult', () => {
+  it('uses Runtime filePath when present in toolUseResult', () => {
     const toolCall = makeToolCall('Write', { file_path: 'input/path.ts' });
     const toolUseResult = {
-      filePath: 'sdk/override.ts',
+      filePath: 'runtime/override.ts',
       structuredPatch: [
         { oldStart: 1, oldLines: 0, newStart: 1, newLines: 1, lines: ['+hello'] },
       ],
@@ -37,7 +37,7 @@ describe('extractDiffData', () => {
     const result = extractDiffData(toolUseResult, toolCall);
 
     expect(result).toBeDefined();
-    expect(result!.filePath).toBe('sdk/override.ts');
+    expect(result!.filePath).toBe('runtime/override.ts');
   });
 
   it('falls back to diffFromToolInput when toolUseResult is undefined', () => {

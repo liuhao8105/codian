@@ -2,7 +2,7 @@ import { createHash } from 'crypto';
 
 import type { VaultFileAdapter } from './VaultFileAdapter';
 
-export const RECOVERY_JOURNAL_PATH = '.claude/recovery-journal.json';
+export const RECOVERY_JOURNAL_PATH = '.codian/recovery-journal.json';
 export const MAX_RECOVERY_SNAPSHOT_BYTES = 1024 * 1024;
 export const MAX_RECOVERY_JOURNAL_BYTES = 8 * 1024 * 1024;
 export const MAX_RECOVERY_ENTRIES = 50;

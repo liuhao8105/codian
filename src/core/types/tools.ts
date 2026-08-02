@@ -4,7 +4,7 @@
 
 import type { DiffLine, DiffStats } from './diff';
 
-/** Diff data for Write/Edit tool operations (pre-computed from SDK structuredPatch). */
+/** Diff data for Write/Edit tool operations (pre-computed from Runtime structuredPatch). */
 export interface ToolDiffData {
   filePath: string;
   diffLines: DiffLine[];

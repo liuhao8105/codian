@@ -9,7 +9,7 @@ argument-hint: "[file] [focus]"
 allowed-tools:
   - Read
   - Grep
-model: claude-sonnet-4-5
+model: gpt-5.6-sol
 ---
 Review this code: $ARGUMENTS`;
 
@@ -18,7 +18,7 @@ Review this code: $ARGUMENTS`;
       expect(parsed.description).toBe('Review code for issues');
       expect(parsed.argumentHint).toBe('[file] [focus]');
       expect(parsed.allowedTools).toEqual(['Read', 'Grep']);
-      expect(parsed.model).toBe('claude-sonnet-4-5');
+      expect(parsed.model).toBe('gpt-5.6-sol');
       expect(parsed.promptContent).toBe('Review this code: $ARGUMENTS');
     });
 
@@ -168,7 +168,7 @@ Prompt`;
 description: |
   Multi-line description
   with multiple lines
-model: claude-sonnet-4-5
+model: gpt-5.6-sol
 allowed-tools:
   - Read
   - Write
@@ -178,14 +178,14 @@ Prompt content`;
       const parsed = parseSlashCommandContent(content);
 
       expect(parsed.description).toBe('Multi-line description\nwith multiple lines');
-      expect(parsed.model).toBe('claude-sonnet-4-5');
+      expect(parsed.model).toBe('gpt-5.6-sol');
       expect(parsed.allowedTools).toEqual(['Read', 'Write']);
       expect(parsed.promptContent).toBe('Prompt content');
     });
 
     it('should handle block scalar at end of frontmatter', () => {
       const content = `---
-model: claude-haiku-4-5
+model: gpt-5.6-luna
 description: |
   Last field in frontmatter
   with multiple lines
@@ -195,7 +195,7 @@ Prompt`;
       const parsed = parseSlashCommandContent(content);
 
       expect(parsed.description).toBe('Last field in frontmatter\nwith multiple lines');
-      expect(parsed.model).toBe('claude-haiku-4-5');
+      expect(parsed.model).toBe('gpt-5.6-luna');
     });
 
     it('should preserve indentation within block scalar content', () => {
@@ -266,7 +266,7 @@ Prompt`;
     it('should handle empty block scalar followed by another field', () => {
       const content = `---
 description: |
-model: claude-sonnet-4-5
+model: gpt-5.6-sol
 ---
 Prompt`;
 
@@ -274,21 +274,21 @@ Prompt`;
 
       // Empty block scalar yields no description (semantically same as absent)
       expect(parsed.description).toBeUndefined();
-      expect(parsed.model).toBe('claude-sonnet-4-5');
+      expect(parsed.model).toBe('gpt-5.6-sol');
     });
 
     it('should handle block scalar with only empty lines before next field', () => {
       const content = `---
 description: |
 
-model: claude-sonnet-4-5
+model: gpt-5.6-sol
 ---
 Prompt`;
 
       const parsed = parseSlashCommandContent(content);
 
       // Empty lines followed by unindented field should end the block scalar
-      expect(parsed.model).toBe('claude-sonnet-4-5');
+      expect(parsed.model).toBe('gpt-5.6-sol');
     });
 
     it('should handle strip chomping indicator (|-)', () => {
@@ -527,7 +527,7 @@ disableModelInvocation: true
 userInvocable: true
 context: fork
 agent: code-reviewer
-model: sonnet
+model: GPT-5.6-Sol
 ---
 Do the thing`;
 
@@ -537,7 +537,7 @@ Do the thing`;
       expect(parsed.userInvocable).toBe(true);
       expect(parsed.context).toBe('fork');
       expect(parsed.agent).toBe('code-reviewer');
-      expect(parsed.model).toBe('sonnet');
+      expect(parsed.model).toBe('GPT-5.6-Sol');
       expect(parsed.promptContent).toBe('Do the thing');
     });
 
@@ -622,7 +622,7 @@ describe('serializeSlashCommandMarkdown', () => {
       description: 'Test command',
       argumentHint: '[file]',
       allowedTools: ['Read', 'Grep'],
-      model: 'claude-sonnet-4-5',
+      model: 'gpt-5.6-sol',
       disableModelInvocation: true,
       userInvocable: false,
       context: 'fork',
@@ -635,7 +635,7 @@ describe('serializeSlashCommandMarkdown', () => {
     expect(result).toContain('allowed-tools:');
     expect(result).toContain('  - Read');
     expect(result).toContain('  - Grep');
-    expect(result).toContain('model: claude-sonnet-4-5');
+    expect(result).toContain('model: gpt-5.6-sol');
     expect(result).toContain('disable-model-invocation: true');
     expect(result).toContain('user-invocable: false');
     expect(result).toContain('context: fork');

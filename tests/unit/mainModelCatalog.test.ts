@@ -47,7 +47,7 @@ describe('CodianPlugin dynamic Codex model catalog', () => {
       ...DEFAULT_SETTINGS,
       model: 'gpt-5.2',
       thinkingBudget: 'off',
-      lastClaudeModel: 'gpt-5.2',
+      lastCodexModel: 'gpt-5.2',
     };
     const saveSettings = jest.spyOn(plugin, 'saveSettings').mockResolvedValue(undefined);
     const refreshCodexModelCatalog = (plugin as any).refreshCodexModelCatalog;
@@ -62,7 +62,7 @@ describe('CodianPlugin dynamic Codex model catalog', () => {
     ]);
     expect(plugin.settings.model).toBe('gpt-5.6-sol');
     expect(plugin.settings.thinkingBudget).toBe('low');
-    expect(plugin.settings.lastClaudeModel).toBe('gpt-5.6-sol');
+    expect(plugin.settings.lastCodexModel).toBe('gpt-5.6-sol');
     expect(plugin.getDefaultThinkingBudgetForModel('gpt-5.5')).toBe('medium');
     expect(saveSettings).toHaveBeenCalledTimes(1);
     expect(killMock).toHaveBeenCalledTimes(1);

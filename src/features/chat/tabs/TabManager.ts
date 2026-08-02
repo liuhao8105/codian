@@ -114,7 +114,7 @@ export class TabManager implements TabManagerInterface {
       },
     });
 
-    // Initialize UI components with shared SDK commands callback
+    // Initialize UI components with shared Runtime commands callback
     initializeTabUI(tab, this.plugin, {
       getSdkCommands: () => this.getSdkCommands(),
     });
@@ -447,9 +447,9 @@ export class TabManager implements TabManagerInterface {
     await this.plugin.updateConversation(conversation.id, {
       messages: context.messages,
       forkSource: { sessionId: context.sourceSessionId, resumeAt: context.resumeAt },
-      // Prevent immediate SDK message load from merging duplicates with the copied messages.
+      // Prevent immediate Runtime message load from merging duplicates with the copied messages.
       // This is in-memory only (not persisted in metadata).
-      sdkMessagesLoaded: true,
+      runtimeMessagesLoaded: true,
       ...(title && { title }),
       ...(context.currentNote && { currentNote: context.currentNote }),
     });
@@ -548,13 +548,13 @@ export class TabManager implements TabManagerInterface {
   }
 
   // ============================================
-  // SDK Commands (Shared)
+  // Runtime Commands (Shared)
   // ============================================
 
   /**
-   * Gets SDK supported commands from any ready service.
+   * Gets Runtime supported commands from any ready service.
    * The command list is the same for all tabs, so we just need one ready service.
-   * @returns Array of SDK commands, or empty array if no service is ready.
+   * @returns Array of Runtime commands, or empty array if no service is ready.
    */
   async getSdkCommands(): Promise<SlashCommand[]> {
     // Find any tab with a ready service
@@ -571,7 +571,7 @@ export class TabManager implements TabManagerInterface {
   // ============================================
 
   /**
-   * Broadcasts a function call to all tabs' CodianService instances.
+   * Broadcasts a function call to all initialized tab runtimes.
    * Used by settings managers to apply configuration changes to all tabs.
    * @param fn Function to call on each service.
    */

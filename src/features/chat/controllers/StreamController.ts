@@ -14,12 +14,11 @@ import {
   TOOL_WRITE,
 } from '../../../core/tools/toolNames';
 import type { ChatMessage, ContentBlock,StreamChunk, SubagentInfo, ToolCallInfo } from '../../../core/types';
-import type { SDKToolUseResult } from '../../../core/types/diff';
+import type { RuntimeToolUseResult } from '../../../core/types/diff';
 import type CodianPlugin from '../../../main';
 import { formatDurationMmSs } from '../../../utils/date';
 import { extractDiffData } from '../../../utils/diff';
 import { getVaultPath, normalizePathForVault } from '../../../utils/path';
-import { loadSubagentFinalResult, loadSubagentToolCalls } from '../../../utils/sdkSession';
 import { FLAVOR_TEXTS } from '../constants';
 import {
   appendThinkingContent,
@@ -55,7 +54,6 @@ export interface StreamControllerDeps {
 }
 
 export class StreamController {
-  private static readonly ASYNC_SUBAGENT_RESULT_RETRY_DELAYS_MS = [200, 600, 1500] as const;
   private static readonly PLAN_BLOCK_ID = 'live-plan';
 
   private deps: StreamControllerDeps;
@@ -247,12 +245,12 @@ export class StreamController {
         break;
       }
 
-      case 'sdk_assistant_uuid':
-        msg.sdkAssistantUuid = chunk.uuid;
+      case 'runtime_assistant_uuid':
+        msg.runtimeAssistantUuid = chunk.uuid;
         break;
 
-      case 'sdk_user_uuid':
-      case 'sdk_user_sent':
+      case 'runtime_user_uuid':
+      case 'runtime_user_sent':
         break;
 
       case 'usage': {
@@ -265,7 +263,7 @@ export class StreamController {
         ) {
           break;
         }
-        // Skip usage updates when subagents ran (SDK reports cumulative usage including subagents)
+        // Skip usage updates when subagents ran (Runtime reports cumulative usage including subagents)
         if (this.deps.subagentManager.subagentsSpawnedThisStream > 0) {
           break;
         }
@@ -402,7 +400,7 @@ export class StreamController {
       }
     }
 
-    // Track Write to ~/.claude/plans/ for plan mode (used by approve-new-session)
+    // Track writes to the Codian plan directory for plan mode.
     if (chunk.name === TOOL_WRITE) {
       this.capturePlanFilePath(chunk.input);
     }
@@ -419,7 +417,7 @@ export class StreamController {
 
   private capturePlanFilePath(input: Record<string, unknown>): void {
     const filePath = input.file_path as string | undefined;
-    if (filePath && filePath.replace(/\\/g, '/').includes('/.claude/plans/')) {
+    if (filePath && filePath.replace(/\\/g, '/').includes('/.codian/plans/')) {
       this.deps.state.planFilePath = filePath;
     }
   }
@@ -464,7 +462,7 @@ export class StreamController {
   }
 
   private async handleToolResult(
-    chunk: { type: 'tool_result'; id: string; content: string; isError?: boolean; toolUseResult?: SDKToolUseResult },
+    chunk: { type: 'tool_result'; id: string; content: string; isError?: boolean; toolUseResult?: RuntimeToolUseResult },
     msg: ChatMessage
   ): Promise<void> {
     const { state, subagentManager } = this.deps;
@@ -827,119 +825,7 @@ export class StreamController {
       chunk.toolUseResult
     );
 
-    await this.hydrateAsyncSubagentToolCalls(handled);
-
     return isLinked || handled !== undefined;
-  }
-
-  private async hydrateAsyncSubagentToolCalls(subagent: SubagentInfo | undefined): Promise<void> {
-    if (!subagent) return;
-    if (subagent.mode !== 'async') return;
-    if (!subagent.agentId) return;
-
-    const asyncStatus = subagent.asyncStatus ?? subagent.status;
-    if (asyncStatus !== 'completed' && asyncStatus !== 'error') return;
-
-    const sessionId = this.deps.getAgentService?.()?.getSessionId();
-    if (!sessionId) return;
-
-    const vaultPath = getVaultPath(this.deps.plugin.app);
-    if (!vaultPath) return;
-
-    const { hasHydrated, finalResultHydrated } = await this.tryHydrateAsyncSubagent(
-      subagent,
-      vaultPath,
-      sessionId,
-      true
-    );
-
-    if (hasHydrated) {
-      this.deps.subagentManager.refreshAsyncSubagent(subagent);
-    }
-
-    if (!finalResultHydrated) {
-      this.scheduleAsyncSubagentResultRetry(subagent, vaultPath, sessionId, 0);
-    }
-  }
-
-  private async tryHydrateAsyncSubagent(
-    subagent: SubagentInfo,
-    vaultPath: string,
-    sessionId: string,
-    hydrateToolCalls: boolean
-  ): Promise<{ hasHydrated: boolean; finalResultHydrated: boolean }> {
-    let hasHydrated = false;
-    let finalResultHydrated = false;
-
-    if (hydrateToolCalls && !subagent.toolCalls?.length) {
-      const recoveredToolCalls = await loadSubagentToolCalls(
-        vaultPath,
-        sessionId,
-        subagent.agentId || ''
-      );
-      if (recoveredToolCalls.length > 0) {
-        subagent.toolCalls = recoveredToolCalls.map((toolCall) => ({
-          ...toolCall,
-          input: { ...toolCall.input },
-        }));
-        hasHydrated = true;
-      }
-    }
-
-    const recoveredFinalResult = await loadSubagentFinalResult(
-      vaultPath,
-      sessionId,
-      subagent.agentId || ''
-    );
-    if (recoveredFinalResult && recoveredFinalResult.trim().length > 0) {
-      finalResultHydrated = true;
-      if (recoveredFinalResult !== subagent.result) {
-        subagent.result = recoveredFinalResult;
-        hasHydrated = true;
-      }
-    }
-
-    return { hasHydrated, finalResultHydrated };
-  }
-
-  private scheduleAsyncSubagentResultRetry(
-    subagent: SubagentInfo,
-    vaultPath: string,
-    sessionId: string,
-    attempt: number
-  ): void {
-    if (!subagent.agentId) return;
-    if (attempt >= StreamController.ASYNC_SUBAGENT_RESULT_RETRY_DELAYS_MS.length) return;
-
-    const delay = StreamController.ASYNC_SUBAGENT_RESULT_RETRY_DELAYS_MS[attempt];
-    setTimeout(() => {
-      void this.retryAsyncSubagentResult(subagent, vaultPath, sessionId, attempt);
-    }, delay);
-  }
-
-  private async retryAsyncSubagentResult(
-    subagent: SubagentInfo,
-    vaultPath: string,
-    sessionId: string,
-    attempt: number
-  ): Promise<void> {
-    if (!subagent.agentId) return;
-    const asyncStatus = subagent.asyncStatus ?? subagent.status;
-    if (asyncStatus !== 'completed' && asyncStatus !== 'error') return;
-
-    const { hasHydrated, finalResultHydrated } = await this.tryHydrateAsyncSubagent(
-      subagent,
-      vaultPath,
-      sessionId,
-      false
-    );
-    if (hasHydrated) {
-      this.deps.subagentManager.refreshAsyncSubagent(subagent);
-    }
-
-    if (!finalResultHydrated) {
-      this.scheduleAsyncSubagentResultRetry(subagent, vaultPath, sessionId, attempt + 1);
-    }
   }
 
   /** Callback from SubagentManager when async state changes. Updates messages only (DOM handled by manager). */

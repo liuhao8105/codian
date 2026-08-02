@@ -281,17 +281,17 @@ describe('SubagentManager', () => {
       expect(manager.isLinkedAgentOutputTool('output-unknown')).toBe(false);
     });
 
-    it('handles TaskOutput with task_id parameter (SDK format)', () => {
+    it('handles TaskOutput with task_id parameter (Runtime format)', () => {
       const { manager, updates } = createManager();
       const parentEl = createMockEl();
 
-      manager.handleTaskToolUse('task-sdk', { description: 'SDK test', run_in_background: true }, parentEl);
-      manager.handleTaskToolResult('task-sdk', JSON.stringify({ agent_id: 'agent-sdk-123' }));
+      manager.handleTaskToolUse('task-runtime', { description: 'Runtime test', run_in_background: true }, parentEl);
+      manager.handleTaskToolResult('task-runtime', JSON.stringify({ agent_id: 'agent-runtime-123' }));
 
       const toolCall: ToolCallInfo = {
         id: 'taskoutput-1',
         name: 'TaskOutput',
-        input: { task_id: 'agent-sdk-123' },
+        input: { task_id: 'agent-runtime-123' },
         status: 'running',
         isExpanded: false,
       };
@@ -303,7 +303,7 @@ describe('SubagentManager', () => {
         'taskoutput-1',
         JSON.stringify({
           retrieval_status: 'success',
-          agents: { 'agent-sdk-123': { status: 'completed', result: 'task_id works!' } },
+          agents: { 'agent-runtime-123': { status: 'completed', result: 'task_id works!' } },
         }),
         false
       );
@@ -670,17 +670,17 @@ ${outputLines}
       expect(result?.result).toBe('Final summary from structured result.');
     });
 
-    it('extracts full result from SDK toolUseResult.content array', () => {
+    it('extracts full result from Runtime toolUseResult.content array', () => {
       const { manager } = createManager();
-      setupLinkedAgentOutput(manager, 'task-1', 'agent-sdk-content', 'out-1');
+      setupLinkedAgentOutput(manager, 'task-1', 'agent-runtime-content', 'out-1');
 
       const fullResult = 'This is the full multi-line result.\n\nLine 2 of the result.\nLine 3 with details.';
-      const sdkToolUseResult = {
+      const runtimeToolUseResult = {
         status: 'completed',
         content: [
           { type: 'text', text: fullResult },
         ],
-        agentId: 'agent-sdk-content',
+        agentId: 'agent-runtime-content',
         prompt: 'Do something',
         totalDurationMs: 5000,
         totalTokens: 1000,
@@ -691,16 +691,16 @@ ${outputLines}
         'out-1',
         '{}',
         false,
-        sdkToolUseResult
+        runtimeToolUseResult
       );
       expect(result?.result).toBe(fullResult);
     });
 
-    it('extracts result from SDK content array with multiple text blocks', () => {
+    it('extracts result from Runtime content array with multiple text blocks', () => {
       const { manager } = createManager();
       setupLinkedAgentOutput(manager, 'task-1', 'agent-multi', 'out-1');
 
-      const sdkToolUseResult = {
+      const runtimeToolUseResult = {
         status: 'completed',
         content: [
           { type: 'text', text: 'Main result text here.' },
@@ -713,7 +713,7 @@ ${outputLines}
         'out-1',
         '{}',
         false,
-        sdkToolUseResult
+        runtimeToolUseResult
       );
       // Should return the first text block (actual result), not the metadata block
       expect(result?.result).toBe('Main result text here.');
@@ -1298,14 +1298,14 @@ Only this is the final result.
       expect(manager.getSyncSubagent('task-1')).toBeUndefined();
     });
 
-    it('extracts result from SDK toolUseResult.content for sync subagent', () => {
+    it('extracts result from Runtime toolUseResult.content for sync subagent', () => {
       const { finalizeSubagentBlock } = jest.requireMock('@/features/chat/rendering');
       const { manager } = createManager();
       const parentEl = createMockEl();
 
-      manager.handleTaskToolUse('task-sdk', { run_in_background: false }, parentEl);
+      manager.handleTaskToolUse('task-runtime', { run_in_background: false }, parentEl);
 
-      const sdkToolUseResult = {
+      const runtimeToolUseResult = {
         status: 'completed',
         content: [
           { type: 'text', text: 'Full sync subagent result with multiple lines.\n\nSecond paragraph.' },
@@ -1314,7 +1314,7 @@ Only this is the final result.
         agentId: 'agent-sync',
       };
 
-      const info = manager.finalizeSyncSubagent('task-sdk', '{}', false, sdkToolUseResult);
+      const info = manager.finalizeSyncSubagent('task-runtime', '{}', false, runtimeToolUseResult);
 
       expect(info).not.toBeNull();
       // Verify the extracted result (first content block) was passed to the renderer

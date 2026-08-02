@@ -138,7 +138,7 @@ export class InlineExitPlanMode {
     if (!planFilePath) return null;
 
     const resolved = nodePath.resolve(planFilePath).replace(/\\/g, '/');
-    if (!resolved.includes('/.claude/plans/')) {
+    if (!resolved.includes('/.codian/plans/')) {
       this.planReadError = 'path outside allowed plan directory';
       return null;
     }

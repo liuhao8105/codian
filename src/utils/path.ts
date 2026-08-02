@@ -105,7 +105,7 @@ export function expandHomePath(p: string): string {
 }
 
 // ============================================
-// Claude CLI Detection
+// CLI path helpers
 // ============================================
 
 function stripSurroundingQuotes(value: string): string {
@@ -169,124 +169,6 @@ function isExistingFile(filePath: string): boolean {
     // Inaccessible path
   }
   return false;
-}
-
-function resolveCliJsNearPathEntry(entry: string, isWindows: boolean): string | null {
-  const directCandidate = path.join(entry, 'node_modules', '@anthropic-ai', 'claude-code', 'cli.js');
-  if (isExistingFile(directCandidate)) {
-    return directCandidate;
-  }
-
-  const baseName = path.basename(entry).toLowerCase();
-  if (baseName === 'bin') {
-    const prefix = path.dirname(entry);
-    const candidate = isWindows
-      ? path.join(prefix, 'node_modules', '@anthropic-ai', 'claude-code', 'cli.js')
-      : path.join(prefix, 'lib', 'node_modules', '@anthropic-ai', 'claude-code', 'cli.js');
-    if (isExistingFile(candidate)) {
-      return candidate;
-    }
-  }
-
-  return null;
-}
-
-function resolveCliJsFromPathEntries(entries: string[], isWindows: boolean): string | null {
-  for (const entry of entries) {
-    const candidate = resolveCliJsNearPathEntry(entry, isWindows);
-    if (candidate) {
-      return candidate;
-    }
-  }
-  return null;
-}
-
-function resolveClaudeFromPathEntries(
-  entries: string[],
-  isWindows: boolean
-): string | null {
-  if (entries.length === 0) {
-    return null;
-  }
-
-  if (!isWindows) {
-    const unixCandidate = findFirstExistingPath(entries, ['claude']);
-    return unixCandidate;
-  }
-
-  const exeCandidate = findFirstExistingPath(entries, ['claude.exe', 'claude']);
-  if (exeCandidate) {
-    return exeCandidate;
-  }
-
-  const cliJsCandidate = resolveCliJsFromPathEntries(entries, isWindows);
-  if (cliJsCandidate) {
-    return cliJsCandidate;
-  }
-
-  return null;
-}
-
-function getNpmGlobalPrefix(): string | null {
-  if (process.env.npm_config_prefix) {
-    return process.env.npm_config_prefix;
-  }
-
-  if (process.platform === 'win32') {
-    const appDataNpm = process.env.APPDATA
-      ? path.join(process.env.APPDATA, 'npm')
-      : null;
-    if (appDataNpm && fs.existsSync(appDataNpm)) {
-      return appDataNpm;
-    }
-  }
-
-  return null;
-}
-
-function getNpmCliJsPaths(): string[] {
-  const homeDir = os.homedir();
-  const isWindows = process.platform === 'win32';
-  const cliJsPaths: string[] = [];
-
-  if (isWindows) {
-    cliJsPaths.push(
-      path.join(homeDir, 'AppData', 'Roaming', 'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'cli.js')
-    );
-
-    const npmPrefix = getNpmGlobalPrefix();
-    if (npmPrefix) {
-      cliJsPaths.push(
-        path.join(npmPrefix, 'node_modules', '@anthropic-ai', 'claude-code', 'cli.js')
-      );
-    }
-
-    const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
-    const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
-
-    cliJsPaths.push(
-      path.join(programFiles, 'nodejs', 'node_global', 'node_modules', '@anthropic-ai', 'claude-code', 'cli.js'),
-      path.join(programFilesX86, 'nodejs', 'node_global', 'node_modules', '@anthropic-ai', 'claude-code', 'cli.js')
-    );
-
-    cliJsPaths.push(
-      path.join('D:', 'Program Files', 'nodejs', 'node_global', 'node_modules', '@anthropic-ai', 'claude-code', 'cli.js')
-    );
-  } else {
-    cliJsPaths.push(
-      path.join(homeDir, '.npm-global', 'lib', 'node_modules', '@anthropic-ai', 'claude-code', 'cli.js'),
-      '/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js',
-      '/usr/lib/node_modules/@anthropic-ai/claude-code/cli.js'
-    );
-
-    if (process.env.npm_config_prefix) {
-      cliJsPaths.push(
-        path.join(process.env.npm_config_prefix, 'lib', 'node_modules', '@anthropic-ai', 'claude-code', 'cli.js')
-      );
-    }
-  }
-
-  return cliJsPaths;
 }
 
 /**
@@ -361,92 +243,39 @@ export function resolveNvmDefaultBin(home: string): string | null {
   return null;
 }
 
-export function findClaudeCLIPath(pathValue?: string): string | null {
+export function findCodexCliPath(pathValue?: string): string | null {
   const homeDir = os.homedir();
-  const isWindows = process.platform === 'win32';
-
   const customEntries = dedupePaths(parsePathEntries(pathValue));
+  const customResolution = findFirstExistingPath(
+    customEntries,
+    process.platform === 'win32' ? ['codex.exe', 'codex'] : ['codex'],
+  );
+  if (customResolution) return customResolution;
 
-  if (customEntries.length > 0) {
-    const customResolution = resolveClaudeFromPathEntries(customEntries, isWindows);
-    if (customResolution) {
-      return customResolution;
-    }
-  }
+  const candidates = process.platform === 'win32'
+    ? [
+        path.join(homeDir, '.local', 'bin', 'codex.exe'),
+        path.join(homeDir, 'AppData', 'Roaming', 'npm', 'codex.exe'),
+      ]
+    : [
+        path.join(homeDir, '.local', 'bin', 'codex'),
+        path.join(homeDir, '.volta', 'bin', 'codex'),
+        path.join(homeDir, '.asdf', 'shims', 'codex'),
+        '/opt/homebrew/bin/codex',
+        '/usr/local/bin/codex',
+      ];
 
-  // On Windows, prefer native .exe, then cli.js. Avoid .cmd fallback
-  // because it requires shell: true and breaks SDK stdio streaming.
-  if (isWindows) {
-    const exePaths: string[] = [
-      path.join(homeDir, '.claude', 'local', 'claude.exe'),
-      path.join(homeDir, 'AppData', 'Local', 'Claude', 'claude.exe'),
-      path.join(process.env.ProgramFiles || 'C:\\Program Files', 'Claude', 'claude.exe'),
-      path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'Claude', 'claude.exe'),
-      path.join(homeDir, '.local', 'bin', 'claude.exe'),
-    ];
-
-    for (const p of exePaths) {
-      if (isExistingFile(p)) {
-        return p;
-      }
-    }
-
-    const cliJsPaths = getNpmCliJsPaths();
-    for (const p of cliJsPaths) {
-      if (isExistingFile(p)) {
-        return p;
-      }
-    }
-
-  }
-
-  const commonPaths: string[] = [
-    path.join(homeDir, '.claude', 'local', 'claude'),
-    path.join(homeDir, '.local', 'bin', 'claude'),
-    path.join(homeDir, '.volta', 'bin', 'claude'),
-    path.join(homeDir, '.asdf', 'shims', 'claude'),
-    path.join(homeDir, '.asdf', 'bin', 'claude'),
-    '/usr/local/bin/claude',
-    '/opt/homebrew/bin/claude',
-    path.join(homeDir, 'bin', 'claude'),
-    path.join(homeDir, '.npm-global', 'bin', 'claude'),
-  ];
-
-  const npmPrefix = getNpmGlobalPrefix();
-  if (npmPrefix) {
-    commonPaths.push(path.join(npmPrefix, 'bin', 'claude'));
-  }
-
-  // NVM: resolve default version bin when NVM_BIN env var is not available (GUI apps)
   const nvmBin = resolveNvmDefaultBin(homeDir);
-  if (nvmBin) {
-    commonPaths.push(path.join(nvmBin, 'claude'));
+  if (nvmBin) candidates.push(path.join(nvmBin, process.platform === 'win32' ? 'codex.exe' : 'codex'));
+
+  for (const candidate of candidates) {
+    if (isExistingFile(candidate)) return candidate;
   }
 
-  for (const p of commonPaths) {
-    if (isExistingFile(p)) {
-      return p;
-    }
-  }
-
-  if (!isWindows) {
-    const cliJsPaths = getNpmCliJsPaths();
-    for (const p of cliJsPaths) {
-      if (isExistingFile(p)) {
-        return p;
-      }
-    }
-  }
-
-  const envEntries = dedupePaths(parsePathEntries(getEnvValue('PATH')));
-  if (envEntries.length > 0) {
-    const envResolution = resolveClaudeFromPathEntries(envEntries, isWindows);
-    if (envResolution) {
-      return envResolution;
-    }
-  }
-
-  return null;
+  return findFirstExistingPath(
+    dedupePaths(parsePathEntries(getEnvValue('PATH'))),
+    process.platform === 'win32' ? ['codex.exe', 'codex'] : ['codex'],
+  );
 }
 
 // ============================================
@@ -694,24 +523,24 @@ export function getPathAccessType(
     return 'vault';
   }
 
-  // Allow access to specific safe subdirectories under ~/.claude/
-  const claudeDir = normalizePathForComparison(resolveRealPath(path.join(os.homedir(), '.claude')));
-  if (resolvedCandidate === claudeDir || resolvedCandidate.startsWith(claudeDir + '/')) {
+  // Allow access to specific safe subdirectories under ~/.codian/.
+  const codianDir = normalizePathForComparison(resolveRealPath(path.join(os.homedir(), '.codian')));
+  if (resolvedCandidate === codianDir || resolvedCandidate.startsWith(codianDir + '/')) {
     const safeSubdirs = ['sessions', 'projects', 'commands', 'agents', 'skills', 'plans'];
-    const safeFiles = ['mcp.json', 'settings.json', 'settings.local.json', 'codian-settings.json', 'claudian-settings.json'];
-    const relativeToClaude = resolvedCandidate.slice(claudeDir.length + 1);
+    const safeFiles = ['mcp.json', 'settings.json', 'settings.local.json', 'codian-settings.json'];
+    const relativeToCodian = resolvedCandidate.slice(codianDir.length + 1);
 
-    if (!relativeToClaude) {
-      // ~/.claude/ itself — read-only
+    if (!relativeToCodian) {
+      // ~/.codian/ itself is read-only.
       return 'context';
     }
 
-    const topSegment = relativeToClaude.split('/')[0];
+    const topSegment = relativeToCodian.split('/')[0];
     if (safeSubdirs.includes(topSegment) || safeFiles.includes(topSegment)) {
       return 'vault';
     }
 
-    // Other paths under ~/.claude/ are read-only
+    // Other paths under ~/.codian/ are read-only.
     return 'context';
   }
 
