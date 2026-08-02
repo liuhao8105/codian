@@ -32,6 +32,52 @@ type SeparatelyLoadedFields = 'slashCommands';
 /** Settings stored in .codian/codian-settings.json. */
 export type StoredCodianSettings = Omit<CodianSettings, SeparatelyLoadedFields>;
 const SETTINGS_SAVE_DIAGNOSTIC_LOG = path.join(os.tmpdir(), 'codian-settings-save.log');
+const KNOWN_STORED_KEYS = Object.keys(DEFAULT_SETTINGS)
+  .filter(key => key !== 'slashCommands') as Array<keyof StoredCodianSettings>;
+
+function pickKnownSettings(value: Record<string, unknown>): Partial<StoredCodianSettings> {
+  const result: Partial<StoredCodianSettings> = {};
+  for (const key of KNOWN_STORED_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(value, key)) {
+      (result as Record<string, unknown>)[key] = value[key];
+    }
+  }
+  return result;
+}
+
+function normalizeProviderConfigs(value: unknown): StoredCodianSettings['providerConfigs'] {
+  const candidate = value && typeof value === 'object'
+    ? value as Record<string, unknown>
+    : {};
+  const codex = candidate.codex && typeof candidate.codex === 'object'
+    ? candidate.codex as Record<string, unknown>
+    : {};
+  const deepseek = candidate.deepseek && typeof candidate.deepseek === 'object'
+    ? candidate.deepseek as Record<string, unknown>
+    : {};
+
+  return {
+    codex: {
+      enabled: typeof codex.enabled === 'boolean'
+        ? codex.enabled
+        : DEFAULT_SETTINGS.providerConfigs.codex.enabled,
+    },
+    deepseek: {
+      enabled: typeof deepseek.enabled === 'boolean'
+        ? deepseek.enabled
+        : DEFAULT_SETTINGS.providerConfigs.deepseek.enabled,
+      apiKey: typeof deepseek.apiKey === 'string'
+        ? deepseek.apiKey
+        : DEFAULT_SETTINGS.providerConfigs.deepseek.apiKey,
+      baseUrl: typeof deepseek.baseUrl === 'string'
+        ? deepseek.baseUrl
+        : DEFAULT_SETTINGS.providerConfigs.deepseek.baseUrl,
+      model: typeof deepseek.model === 'string'
+        ? deepseek.model
+        : DEFAULT_SETTINGS.providerConfigs.deepseek.model,
+    },
+  };
+}
 
 function appendSettingsDiagnosticLog(message: string): void {
   try {
@@ -106,16 +152,18 @@ export class CodianSettingsStorage {
     }
 
     const stored = await this.readStoredSettings(activePath);
-    const { activeConversationId: _activeConversationId, ...storedWithoutLegacy } = stored;
+    const knownSettings = pickKnownSettings(stored);
 
-    const blockedCommands = normalizeBlockedCommands(stored.blockedCommands);
-    const hostnameCliPaths = normalizeHostnameCliPaths(stored.codexCliPathsByHost);
+    const blockedCommands = normalizeBlockedCommands(knownSettings.blockedCommands);
+    const hostnameCliPaths = normalizeHostnameCliPaths(knownSettings.codexCliPathsByHost);
+    const providerConfigs = normalizeProviderConfigs(knownSettings.providerConfigs);
 
     return {
       ...this.getDefaults(),
-      ...storedWithoutLegacy,
+      ...knownSettings,
       blockedCommands,
       codexCliPathsByHost: hostnameCliPaths,
+      providerConfigs,
     } as StoredCodianSettings;
   }
 
@@ -124,7 +172,9 @@ export class CodianSettingsStorage {
       `save provider=${settings.currentProvider} model=${settings.model} lastEnvHash=${settings.lastEnvHash || ''}\n` +
       `${new Error().stack || ''}`
     );
-    const content = JSON.stringify(settings, null, 2);
+    const knownSettings = pickKnownSettings(settings as unknown as Record<string, unknown>);
+    knownSettings.providerConfigs = normalizeProviderConfigs(knownSettings.providerConfigs);
+    const content = JSON.stringify(knownSettings, null, 2);
     await this.adapter.write(CODIAN_SETTINGS_PATH, content);
   }
 
