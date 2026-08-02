@@ -2,7 +2,7 @@
 
 import { execFileSync } from 'child_process';
 import { createHash } from 'crypto';
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { basename, join, resolve } from 'path';
 
 const RELEASE_FILES = ['main.js', 'manifest.json', 'styles.css'];
@@ -87,10 +87,8 @@ export function verifyRelease(root) {
   const version = packageJson.version;
   const outputDirectory = join(root, 'outputs');
   const installArchive = join(outputDirectory, `codian-${version}.zip`);
-  const rollbackArchive = join(outputDirectory, `codian-${version}-rollback.zip`);
   const checksumPath = join(outputDirectory, `codian-${version}-sha256.txt`);
   assertExactArchive(installArchive);
-  assertExactArchive(rollbackArchive);
 
   for (const file of RELEASE_FILES) {
     const source = readFileSync(join(root, file));
@@ -101,25 +99,22 @@ export function verifyRelease(root) {
     }
   }
 
-  const rollbackManifest = JSON.parse(
-    readArchiveFile(rollbackArchive, 'manifest.json').toString('utf8'),
-  );
-  if (
-    typeof rollbackManifest.version !== 'string' ||
-    rollbackManifest.version === version ||
-    versions[rollbackManifest.version] !== rollbackManifest.minAppVersion
-  ) {
-    throw new Error('Rollback archive manifest version is invalid or absent from version map');
-  }
-
   const expectedPaths = [
     ...RELEASE_FILES.map(file => join(outputDirectory, file)),
     installArchive,
-    rollbackArchive,
+    checksumPath,
   ];
   const expectedNames = expectedPaths.map(filePath => basename(filePath));
-  const checksums = parseChecksums(readFileSync(checksumPath, 'utf8'), expectedNames);
-  for (const filePath of expectedPaths) {
+  const publishedNames = readdirSync(outputDirectory).sort();
+  if (publishedNames.length !== expectedNames.length ||
+      expectedNames.some(name => !publishedNames.includes(name))) {
+    throw new Error('Output directory does not contain the exact release asset set');
+  }
+
+  const hashedPaths = expectedPaths.filter(filePath => filePath !== checksumPath);
+  const hashedNames = hashedPaths.map(filePath => basename(filePath));
+  const checksums = parseChecksums(readFileSync(checksumPath, 'utf8'), hashedNames);
+  for (const filePath of hashedPaths) {
     if (checksums.get(basename(filePath)) !== sha256(filePath)) {
       throw new Error(`SHA-256 mismatch for ${basename(filePath)}`);
     }
@@ -127,7 +122,6 @@ export function verifyRelease(root) {
 
   return {
     version,
-    rollbackVersion: rollbackManifest.version,
     assets: expectedNames,
   };
 }
@@ -136,7 +130,7 @@ try {
   const { root } = parseArgs(process.argv.slice(2));
   const result = verifyRelease(root);
   process.stdout.write(
-    `Verified Codian ${result.version}; rollback ${result.rollbackVersion}; ${result.assets.length} hashed assets\n`,
+    `Verified Codian ${result.version}; ${result.assets.length} release assets\n`,
   );
 } catch (error) {
   process.stderr.write(`Release verification failed: ${error instanceof Error ? error.message : String(error)}\n`);

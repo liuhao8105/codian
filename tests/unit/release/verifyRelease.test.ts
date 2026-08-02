@@ -12,10 +12,8 @@ function writeJson(target: string, value: unknown): void {
   fs.writeFileSync(target, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-function createFixture(): { root: string; rollback: string } {
+function createFixture(): string {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'codian-release-'));
-  const rollback = path.join(root, 'rollback-source');
-  fs.mkdirSync(rollback);
   writeJson(path.join(root, 'package.json'), { name: 'codian', version: currentVersion });
   writeJson(path.join(root, 'manifest.json'), {
     id: 'codian',
@@ -24,27 +22,17 @@ function createFixture(): { root: string; rollback: string } {
   });
   writeJson(path.join(root, 'versions.json'), {
     [currentVersion]: '1.4.5',
-    '1.3.83-stability-hardening': '1.4.5',
   });
   fs.writeFileSync(path.join(root, 'main.js'), 'x'.repeat(2 * 1024 * 1024));
   fs.writeFileSync(path.join(root, 'styles.css'), 'current-css');
-  writeJson(path.join(rollback, 'manifest.json'), {
-    id: 'codian',
-    version: '1.3.83-stability-hardening',
-    minAppVersion: '1.4.5',
-  });
-  fs.writeFileSync(path.join(rollback, 'main.js'), 'rollback-main');
-  fs.writeFileSync(path.join(rollback, 'styles.css'), 'rollback-css');
-  return { root, rollback };
+  return root;
 }
 
-function runPackage(root: string, rollback: string): void {
+function runPackage(root: string): void {
   execFileSync(process.execPath, [
     packageScript,
     '--root',
     root,
-    '--rollback-dir',
-    rollback,
   ]);
 }
 
@@ -63,11 +51,11 @@ describe('release packaging and verification', () => {
     }
   });
 
-  it('creates exact install/rollback archives and matching checksums', () => {
-    const { root, rollback } = createFixture();
+  it('creates an exact install archive and matching checksums', () => {
+    const root = createFixture();
     fixtures.push(root);
 
-    runPackage(root, rollback);
+    runPackage(root);
     const result = runVerify(root);
 
     expect(result.status).toBe(0);
@@ -79,11 +67,13 @@ describe('release packaging and verification', () => {
     expect(fs.readFileSync(path.join(root, 'outputs', 'main.js'), 'utf8')).toHaveLength(
       2 * 1024 * 1024,
     );
-    expect(
-      fs.existsSync(
-        path.join(root, 'outputs', `codian-${currentVersion}-rollback.zip`),
-      ),
-    ).toBe(true);
+    expect(fs.readdirSync(path.join(root, 'outputs')).sort()).toEqual([
+      `codian-${currentVersion}-sha256.txt`,
+      `codian-${currentVersion}.zip`,
+      'main.js',
+      'manifest.json',
+      'styles.css',
+    ]);
     expect(
       fs.readFileSync(
         path.join(root, 'outputs', `codian-${currentVersion}-sha256.txt`),
@@ -93,9 +83,9 @@ describe('release packaging and verification', () => {
   });
 
   it('fails closed when release versions disagree', () => {
-    const { root, rollback } = createFixture();
+    const root = createFixture();
     fixtures.push(root);
-    runPackage(root, rollback);
+    runPackage(root);
     writeJson(path.join(root, 'manifest.json'), {
       id: 'codian',
       version: 'different-version',
@@ -109,9 +99,9 @@ describe('release packaging and verification', () => {
   });
 
   it('fails closed when an archive contains an extra file', () => {
-    const { root, rollback } = createFixture();
+    const root = createFixture();
     fixtures.push(root);
-    runPackage(root, rollback);
+    runPackage(root);
     const output = path.join(root, 'outputs');
     fs.writeFileSync(path.join(root, 'extra.txt'), 'unexpected');
     execFileSync('zip', [
@@ -127,9 +117,9 @@ describe('release packaging and verification', () => {
   });
 
   it('fails closed when a published checksum does not match the bytes', () => {
-    const { root, rollback } = createFixture();
+    const root = createFixture();
     fixtures.push(root);
-    runPackage(root, rollback);
+    runPackage(root);
     fs.appendFileSync(path.join(root, 'outputs', `codian-${currentVersion}.zip`), 'tamper');
 
     const result = runVerify(root);
