@@ -16,12 +16,16 @@ following surfaces must be clean:
 - tracked source, tests, documentation, manifests, lockfiles, and scripts;
 - the production dependency graph and compiled `main.js`;
 - the installed Obsidian plugin directory and its `data.json`;
-- the active vault's Codian-owned data directory;
+- plugin-generated paths, filenames, setting keys, and migration metadata in the
+  active vault's Codian-owned data directory;
 - current branch and release naming.
 
 Git history and the user's global `~/.claude` directory are outside the cleanup
 boundary. The global directory may belong to a separately installed program and
-must not be modified.
+must not be modified. User-authored skill text, third-party source and license
+text, and historical conversation payloads are migrated byte-for-byte and are
+not rewritten merely because their content discusses another provider. Those
+files are user data, not Codian implementation or support.
 
 ## Chosen architecture: two-stage migration
 
@@ -84,6 +88,9 @@ types for messages, approvals, hooks, rewinds, and tool results.
   old Chrome compatibility switch.
 - Preserve the actual contents of skills, commands, agents, sessions, local
   memory, MCP configuration, and recovery journal byte-for-byte during Stage A.
+- Transform only plugin-owned structured metadata keys whose meaning is part of
+  the retired compatibility layer. Never rewrite user prose, third-party source,
+  licenses, or historical messages.
 
 ### UI and documentation
 
@@ -117,6 +124,11 @@ Development follows red-green-refactor. Required automated coverage includes:
 - Codex and DeepSeek runtime behavior remains intact;
 - final package policy rejects forbidden names, dependency names, path strings,
   and compiled-bundle markers.
+
+The zero-reference source audit covers tracked project files, package metadata,
+the compiled plugin, and installed plugin files. The data-migration audit checks
+that the active directory and plugin-owned structured metadata use Codian names,
+while separately proving byte parity for user-authored and third-party payloads.
 
 Final verification requires full tests, typecheck, lint, build, release package
 verification, production dependency audit, source/lockfile/package/bundle scan,
