@@ -150,7 +150,8 @@ describe('StorageService migration', () => {
     expect(saved.strongRulesFilePath).toBe('墙的AI记忆/强规则-大叔墙.md');
     expect(saved.strongRulesPrompt).toBe('旧强规则');
     expect(saved.memoryFilePath).toBe('墙的AI记忆/长期记忆-大叔墙.md');
-    expect(saved.currentProvider).toBe('codex');
+    expect(saved.currentProvider).toBeUndefined();
+    expect(initialized.codian.currentProvider).toBe('codex');
     expect(initialized.codian.strongRulesFilePath).toBe('墙的AI记忆/强规则-大叔墙.md');
   });
 

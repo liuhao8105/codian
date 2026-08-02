@@ -53,7 +53,7 @@ function createMockPlugin(settings = {}) {
       },
     },
     getActiveEnvironmentVariables: jest.fn().mockReturnValue(''),
-    getResolvedClaudeCliPath: jest.fn().mockReturnValue('/fake/claude'),
+    getResolvedCodexCliPath: jest.fn().mockReturnValue('/fake/codex'),
   } as any;
 }
 
@@ -123,32 +123,32 @@ describe('InlineEditService', () => {
       expect(res.continue).toBe(false);
     });
 
-    it('should allow Read inside ~/.claude/ directory', async () => {
+    it('should allow Read inside ~/.codian/ directory', async () => {
       // Mock os.homedir to return a known path
       jest.spyOn(os, 'homedir').mockReturnValue('/home/test');
 
       const hook = createVaultRestrictionHook('/test/vault/path');
       const res = await callHook(hook.hooks[0],
-        { tool_name: 'Read', tool_input: { file_path: '/home/test/.claude/settings.json' } },
+        { tool_name: 'Read', tool_input: { file_path: '/home/test/.codian/settings.json' } },
         'tool-4', {},
       );
 
       expect(res.continue).toBe(true);
     });
 
-    it('should allow Glob inside ~/.claude/ directory', async () => {
+    it('should allow Glob inside ~/.codian/ directory', async () => {
       jest.spyOn(os, 'homedir').mockReturnValue('/home/test');
 
       const hook = createVaultRestrictionHook('/test/vault/path');
       const res = await callHook(hook.hooks[0],
-        { tool_name: 'Glob', tool_input: { pattern: '/home/test/.claude/**/*.md' } },
+        { tool_name: 'Glob', tool_input: { pattern: '/home/test/.codian/**/*.md' } },
         'tool-5', {},
       );
 
       expect(res.continue).toBe(true);
     });
 
-    it('should still block paths outside vault and ~/.claude/', async () => {
+    it('should still block paths outside vault and ~/.codian/', async () => {
       jest.spyOn(os, 'homedir').mockReturnValue('/home/test');
 
       const hook = createVaultRestrictionHook('/test/vault/path');
@@ -161,12 +161,12 @@ describe('InlineEditService', () => {
       expect(res.hookSpecificOutput.permissionDecisionReason).toContain('outside allowed paths');
     });
 
-    it('should block path traversal via ~/.claude/../ to escape allowed directory', async () => {
+    it('should block path traversal via ~/.codian/../ to escape allowed directory', async () => {
       jest.spyOn(os, 'homedir').mockReturnValue('/home/test');
 
       const hook = createVaultRestrictionHook('/test/vault/path');
       const res = await callHook(hook.hooks[0],
-        { tool_name: 'Read', tool_input: { file_path: '/home/test/.claude/../.ssh/id_rsa' } },
+        { tool_name: 'Read', tool_input: { file_path: '/home/test/.codian/../.ssh/id_rsa' } },
         'tool-7', {},
       );
 
@@ -416,7 +416,7 @@ describe('InlineEditService', () => {
     });
 
     it('should return error when Codex CLI is unavailable', async () => {
-      mockPlugin.getResolvedClaudeCliPath.mockReturnValue(null);
+      mockPlugin.getResolvedCodexCliPath.mockReturnValue(null);
       mockExecCodexPrompt.mockRejectedValue(
         new Error('找不到 Codex CLI。请在设置中填写 Codex CLI 路径，或安装 Codex 应用。')
       );
@@ -475,32 +475,7 @@ describe('InlineEditService', () => {
       expect(options?.permissionMode).toBe('read-only');
     });
 
-    it('should set settingSources to project only when loadUserClaudeSettings is false', async () => {
-      mockPlugin.settings.loadUserClaudeSettings = false;
-      service = new InlineEditService(mockPlugin);
-
-      setMockMessages([
-        { type: 'system', subtype: 'init', session_id: 'test-session' },
-        {
-          type: 'assistant',
-          message: { content: [{ type: 'text', text: '<replacement>fixed</replacement>' }] },
-        },
-        { type: 'result' },
-      ]);
-
-      await service.editText({
-        mode: 'selection',
-        selectedText: 'test',
-        instruction: 'fix',
-        notePath: 'test.md',
-      });
-
-      const options = getLastOptions();
-      expect(options?.prompt).toContain('<editor_selection');
-    });
-
-    it('should set settingSources to include user when loadUserClaudeSettings is true', async () => {
-      mockPlugin.settings.loadUserClaudeSettings = true;
+    it('keeps the inline-edit prompt scoped to the project', async () => {
       service = new InlineEditService(mockPlugin);
 
       setMockMessages([
