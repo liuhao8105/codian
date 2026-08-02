@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 interface PackageManifest {
@@ -18,6 +18,13 @@ describe('release dependency policy', () => {
 
   it('does not ship the unused Codex SDK', () => {
     expect(manifest.dependencies).not.toHaveProperty('@openai/codex-sdk');
+  });
+
+  it('has no dormant provider runtime entry point', () => {
+    expect(existsSync(join(
+      __dirname,
+      '../../../src/core/agent/ClaudianService.ts',
+    ))).toBe(false);
   });
 
   it('pins the Obsidian development API for reproducible installs', () => {

@@ -1,8 +1,3 @@
-// eslint-disable-next-line jest/no-mocks-import
-import {
-  resetMockMessages,
-} from '@test/__mocks__/claude-agent-sdk';
-
 jest.mock('@/core/runtime/codexExec', () => ({
   execCodexPrompt: jest.fn(),
 }));
@@ -54,7 +49,6 @@ describe('InstructionRefineService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    resetMockMessages();
     mockExecCodexPrompt.mockResolvedValue({ text: '<instruction>ok</instruction>' });
     mockPlugin = createMockPlugin();
     service = new InstructionRefineService(mockPlugin);
@@ -279,7 +273,6 @@ describe('InstructionRefineService', () => {
       await service.refineInstruction('test', '');
 
       // Set up messages for the continuation
-      resetMockMessages();
       setMockMessages([
         {
           type: 'assistant',

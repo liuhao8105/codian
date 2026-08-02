@@ -30,9 +30,6 @@ export {
   type ThinkingBudget,
 } from './models';
 
-// SDK types
-export { type SDKMessage } from './sdk';
-
 // Settings types
 export {
   type ApprovalDecision,

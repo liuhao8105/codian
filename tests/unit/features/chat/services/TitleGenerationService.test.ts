@@ -1,8 +1,3 @@
-// eslint-disable-next-line jest/no-mocks-import
-import {
-  resetMockMessages,
-} from '@test/__mocks__/claude-agent-sdk';
-
 jest.mock('@/core/runtime/codexExec', () => ({
   execCodexPrompt: jest.fn(),
 }));
@@ -52,7 +47,6 @@ describe('TitleGenerationService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    resetMockMessages();
     mockExecCodexPrompt.mockResolvedValue({ text: 'Title' });
     mockPlugin = createMockPlugin();
     service = new TitleGenerationService(mockPlugin);

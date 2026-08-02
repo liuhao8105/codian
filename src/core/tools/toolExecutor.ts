@@ -10,8 +10,8 @@ import * as path from 'path';
 import type CodianPlugin from '../../main';
 import { getEnhancedPath } from '../../utils/env';
 import { getPathAccessType, getVaultPath, isPathWithinVault } from '../../utils/path';
-import type { ApprovalCallbackOptions } from '../agent';
 import type { McpServerManager } from '../mcp';
+import type { ApprovalCallbackOptions } from '../runtime/contracts';
 import { findBashCommandPathViolation } from '../security/BashPathValidator';
 import { isCommandBlocked } from '../security/BlocklistChecker';
 import {

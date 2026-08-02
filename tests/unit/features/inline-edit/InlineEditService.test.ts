@@ -1,7 +1,3 @@
-// eslint-disable-next-line jest/no-mocks-import
-import {
-  resetMockMessages,
-} from '@test/__mocks__/claude-agent-sdk';
 import * as fs from 'fs';
 import * as os from 'os';
 
@@ -73,7 +69,6 @@ describe('InlineEditService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    resetMockMessages();
     mockExecCodexPrompt.mockResolvedValue({ text: '<replacement>fixed</replacement>' });
     mockPlugin = createMockPlugin();
     service = new InlineEditService(mockPlugin);
