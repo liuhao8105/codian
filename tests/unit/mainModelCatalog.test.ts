@@ -90,4 +90,46 @@ describe('CodianPlugin dynamic Codex model catalog', () => {
     ]);
     expect(warn).not.toHaveBeenCalled();
   });
+
+  it('does not refresh again when Codian opens inside the six-hour success TTL', async () => {
+    const now = jest.spyOn(Date, 'now').mockReturnValue(1_000 + 6 * 60 * 60 * 1000 - 1);
+    const leaf = { view: {}, setViewState: jest.fn() };
+    const app = {
+      vault: { adapter: { basePath: '/test/vault' } },
+      workspace: {
+        getLeavesOfType: jest.fn(() => [leaf]),
+        revealLeaf: jest.fn(),
+      },
+    };
+    const plugin = new CodianPlugin(app as any, { id: 'codian', version: 'test' } as any);
+    plugin.settings = { ...DEFAULT_SETTINGS };
+    (plugin as any).lastSuccessfulCodexModelRefreshAt = 1_000;
+
+    await plugin.activateView();
+    await Promise.resolve();
+
+    expect(requestMock).not.toHaveBeenCalled();
+    now.mockRestore();
+  });
+
+  it('refreshes when Codian opens after the six-hour success TTL', async () => {
+    const now = jest.spyOn(Date, 'now').mockReturnValue(1_000 + 6 * 60 * 60 * 1000 + 1);
+    const leaf = { view: {}, setViewState: jest.fn() };
+    const app = {
+      vault: { adapter: { basePath: '/test/vault' } },
+      workspace: {
+        getLeavesOfType: jest.fn(() => [leaf]),
+        revealLeaf: jest.fn(),
+      },
+    };
+    const plugin = new CodianPlugin(app as any, { id: 'codian', version: 'test' } as any);
+    plugin.settings = { ...DEFAULT_SETTINGS };
+    (plugin as any).lastSuccessfulCodexModelRefreshAt = 1_000;
+
+    await plugin.activateView();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(requestMock).toHaveBeenCalledWith('model/list', {});
+    now.mockRestore();
+  });
 });

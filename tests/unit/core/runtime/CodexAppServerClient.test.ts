@@ -35,7 +35,37 @@ jest.mock('@/core/runtime/codexExec', () => ({
   resolveCodexCliPath: jest.fn(() => '/mock/codex'),
 }));
 
-import { CodexAppServerClient } from '@/core/runtime/CodexAppServerClient';
+import {
+  CodexAppServerClient,
+  summarizeSpawnForLog,
+  summarizeStderrForLog,
+} from '@/core/runtime/CodexAppServerClient';
+
+describe('CodexAppServerClient diagnostic summaries', () => {
+  it('records only configured booleans and counts for process startup', () => {
+    const summary = summarizeSpawnForLog({
+      provider: 'codex',
+      modelConfigured: true,
+      baseUrlConfigured: true,
+      cliResolved: true,
+      disabledMcpCount: 2,
+    });
+
+    expect(summary).toBe('spawn provider=codex modelConfigured=true baseUrlConfigured=true cliResolved=true disabledMcpCount=2');
+  });
+
+  it('classifies stderr without persisting secrets, URLs, paths, environment values, or stacks', () => {
+    const summary = summarizeStderrForLog(
+      'unauthorized token=secret at /Users/example/private.md https://api.example.test\nstack-private',
+    );
+
+    expect(summary).toContain('stderr category=auth');
+    expect(summary).not.toContain('secret');
+    expect(summary).not.toContain('/Users/example');
+    expect(summary).not.toContain('api.example.test');
+    expect(summary).not.toContain('stack-private');
+  });
+});
 
 function createPlugin() {
   return {

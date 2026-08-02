@@ -1,9 +1,92 @@
 import {
+  appendWithinDeepSeekStreamLimit,
+  fetchDeepSeekResponseWithTimeout,
   parseDeepSeekDSMLToolCalls,
+  parseSSEStream,
+  readSseChunkWithTimeout,
   shouldForceDeepSeekExecutionContinuation,
   shouldForceDeepSeekWriteAfterToolRounds,
   stripDeepSeekDSMLToolCallBlocks,
 } from '@/core/runtime/DeepSeekRuntime';
+
+describe('DeepSeekRuntime network liveness', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  it('rejects when response headers do not arrive within 30 seconds', async () => {
+    jest.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise<Response>(() => {}));
+
+    const request = fetchDeepSeekResponseWithTimeout('https://example.invalid', {}, new AbortController().signal);
+    const rejection = request.catch((error: unknown) => error);
+    await jest.advanceTimersByTimeAsync(30_000);
+
+    await expect(rejection).resolves.toEqual(
+      new Error('DeepSeek API connection timed out after 30000ms.'),
+    );
+  });
+
+  it('propagates user cancellation before the header timeout', async () => {
+    jest.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise<Response>(() => {}));
+    const controller = new AbortController();
+
+    const request = fetchDeepSeekResponseWithTimeout('https://example.invalid', {}, controller.signal);
+    controller.abort();
+
+    await expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('clears the response-header timer after success', async () => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('ok'));
+
+    await fetchDeepSeekResponseWithTimeout('https://example.invalid', {}, new AbortController().signal);
+
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('rejects and cancels a reader after 90 seconds of stream inactivity', async () => {
+    const reader = {
+      read: jest.fn(() => new Promise<ReadableStreamReadResult<Uint8Array>>(() => {})),
+      cancel: jest.fn(async () => undefined),
+    } as unknown as ReadableStreamDefaultReader<Uint8Array>;
+
+    const read = readSseChunkWithTimeout(reader, new AbortController().signal);
+    const rejection = read.catch((error: unknown) => error);
+    await jest.advanceTimersByTimeAsync(90_000);
+
+    await expect(rejection).resolves.toEqual(
+      new Error('DeepSeek stream was idle for 90000ms.'),
+    );
+    expect(reader.cancel).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('DeepSeekRuntime stream capacity', () => {
+  it('rejects an incomplete SSE line larger than 1 MiB', async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('x'.repeat(1024 * 1024 + 1)));
+        controller.close();
+      },
+    });
+    const iterator = parseSSEStream(new Response(stream), new AbortController().signal);
+
+    await expect(iterator.next()).rejects.toThrow('DeepSeek SSE buffer exceeds 1048576 characters.');
+  });
+
+  it('rejects accumulated text, reasoning, and tool arguments above 1 MiB', () => {
+    for (const label of ['text', 'reasoning', 'tool arguments']) {
+      expect(() => appendWithinDeepSeekStreamLimit('x'.repeat(1024 * 1024), 'y', label))
+        .toThrow(`DeepSeek ${label} exceeds 1048576 characters.`);
+    }
+  });
+});
 
 describe('DeepSeekRuntime DSML fallback parsing', () => {
   const dsml = `<||DSML||tool_calls>

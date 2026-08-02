@@ -86,4 +86,52 @@ describe('CodianDiagnostics', () => {
       expect.arrayContaining(['secure-storage-unavailable', 'legacy-plaintext-retained']),
     );
   });
+
+  it('warns on large long-run storage and counts installed backup directories without exposing names', async () => {
+    const files = Array.from({ length: 10_000 }, (_, index) => `.codian/item-${index}.json`);
+    const privateBackupName = '.obsidian/plugins/codian/.backup-private-name';
+    const plugin = {
+      manifest: { version: 'test' },
+      settings: { currentProvider: 'codex', permissionMode: 'normal' },
+      storage: {
+        getSecretStorageStatus: jest.fn(async () => ({
+          available: true,
+          stored: false,
+          readable: false,
+          retainedLegacyPlaintext: false,
+        })),
+        recovery: { getAll: jest.fn(async () => []) },
+      },
+      app: {
+        vault: {
+          adapter: {
+            exists: jest.fn(async () => true),
+            list: jest.fn(async (folder: string) => {
+              if (folder === '.codian') return { files, folders: [] };
+              if (folder === '.obsidian/plugins/codian') {
+                return { files: [], folders: [privateBackupName] };
+              }
+              return { files: [], folders: [] };
+            }),
+            stat: jest.fn(async () => ({ type: 'file', ctime: 0, mtime: 0, size: 64 * 1024 })),
+          },
+        },
+      },
+    } as unknown as CodianPlugin;
+
+    const snapshot = await new CodianDiagnostics(plugin).buildSnapshot();
+    const serialized = JSON.stringify(snapshot);
+
+    expect(snapshot).toMatchObject({
+      installation: { historicalBackupDirectories: 1 },
+      storage: { codian: { files: 10_000 } },
+    });
+    expect(snapshot.warnings).toEqual(expect.arrayContaining([
+      'storage-large',
+      'storage-file-count-large',
+      'installed-backups-present',
+    ]));
+    expect(serialized).not.toContain('private-name');
+    expect(serialized).not.toContain('.obsidian/plugins');
+  });
 });

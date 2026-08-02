@@ -187,3 +187,19 @@ describe('executeDeepSeekToolCall Bash', () => {
     expect(result).toContain('after-null');
   });
 });
+
+describe('executeDeepSeekToolCall result capacity', () => {
+  it('bounds large Read results before returning them to DeepSeek', async () => {
+    const context = createContext('/mock/vault', {});
+    (context.plugin.app.vault as any).getFileByPath = jest.fn(() => ({ path: 'large.md' }));
+    (context.plugin.app.vault as any).cachedRead = jest.fn(async () => 'x'.repeat(50_001));
+
+    const result = await executeDeepSeekToolCall(
+      { id: 'tool-read', name: 'Read', arguments: { file_path: 'large.md' } },
+      context,
+    );
+
+    expect(result.length).toBeLessThanOrEqual(50_000);
+    expect(result).toContain('tool result truncated');
+  });
+});
