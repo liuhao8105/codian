@@ -2,18 +2,14 @@
  * StorageService - Main coordinator for distributed storage system.
  *
  * Manages:
- * - CC settings in .codian/settings.json (CC-compatible, shareable)
- * - Claudian settings in .codian/codian-settings.json (Claudian-specific)
+ * - Runtime permission settings in .codian/settings.json
+ * - Codian settings in .codian/codian-settings.json (Codian-specific)
  * - Slash commands in .codian/commands/*.md
  * - Chat sessions in .codian/sessions/*.jsonl
  * - MCP configs in .codian/mcp.json
  * - Local memories in .codian/local-memory/
  *
- * Handles migration from legacy formats:
- * - Old settings.json with Claudian fields → split into CC + Claudian files
- * - Old .codian/codian-settings.json → .codian/codian-settings.json
- * - Old permissions array → CC permissions object
- * - data.json state → codian-settings.json
+ * Migrates plugin-owned state from data.json into the distributed files.
  */
 
 import type { App, Plugin } from 'obsidian';
@@ -29,56 +25,41 @@ import {
 } from '../security';
 import type {
   AgentModel,
-  CCPermissions,
-  CCSettings,
   Conversation,
-  LegacyPermission,
+  RuntimePermissions,
+  RuntimeSettings,
   SlashCommand,
 } from '../types';
-import {
-  createPermissionRule,
-  DEFAULT_CC_PERMISSIONS,
-  DEFAULT_SETTINGS,
-  legacyPermissionsToCCPermissions,
-} from '../types';
+import { createPermissionRule } from '../types';
 import { AGENTS_PATH, AgentVaultStorage } from './AgentVaultStorage';
 import {
   CODIAN_SETTINGS_PATH,
   CodianSettingsStorage,
-  normalizeBlockedCommands,
   type StoredCodianSettings,
 } from './CodianSettingsStorage';
 import { LOCAL_MEMORY_PATH, LocalMemoryStorage } from './LocalMemoryStorage';
 import { McpStorage } from './McpStorage';
-import {
-  CLAUDIAN_ONLY_FIELDS,
-  convertEnvObjectToString,
-  mergeEnvironmentVariables,
-} from './migrationConstants';
 import { RecoveryJournal } from './RecoveryJournal';
-import { isLegacyPermissionsFormat,RUNTIME_SETTINGS_PATH, RuntimeSettingsStorage } from './RuntimeSettingsStorage';
+import { RUNTIME_SETTINGS_PATH, RuntimeSettingsStorage } from './RuntimeSettingsStorage';
 import { SESSIONS_PATH, SessionStorage } from './SessionStorage';
 import { SKILLS_PATH, SkillStorage } from './SkillStorage';
 import { COMMANDS_PATH, SlashCommandStorage } from './SlashCommandStorage';
 import { VaultFileAdapter } from './VaultFileAdapter';
 
-/** Base path for all Claudian storage. */
+/** Base path for all Codian storage. */
 export const CODIAN_ROOT = '.codian';
 
-/** Legacy Claudian/Codian settings path used by older builds. */
-export const LEGACY_CLAUDIAN_SETTINGS_PATH = '.codian/codian-settings.json';
-
-/** Legacy settings path (now CC settings). */
+/** Legacy settings path (now runtime settings). */
 export const SETTINGS_PATH = RUNTIME_SETTINGS_PATH;
 
 /**
  * Combined settings for the application.
- * Merges CC settings (permissions) with Claudian settings.
+ * Merges runtime settings (permissions) with Codian settings.
  */
 export interface CombinedSettings {
-  /** CC-compatible settings (permissions, etc.) */
-  cc: CCSettings;
-  /** Claudian-specific settings */
+  /** Runtime permission settings */
+  runtime: RuntimeSettings;
+  /** Codian-specific settings */
   codian: StoredCodianSettings;
 }
 
@@ -86,45 +67,12 @@ export interface CodianSecretStorageStatus extends SecretStorageStatus {
   retainedLegacyPlaintext: boolean;
 }
 
-/** Legacy data format (pre-split migration). */
-interface LegacySettingsJson {
-  // Old Claudian fields that were in settings.json
-  userName?: string;
-  enableBlocklist?: boolean;
-  blockedCommands?: unknown;
-  model?: string;
-  thinkingBudget?: string;
-  permissionMode?: string;
-  lastNonPlanPermissionMode?: string;
-  permissions?: LegacyPermission[];
-  excludedTags?: string[];
-  mediaFolder?: string;
-  environmentVariables?: string;
-  envSnippets?: unknown[];
-  systemPrompt?: string;
-  strongRulesFilePath?: string;
-  strongRulesPrompt?: string;
-  memoryFilePath?: string;
-  enableLocalMemory?: boolean;
-  localMemoryPath?: string;
-  allowedExportPaths?: string[];
-  keyboardNavigation?: unknown;
-  claudeCliPath?: string;
-  claudeCliPaths?: unknown;
-  loadUserClaudeSettings?: boolean;
-  enableAutoTitleGeneration?: boolean;
-  titleGenerationModel?: string;
-
-  // CC fields
-  $schema?: string;
-  env?: Record<string, string>;
-}
 
 /** Legacy data.json format. */
 interface LegacyDataJson {
   activeConversationId?: string | null;
   lastEnvHash?: string;
-  lastClaudeModel?: AgentModel;
+  lastCodexModel?: AgentModel;
   lastCustomModel?: AgentModel;
   conversations?: Conversation[];
   slashCommands?: SlashCommand[];
@@ -133,10 +81,8 @@ interface LegacyDataJson {
   [key: string]: unknown;
 }
 
-// CLAUDIAN_ONLY_FIELDS is imported from ./migrationConstants
-
 export class StorageService {
-  readonly ccSettings: RuntimeSettingsStorage;
+  readonly runtimeSettings: RuntimeSettingsStorage;
   readonly codianSettings: CodianSettingsStorage;
   readonly commands: SlashCommandStorage;
   readonly skills: SkillStorage;
@@ -157,7 +103,7 @@ export class StorageService {
     this.app = plugin.app;
     this.secretStorage = secretStorage;
     this.adapter = new VaultFileAdapter(this.app);
-    this.ccSettings = new RuntimeSettingsStorage(this.adapter);
+    this.runtimeSettings = new RuntimeSettingsStorage(this.adapter);
     this.codianSettings = new CodianSettingsStorage(this.adapter);
     this.commands = new SlashCommandStorage(this.adapter);
     this.skills = new SkillStorage(this.adapter);
@@ -172,14 +118,14 @@ export class StorageService {
     await this.ensureDirectories();
     await this.runMigrations();
 
-    const cc = await this.ccSettings.load();
+    const runtime = await this.runtimeSettings.load();
     let codian = await this.codianSettings.load();
     if (!(await this.adapter.exists(CODIAN_SETTINGS_PATH))) {
       await this.codianSettings.save(codian);
     }
     codian = await this.hydrateAndMigrateSecrets(codian);
 
-    return { cc, codian };
+    return { runtime, codian };
   }
 
   async getSecretStorageStatus(): Promise<CodianSecretStorageStatus> {
@@ -216,18 +162,8 @@ export class StorageService {
   }
 
   private async runMigrations(): Promise<void> {
-    const ccExists = await this.ccSettings.exists();
-    const claudianExists = await this.codianSettings.exists();
+
     const dataJson = await this.loadDataJson();
-
-    if (!claudianExists) {
-      await this.migrateFromLegacyClaudianSettings();
-    }
-
-    // Check if old settings.json has Claudian fields that need migration
-    if (ccExists && !(await this.codianSettings.exists())) {
-      await this.migrateFromOldSettingsJson();
-    }
 
     if (dataJson) {
       const hasState = this.hasStateToMigrate(dataJson);
@@ -255,7 +191,7 @@ export class StorageService {
   private hasStateToMigrate(data: LegacyDataJson): boolean {
     return (
       data.lastEnvHash !== undefined ||
-      data.lastClaudeModel !== undefined ||
+      data.lastCodexModel !== undefined ||
       data.lastCustomModel !== undefined
     );
   }
@@ -267,126 +203,6 @@ export class StorageService {
     );
   }
 
-  /**
-   * Migrate settings written by older builds under .codian/.
-   *
-   * This keeps user-configured memory/rules paths when the plugin moves to the
-   * .claude-compatible storage layout.
-   */
-  private async migrateFromLegacyClaudianSettings(): Promise<void> {
-    if (!(await this.adapter.exists(LEGACY_CLAUDIAN_SETTINGS_PATH))) {
-      return;
-    }
-
-    const content = await this.adapter.read(LEGACY_CLAUDIAN_SETTINGS_PATH);
-    const legacy = JSON.parse(content) as Partial<StoredCodianSettings>;
-    const { slashCommands: _, ...defaults } = DEFAULT_SETTINGS;
-
-    await this.codianSettings.save({
-      ...defaults,
-      ...legacy,
-      blockedCommands: normalizeBlockedCommands(legacy.blockedCommands),
-    } as StoredCodianSettings);
-  }
-
-  /**
-   * Migrate from old settings.json (with Claudian fields) to split format.
-   *
-   * Handles:
-   * - Legacy Claudian fields (userName, model, etc.) → codian-settings.json
-   * - Legacy permissions array → CC permissions object
-   * - CC env object → Claudian environmentVariables string
-   * - Preserves existing CC permissions if already in CC format
-   */
-  private async migrateFromOldSettingsJson(): Promise<void> {
-    const content = await this.adapter.read(RUNTIME_SETTINGS_PATH);
-    const oldSettings = JSON.parse(content) as LegacySettingsJson;
-
-    const hasClaudianFields = Array.from(CLAUDIAN_ONLY_FIELDS).some(
-      field => (oldSettings as Record<string, unknown>)[field] !== undefined
-    );
-
-    if (!hasClaudianFields) {
-      return;
-    }
-
-    // Handle environment variables: merge Claudian string format with CC object format
-    let environmentVariables = oldSettings.environmentVariables ?? '';
-    if (oldSettings.env && typeof oldSettings.env === 'object') {
-      const envFromCC = convertEnvObjectToString(oldSettings.env);
-      if (envFromCC) {
-        environmentVariables = mergeEnvironmentVariables(environmentVariables, envFromCC);
-      }
-    }
-
-    const claudianFields: Partial<StoredCodianSettings> = {
-      userName: oldSettings.userName ?? DEFAULT_SETTINGS.userName,
-      enableBlocklist: oldSettings.enableBlocklist ?? DEFAULT_SETTINGS.enableBlocklist,
-      blockedCommands: normalizeBlockedCommands(oldSettings.blockedCommands),
-      currentProvider: DEFAULT_SETTINGS.currentProvider,
-      providerConfigs: DEFAULT_SETTINGS.providerConfigs,
-      model: (oldSettings.model as AgentModel) ?? DEFAULT_SETTINGS.model,
-      thinkingBudget: (oldSettings.thinkingBudget as StoredCodianSettings['thinkingBudget']) ?? DEFAULT_SETTINGS.thinkingBudget,
-      permissionMode: (oldSettings.permissionMode as StoredCodianSettings['permissionMode']) ?? DEFAULT_SETTINGS.permissionMode,
-      excludedTags: oldSettings.excludedTags ?? DEFAULT_SETTINGS.excludedTags,
-      mediaFolder: oldSettings.mediaFolder ?? DEFAULT_SETTINGS.mediaFolder,
-      environmentVariables, // Merged from both sources
-      envSnippets: oldSettings.envSnippets as StoredCodianSettings['envSnippets'] ?? DEFAULT_SETTINGS.envSnippets,
-      systemPrompt: oldSettings.systemPrompt ?? DEFAULT_SETTINGS.systemPrompt,
-      strongRulesFilePath: oldSettings.strongRulesFilePath ?? DEFAULT_SETTINGS.strongRulesFilePath,
-      strongRulesPrompt: oldSettings.strongRulesPrompt ?? DEFAULT_SETTINGS.strongRulesPrompt,
-      memoryFilePath: oldSettings.memoryFilePath ?? DEFAULT_SETTINGS.memoryFilePath,
-      enableLocalMemory: oldSettings.enableLocalMemory ?? DEFAULT_SETTINGS.enableLocalMemory,
-      localMemoryPath: oldSettings.localMemoryPath ?? DEFAULT_SETTINGS.localMemoryPath,
-      allowedExportPaths: oldSettings.allowedExportPaths ?? DEFAULT_SETTINGS.allowedExportPaths,
-      persistentExternalContextPaths: DEFAULT_SETTINGS.persistentExternalContextPaths,
-      keyboardNavigation: oldSettings.keyboardNavigation as StoredCodianSettings['keyboardNavigation'] ?? DEFAULT_SETTINGS.keyboardNavigation,
-      codexCliPath: oldSettings.claudeCliPath ?? DEFAULT_SETTINGS.codexCliPath,
-      codexCliPathsByHost: DEFAULT_SETTINGS.codexCliPathsByHost,
-      enableAutoTitleGeneration: oldSettings.enableAutoTitleGeneration ?? DEFAULT_SETTINGS.enableAutoTitleGeneration,
-      titleGenerationModel: oldSettings.titleGenerationModel ?? DEFAULT_SETTINGS.titleGenerationModel,
-      lastCodexModel: DEFAULT_SETTINGS.lastCodexModel,
-      lastCustomModel: DEFAULT_SETTINGS.lastCustomModel,
-      lastEnvHash: DEFAULT_SETTINGS.lastEnvHash,
-    };
-
-    // Save Claudian settings FIRST (before stripping from settings.json)
-    await this.codianSettings.save(claudianFields as StoredCodianSettings);
-
-    // Verify Claudian settings were saved
-    const savedClaudian = await this.codianSettings.load();
-    if (!savedClaudian || savedClaudian.userName === undefined) {
-      throw new Error('Failed to verify codian-settings.json was saved correctly');
-    }
-
-    // Handle permissions: convert legacy format OR preserve existing CC format
-    let ccPermissions: CCPermissions;
-    if (isLegacyPermissionsFormat(oldSettings)) {
-      ccPermissions = legacyPermissionsToCCPermissions(oldSettings.permissions);
-    } else if (oldSettings.permissions && typeof oldSettings.permissions === 'object' && !Array.isArray(oldSettings.permissions)) {
-      // Already in CC format - preserve it including defaultMode and additionalDirectories
-      const existingPerms = oldSettings.permissions as unknown as CCPermissions;
-      ccPermissions = {
-        allow: existingPerms.allow ?? [],
-        deny: existingPerms.deny ?? [],
-        ask: existingPerms.ask ?? [],
-        defaultMode: existingPerms.defaultMode,
-        additionalDirectories: existingPerms.additionalDirectories,
-      };
-    } else {
-      ccPermissions = { ...DEFAULT_CC_PERMISSIONS };
-    }
-
-    // Rewrite settings.json with only CC fields
-    const ccSettings: CCSettings = {
-      $schema: 'https://json.schemastore.org/claude-code-settings.json',
-      permissions: ccPermissions,
-    };
-
-    // Pass true to strip Claudian-only fields during migration
-    await this.ccSettings.save(ccSettings, true);
-  }
-
   private async migrateFromDataJson(dataJson: LegacyDataJson): Promise<void> {
     const codian = await this.codianSettings.load();
 
@@ -394,8 +210,8 @@ export class StorageService {
     if (dataJson.lastEnvHash !== undefined && !codian.lastEnvHash) {
       codian.lastEnvHash = dataJson.lastEnvHash;
     }
-    if (dataJson.lastClaudeModel !== undefined && !codian.lastCodexModel) {
-      codian.lastCodexModel = dataJson.lastClaudeModel;
+    if (dataJson.lastCodexModel !== undefined && !codian.lastCodexModel) {
+      codian.lastCodexModel = dataJson.lastCodexModel;
     }
     if (dataJson.lastCustomModel !== undefined && !codian.lastCustomModel) {
       codian.lastCustomModel = dataJson.lastCustomModel;
@@ -446,7 +262,7 @@ export class StorageService {
 
     const cleaned: Record<string, unknown> = { ...dataJson };
     delete cleaned.lastEnvHash;
-    delete cleaned.lastClaudeModel;
+    delete cleaned.lastCodexModel;
     delete cleaned.lastCustomModel;
     delete cleaned.conversations;
     delete cleaned.slashCommands;
@@ -489,27 +305,27 @@ export class StorageService {
     return this.adapter;
   }
 
-  async getPermissions(): Promise<CCPermissions> {
-    return this.ccSettings.getPermissions();
+  async getPermissions(): Promise<RuntimePermissions> {
+    return this.runtimeSettings.getPermissions();
   }
 
-  async updatePermissions(permissions: CCPermissions): Promise<void> {
-    return this.ccSettings.updatePermissions(permissions);
+  async updatePermissions(permissions: RuntimePermissions): Promise<void> {
+    return this.runtimeSettings.updatePermissions(permissions);
   }
 
   async addAllowRule(rule: string): Promise<void> {
-    return this.ccSettings.addAllowRule(createPermissionRule(rule));
+    return this.runtimeSettings.addAllowRule(createPermissionRule(rule));
   }
 
   async addDenyRule(rule: string): Promise<void> {
-    return this.ccSettings.addDenyRule(createPermissionRule(rule));
+    return this.runtimeSettings.addDenyRule(createPermissionRule(rule));
   }
 
   /**
    * Remove a permission rule from all lists.
    */
   async removePermissionRule(rule: string): Promise<void> {
-    return this.ccSettings.removeRule(createPermissionRule(rule));
+    return this.runtimeSettings.removeRule(createPermissionRule(rule));
   }
 
   async updateCodianSettings(updates: Partial<StoredCodianSettings>): Promise<void> {
@@ -640,17 +456,6 @@ export class StorageService {
     }
   }
 
-  async updateClaudianSettings(updates: Partial<StoredCodianSettings>): Promise<void> {
-    return this.updateCodianSettings(updates);
-  }
-
-  async saveClaudianSettings(settings: StoredCodianSettings): Promise<void> {
-    return this.saveCodianSettings(settings);
-  }
-
-  async loadClaudianSettings(): Promise<StoredCodianSettings> {
-    return this.loadCodianSettings();
-  }
 }
 
 /**

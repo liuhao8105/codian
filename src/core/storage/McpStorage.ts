@@ -1,8 +1,8 @@
 /**
  * McpStorage - Handles .codian/mcp.json read/write
  *
- * MCP server configurations are stored in Claude Code-compatible format
- * with optional Claudian-specific metadata in _codian field.
+ * MCP server configurations use the standard MCP server map format
+ * with optional Codian-specific metadata in _codian field.
  *
  * File format:
  * {
@@ -86,7 +86,7 @@ export class McpStorage {
     for (const server of servers) {
       mcpServers[server.name] = server.config;
 
-      // Only store Claudian metadata if different from defaults
+      // Only store Codian metadata if different from defaults
       const meta: {
         enabled?: boolean;
         contextSaving?: boolean;
@@ -161,7 +161,7 @@ export class McpStorage {
    * Parse pasted JSON (supports multiple formats).
    *
    * Formats supported:
-   * 1. Full Claude Code format: { "mcpServers": { "name": {...} } }
+   * 1. Full Codex format: { "mcpServers": { "name": {...} } }
    * 2. Single server with name: { "name": { "command": "..." } }
    * 3. Single server without name: { "command": "..." }
    */
@@ -173,7 +173,7 @@ export class McpStorage {
         throw new Error('Invalid JSON object');
       }
 
-      // Format 1: Full Claude Code format
+      // Format 1: Full Codex format
       // { "mcpServers": { "server-name": { "command": "...", ... } } }
       if (parsed.mcpServers && typeof parsed.mcpServers === 'object') {
         const servers: Array<{ name: string; config: McpServerConfig }> = [];

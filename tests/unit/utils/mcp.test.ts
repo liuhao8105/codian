@@ -161,7 +161,7 @@ describe('splitCommandString', () => {
   });
 
   it('handles single word', () => {
-    expect(splitCommandString('claude')).toEqual(['claude']);
+    expect(splitCommandString('codex')).toEqual(['codex']);
   });
 
   it('handles empty string', () => {
@@ -212,7 +212,7 @@ describe('splitCommandString', () => {
 
 describe('parseCommand', () => {
   it('parses command with no arguments', () => {
-    expect(parseCommand('claude')).toEqual({ cmd: 'claude', args: [] });
+    expect(parseCommand('codex')).toEqual({ cmd: 'codex', args: [] });
   });
 
   it('parses command with arguments', () => {

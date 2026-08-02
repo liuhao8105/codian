@@ -77,7 +77,7 @@ description: "Value with: colon"
 tools:
   - Read
   - Grep
-model: sonnet
+model: GPT-5.6-Sol
 enabled: true
 count: 5
 ---
@@ -87,7 +87,7 @@ Prompt`;
     expect(result).not.toBeNull();
     expect(result!.frontmatter.description).toBe('Value with: colon');
     expect(result!.frontmatter.tools).toEqual(['Read', 'Grep']);
-    expect(result!.frontmatter.model).toBe('sonnet');
+    expect(result!.frontmatter.model).toBe('GPT-5.6-Sol');
     expect(result!.frontmatter.enabled).toBe(true);
     expect(result!.frontmatter.count).toBe(5);
     expect(result!.body).toBe('Prompt');
@@ -98,7 +98,7 @@ Prompt`;
     const content = `---
 name: code-reviewer
 description: Use this agent when reviewing. Examples: Context: The user said something. user: hello
-model: opus
+model: GPT-5.6-Terra
 ---
 You are a code reviewer.`;
 
@@ -107,7 +107,7 @@ You are a code reviewer.`;
     expect(result!.frontmatter.name).toBe('code-reviewer');
     // Fallback parser takes first colon-space as separator, so description includes the rest
     expect(result!.frontmatter.description).toContain('Use this agent');
-    expect(result!.frontmatter.model).toBe('opus');
+    expect(result!.frontmatter.model).toBe('GPT-5.6-Terra');
     expect(result!.body).toBe('You are a code reviewer.');
   });
 
@@ -278,13 +278,13 @@ describe('parseFrontmatter fallback parser', () => {
   it('falls back to line-by-line parsing when parseYaml throws', () => {
     const content = `---
 name: test
-model: opus
+model: GPT-5.6-Terra
 ---
 Body`;
     const result = parseFrontmatter(content);
     expect(result).not.toBeNull();
     expect(result!.frontmatter.name).toBe('test');
-    expect(result!.frontmatter.model).toBe('opus');
+    expect(result!.frontmatter.model).toBe('GPT-5.6-Terra');
     expect(result!.body).toBe('Body');
   });
 
@@ -377,13 +377,13 @@ Body`;
     const content = `---
 name: test
 
-model: opus
+model: GPT-5.6-Terra
 ---
 Body`;
     const result = parseFrontmatter(content);
     expect(result).not.toBeNull();
     expect(result!.frontmatter.name).toBe('test');
-    expect(result!.frontmatter.model).toBe('opus');
+    expect(result!.frontmatter.model).toBe('GPT-5.6-Terra');
   });
 
   it('fallback parser handles keys with trailing colon only', () => {

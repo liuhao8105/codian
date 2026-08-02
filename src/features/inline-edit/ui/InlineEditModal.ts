@@ -456,7 +456,7 @@ class InlineEditController {
     const userMessage = this.inputEl.value.trim();
     if (!userMessage) return;
 
-    // Slash commands are passed directly to SDK for handling
+    // Slash commands are passed directly to Runtime for handling
 
     this.removeSelectionListeners();
 

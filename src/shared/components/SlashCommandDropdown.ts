@@ -10,10 +10,10 @@ import type { SlashCommand } from '../../core/types';
 import { normalizeArgumentHint } from '../../utils/slashCommand';
 
 /**
- * SDK commands to filter out from the dropdown.
+ * Runtime commands to filter out from the dropdown.
  * These are either handled differently in Codian or don't apply.
  */
-const FILTERED_SDK_COMMANDS = new Set([
+const FILTERED_Runtime_COMMANDS = new Set([
   'context',
   'cost',
   'init',
@@ -26,8 +26,8 @@ export interface SlashCommandDropdownCallbacks {
   onSelect: (command: SlashCommand) => void;
   onHide: () => void;
   /**
-   * Callback to fetch SDK supported commands.
-   * SDK is the single source of truth for slash commands.
+   * Callback to fetch Runtime supported commands.
+   * Runtime is the single source of truth for slash commands.
    * Only available after the service is initialized (first message sent).
    */
   getSdkCommands?: () => Promise<SlashCommand[]>;
@@ -51,9 +51,9 @@ export class SlashCommandDropdown {
   private isFixed: boolean;
   private hiddenCommands: Set<string>;
 
-  // SDK skills cache
+  // Runtime skills cache
   private cachedSdkSkills: SlashCommand[] = [];
-  private sdkSkillsFetched = false;
+  private runtimeSkillsFetched = false;
 
   // Race condition guard for async dropdown rendering
   private requestId = 0;
@@ -161,12 +161,12 @@ export class SlashCommandDropdown {
   }
 
   /**
-   * Resets the SDK skills cache.
+   * Resets the Runtime skills cache.
    * Call this when switching conversations or creating a new chat.
    */
   resetSdkSkillsCache(): void {
     this.cachedSdkSkills = [];
-    this.sdkSkillsFetched = false;
+    this.runtimeSkillsFetched = false;
     this.requestId = 0;
   }
 
@@ -193,22 +193,22 @@ export class SlashCommandDropdown {
     const builtInCommands = getBuiltInCommandsForDropdown();
     const searchLower = searchText.toLowerCase();
 
-    // Fetch SDK commands if not cached and callback is available
-    // SDK is the single source of truth for slash commands
+    // Fetch Runtime commands if not cached and callback is available
+    // Runtime is the single source of truth for slash commands
     // Only mark as fetched when we get non-empty results (service is ready)
     // This allows retries when service isn't ready yet or on transient errors
-    if (!this.sdkSkillsFetched && this.callbacks.getSdkCommands) {
+    if (!this.runtimeSkillsFetched && this.callbacks.getSdkCommands) {
       try {
-        const sdkCommands = await this.callbacks.getSdkCommands();
+        const runtimeCommands = await this.callbacks.getSdkCommands();
         // Discard results if a newer request was made during await
         if (currentRequest !== this.requestId) return;
-        if (sdkCommands.length > 0) {
-          this.cachedSdkSkills = sdkCommands;
-          this.sdkSkillsFetched = true;
+        if (runtimeCommands.length > 0) {
+          this.cachedSdkSkills = runtimeCommands;
+          this.runtimeSkillsFetched = true;
         }
-        // Keep sdkSkillsFetched false to allow retry on empty results
+        // Keep runtimeSkillsFetched false to allow retry on empty results
       } catch {
-        // Keep sdkSkillsFetched false to allow retry on error
+        // Keep runtimeSkillsFetched false to allow retry on error
         if (currentRequest !== this.requestId) return;
       }
     }
@@ -235,9 +235,9 @@ export class SlashCommandDropdown {
   }
 
   /**
-   * Builds the merged command list from built-in and SDK commands.
+   * Builds the merged command list from built-in and Runtime commands.
    * Built-in commands have highest priority and are not subject to hiding.
-   * SDK commands are deduplicated, filtered, and respect user hiding.
+   * Runtime commands are deduplicated, filtered, and respect user hiding.
    */
   private buildCommandList(builtInCommands: SlashCommand[]): SlashCommand[] {
     const seenNames = new Set<string>();
@@ -256,7 +256,7 @@ export class SlashCommandDropdown {
     for (const cmd of this.cachedSdkSkills) {
       const nameLower = cmd.name.toLowerCase();
       if (
-        FILTERED_SDK_COMMANDS.has(nameLower) ||
+        FILTERED_Runtime_COMMANDS.has(nameLower) ||
         seenNames.has(nameLower) ||
         this.hiddenCommands.has(nameLower)
       ) {

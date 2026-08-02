@@ -153,10 +153,6 @@
       "name": "MCP 服务器",
       "desc": "配置模型上下文协议服务器，通过外部工具和数据源扩展 Codex 的能力。启用上下文保存模式的服务器需要 @ 提及才能激活。"
     },
-    "plugins": {
-      "name": "遗留插件兼容设置",
-      "desc": "这是从上游项目继承的兼容设置，仅用于迁移和向后兼容。"
-    },
     "subagents": {
       "name": "子代理",
       "desc": "配置 Codian 可委派给其处理的自定义子代理。",
@@ -196,10 +192,6 @@
       }
     },
     "safety": "安全",
-    "loadUserSettings": {
-      "name": "加载遗留设置",
-      "desc": "为兼容迁移过程加载 ~/.claude/settings.json。启用后，这些遗留权限规则可能绕过安全模式。"
-    },
     "enableBlocklist": {
       "name": "启用命令黑名单",
       "desc": "阻止潜在危险的 bash 命令"
@@ -244,14 +236,6 @@
       "invalid": "格式无效。使用：256k、1m 或精确数量（1000-10000000）。"
     },
     "advanced": "高级",
-    "show1MModel": {
-      "name": "遗留 Anthropic 1M 选项",
-      "desc": "已废弃的遗留兼容选项，仅为向后兼容保留。"
-    },
-    "enableChrome": {
-      "name": "启用 Chrome 扩展",
-      "desc": "允许 Codian 通过 claude-in-chrome 扩展与 Chrome 交互。需要安装该扩展。需要重启会话。"
-    },
     "enableBangBash": {
       "name": "启用命令模式 (!)",
       "desc": "在空输入框中输入 ! 进入命令模式。通过 Node.js child_process 直接运行命令。需要重新打开视图。",

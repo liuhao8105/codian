@@ -13,15 +13,7 @@
 它的核心思路很简单：
 - 你的 Obsidian 仓库就是 Codex 的工作目录
 - 你可以直接在笔记环境里聊天、改写、看图、读写文件、执行多步任务
-- 保留了类似 `claudian` 的使用体验，但底层已经改成 `Codex`
-
-## 项目来源
-
-本项目基于开源项目 [`YishenTu/claudian`](https://github.com/YishenTu/claudian) 修改而来，
-目标是把原先以 `Claude / Claudian` 为核心的插件体验，迁移为面向 `Codex / Codian`
-的可用版本。
-
-上游项目采用 MIT 许可证，本仓库保留了原始许可证声明。
+- 以 `Codex` 为主运行时，并提供一致的 `Codian` 插件体验
 
 ## 当前状态
 
@@ -210,4 +202,3 @@ which codex
 
 - [Obsidian](https://obsidian.md)
 - [OpenAI Codex](https://openai.com)
-- 上游开源项目 [`YishenTu/claudian`](https://github.com/YishenTu/claudian)

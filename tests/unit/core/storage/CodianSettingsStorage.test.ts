@@ -41,13 +41,13 @@ describe('CodianSettingsStorage', () => {
     it('should parse valid JSON and merge with defaults', async () => {
       mockAdapter.exists.mockResolvedValue(true);
       mockAdapter.read.mockResolvedValue(JSON.stringify({
-        model: 'claude-opus-4-5',
+        model: 'gpt-5.6-terra',
         userName: 'TestUser',
       }));
 
       const result = await storage.load();
 
-      expect(result.model).toBe('claude-opus-4-5');
+      expect(result.model).toBe('gpt-5.6-terra');
       expect(result.userName).toBe('TestUser');
       // Defaults should still be present for unspecified fields
       expect(result.thinkingBudget).toBe(DEFAULT_SETTINGS.thinkingBudget);
@@ -68,10 +68,10 @@ describe('CodianSettingsStorage', () => {
       expect(result.blockedCommands.windows).toContain('custom-win-cmd');
     });
 
-    it('should normalize claudeCliPathsByHost from loaded data', async () => {
+    it('should normalize codexCliPathsByHost from loaded data', async () => {
       mockAdapter.exists.mockResolvedValue(true);
       mockAdapter.read.mockResolvedValue(JSON.stringify({
-        claudeCliPathsByHost: {
+        codexCliPathsByHost: {
           'host-a': '/custom/path-a',
           'host-b': '/custom/path-b',
         },
@@ -83,16 +83,6 @@ describe('CodianSettingsStorage', () => {
       expect(result.codexCliPathsByHost['host-b']).toBe('/custom/path-b');
     });
 
-    it('should preserve legacy claudeCliPath field', async () => {
-      mockAdapter.exists.mockResolvedValue(true);
-      mockAdapter.read.mockResolvedValue(JSON.stringify({
-        claudeCliPath: '/legacy/path',
-      }));
-
-      const result = await storage.load();
-
-      expect(result.codexCliPath).toBe('/legacy/path');
-    });
 
     it('should restore valid settings from backup when the primary JSON is corrupt', async () => {
       mockAdapter.exists.mockImplementation(async (path: string) =>
@@ -101,12 +91,12 @@ describe('CodianSettingsStorage', () => {
       mockAdapter.read.mockImplementation(async (path: string) =>
         path === CODIAN_SETTINGS_PATH
           ? 'invalid json'
-          : JSON.stringify({ model: 'claude-opus-4-5', userName: 'Recovered' })
+          : JSON.stringify({ model: 'gpt-5.6-terra', userName: 'Recovered' })
       );
 
       const result = await storage.load();
 
-      expect(result.model).toBe('claude-opus-4-5');
+      expect(result.model).toBe('gpt-5.6-terra');
       expect(result.userName).toBe('Recovered');
       expect(mockAdapter.restoreFromBackup).toHaveBeenCalledWith(
         CODIAN_SETTINGS_PATH,
@@ -133,7 +123,7 @@ describe('CodianSettingsStorage', () => {
     it('should write settings to file', async () => {
       const settings = {
         ...DEFAULT_SETTINGS,
-        model: 'claude-opus-4-5' as const,
+        model: 'gpt-5.6-terra' as const,
       };
       // Remove slashCommands as it's stored separately
       const { slashCommands: _, ...storedSettings } = settings;
@@ -145,7 +135,7 @@ describe('CodianSettingsStorage', () => {
         expect.any(String)
       );
       const writtenContent = JSON.parse(mockAdapter.write.mock.calls[0][1]);
-      expect(writtenContent.model).toBe('claude-opus-4-5');
+      expect(writtenContent.model).toBe('gpt-5.6-terra');
     });
 
     it('should throw on write error', async () => {
@@ -183,15 +173,15 @@ describe('CodianSettingsStorage', () => {
     it('should merge updates with existing settings', async () => {
       mockAdapter.exists.mockResolvedValue(true);
       mockAdapter.read.mockResolvedValue(JSON.stringify({
-        model: 'claude-haiku-4-5',
+        model: 'gpt-5.6-luna',
         userName: 'ExistingUser',
       }));
 
-      await storage.update({ model: 'claude-opus-4-5' });
+      await storage.update({ model: 'gpt-5.6-terra' });
 
       const writeCall = mockAdapter.write.mock.calls[0];
       const writtenContent = JSON.parse(writeCall[1]);
-      expect(writtenContent.model).toBe('claude-opus-4-5');
+      expect(writtenContent.model).toBe('gpt-5.6-terra');
       expect(writtenContent.userName).toBe('ExistingUser');
     });
   });
@@ -211,7 +201,7 @@ describe('CodianSettingsStorage', () => {
     it('should return null when legacy activeConversationId is missing', async () => {
       mockAdapter.exists.mockResolvedValue(true);
       mockAdapter.read.mockResolvedValue(JSON.stringify({
-        model: 'claude-haiku-4-5',
+        model: 'gpt-5.6-luna',
       }));
 
       const legacyId = await storage.getLegacyActiveConversationId();
@@ -223,7 +213,7 @@ describe('CodianSettingsStorage', () => {
       mockAdapter.exists.mockResolvedValue(true);
       mockAdapter.read.mockResolvedValue(JSON.stringify({
         activeConversationId: 'conv-123',
-        model: 'claude-haiku-4-5',
+        model: 'gpt-5.6-luna',
       }));
 
       await storage.clearLegacyActiveConversationId();
@@ -231,7 +221,7 @@ describe('CodianSettingsStorage', () => {
       const writeCall = mockAdapter.write.mock.calls[0];
       const writtenContent = JSON.parse(writeCall[1]);
       expect(writtenContent.activeConversationId).toBeUndefined();
-      expect(writtenContent.model).toBe('claude-haiku-4-5');
+      expect(writtenContent.model).toBe('gpt-5.6-luna');
     });
   });
 
@@ -261,7 +251,7 @@ describe('CodianSettingsStorage', () => {
     it('should not write when activeConversationId key is absent', async () => {
       mockAdapter.exists.mockResolvedValue(true);
       mockAdapter.read.mockResolvedValue(JSON.stringify({
-        model: 'claude-haiku-4-5',
+        model: 'gpt-5.6-luna',
       }));
 
       await storage.clearLegacyActiveConversationId();
@@ -275,11 +265,11 @@ describe('CodianSettingsStorage', () => {
       mockAdapter.exists.mockResolvedValue(true);
       mockAdapter.read.mockResolvedValue(JSON.stringify({}));
 
-      await storage.setLastModel('claude-sonnet-4-5', false);
+      await storage.setLastModel('gpt-5.6-sol', false);
 
       const writeCall = mockAdapter.write.mock.calls[0];
       const writtenContent = JSON.parse(writeCall[1]);
-      expect(writtenContent.lastCodexModel).toBe('claude-sonnet-4-5');
+      expect(writtenContent.lastCodexModel).toBe('gpt-5.6-sol');
       // lastCustomModel keeps its default value (empty string)
     });
 
@@ -292,7 +282,7 @@ describe('CodianSettingsStorage', () => {
       const writeCall = mockAdapter.write.mock.calls[0];
       const writtenContent = JSON.parse(writeCall[1]);
       expect(writtenContent.lastCustomModel).toBe('custom-model-id');
-      // lastClaudeModel keeps its default value
+      // lastCodexModel keeps its default value
     });
   });
 

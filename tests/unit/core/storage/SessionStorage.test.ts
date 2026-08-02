@@ -43,7 +43,7 @@ describe('SessionStorage', () => {
 
     it('loads and parses conversation from JSONL file', async () => {
       const jsonlContent = [
-        '{"type":"meta","id":"conv-123","title":"Test Chat","createdAt":1700000000,"updatedAt":1700001000,"sessionId":"sdk-session"}',
+        '{"type":"meta","id":"conv-123","title":"Test Chat","createdAt":1700000000,"updatedAt":1700001000,"sessionId":"runtime-session"}',
         '{"type":"message","message":{"id":"msg-1","role":"user","content":"Hello","timestamp":1700000100}}',
         '{"type":"message","message":{"id":"msg-2","role":"assistant","content":"Hi!","timestamp":1700000200}}',
       ].join('\n');
@@ -59,7 +59,7 @@ describe('SessionStorage', () => {
         createdAt: 1700000000,
         updatedAt: 1700001000,
         lastResponseAt: undefined,
-        sessionId: 'sdk-session',
+        sessionId: 'runtime-session',
         messages: [
           { id: 'msg-1', role: 'user', content: 'Hello', timestamp: 1700000100 },
           { id: 'msg-2', role: 'assistant', content: 'Hi!', timestamp: 1700000200 },
@@ -134,7 +134,7 @@ describe('SessionStorage', () => {
 
     it('preserves all conversation metadata', async () => {
       const usage: UsageInfo = {
-        model: 'claude-sonnet-4-5',
+        model: 'gpt-5.6-sol',
         inputTokens: 1000,
         cacheCreationInputTokens: 500,
         cacheReadInputTokens: 200,
@@ -150,7 +150,7 @@ describe('SessionStorage', () => {
         createdAt: 1700000000,
         updatedAt: 1700001000,
         lastResponseAt: 1700000900,
-        sessionId: 'sdk-session',
+        sessionId: 'runtime-session',
         currentNote: 'notes/test.md',
         usage,
         titleGenerationStatus: 'success',
@@ -176,7 +176,7 @@ describe('SessionStorage', () => {
         title: 'Save Test',
         createdAt: 1700000000,
         updatedAt: 1700001000,
-        sessionId: 'sdk-session',
+        sessionId: 'runtime-session',
         messages: [
           { id: 'msg-1', role: 'user', content: 'Hello', timestamp: 1700000100 },
           { id: 'msg-2', role: 'assistant', content: 'Hi!', timestamp: 1700000200 },
@@ -294,7 +294,7 @@ describe('SessionStorage', () => {
 
     it('preserves all metadata fields in serialization', async () => {
       const usage: UsageInfo = {
-        model: 'claude-opus-4-5',
+        model: 'gpt-5.6-terra',
         inputTokens: 5000,
         cacheCreationInputTokens: 1000,
         cacheReadInputTokens: 500,
@@ -309,7 +309,7 @@ describe('SessionStorage', () => {
         createdAt: 1700000000,
         updatedAt: 1700001000,
         lastResponseAt: 1700000900,
-        sessionId: 'sdk-session-abc',
+        sessionId: 'runtime-session-abc',
         currentNote: 'projects/notes.md',
         usage,
         titleGenerationStatus: 'pending',
@@ -353,7 +353,7 @@ describe('SessionStorage', () => {
         }
         if (path.includes('conv-2')) {
           return Promise.resolve([
-            '{"type":"meta","id":"conv-2","title":"Second","createdAt":1700000000,"updatedAt":1700001000,"sessionId":"sdk-2"}',
+            '{"type":"meta","id":"conv-2","title":"Second","createdAt":1700000000,"updatedAt":1700001000,"sessionId":"runtime-2"}',
             '{"type":"message","message":{"id":"msg-1","role":"assistant","content":"Assistant first","timestamp":1700000100}}',
             '{"type":"message","message":{"id":"msg-2","role":"user","content":"User message","timestamp":1700000200}}',
           ].join('\n'));
@@ -578,7 +578,7 @@ describe('SessionStorage', () => {
   });
 
   // ============================================
-  // SDK-Native Session Metadata Tests
+  // Runtime-Native Session Metadata Tests
   // ============================================
 
   describe('isNativeSession', () => {
@@ -656,7 +656,7 @@ describe('SessionStorage', () => {
 
     it('preserves all optional fields', async () => {
       const usage: UsageInfo = {
-        model: 'claude-sonnet-4-5',
+        model: 'gpt-5.6-sol',
         inputTokens: 1000,
         cacheCreationInputTokens: 500,
         cacheReadInputTokens: 200,
@@ -919,7 +919,7 @@ describe('SessionStorage', () => {
 
       expect(metas).toHaveLength(1);
       expect(metas[0].isNative).toBe(true);
-      expect(metas[0].preview).toBe('SDK session');
+      expect(metas[0].preview).toBe('Runtime session');
       expect(metas[0].messageCount).toBe(0);
     });
   });
@@ -985,7 +985,7 @@ describe('SessionStorage', () => {
         title: 'Subagent Test',
         createdAt: 1700000000,
         updatedAt: 1700001000,
-        sessionId: 'sdk-session',
+        sessionId: 'runtime-session',
         messages: [
           { id: 'msg-1', role: 'user', content: 'Hello', timestamp: 1700000100 },
           {
@@ -1048,7 +1048,7 @@ describe('SessionStorage', () => {
         title: 'Task Subagent Test',
         createdAt: 1700000000,
         updatedAt: 1700001000,
-        sessionId: 'sdk-session',
+        sessionId: 'runtime-session',
         messages: [
           {
             id: 'msg-1',
@@ -1081,7 +1081,7 @@ describe('SessionStorage', () => {
         title: 'Rewind Test',
         createdAt: 1700000000,
         updatedAt: 1700001000,
-        sessionId: 'sdk-session',
+        sessionId: 'runtime-session',
         messages: [],
         resumeSessionAt: 'assistant-uuid-123',
       };
@@ -1110,7 +1110,7 @@ describe('SessionStorage', () => {
   describe('toSessionMetadata', () => {
     it('converts Conversation to SessionMetadata', () => {
       const usage: UsageInfo = {
-        model: 'claude-opus-4-5',
+        model: 'gpt-5.6-terra',
         inputTokens: 5000,
         cacheCreationInputTokens: 1000,
         cacheReadInputTokens: 500,
@@ -1125,8 +1125,8 @@ describe('SessionStorage', () => {
         createdAt: 1700000000,
         updatedAt: 1700001000,
         lastResponseAt: 1700000900,
-        sessionId: 'sdk-session',
-        sdkSessionId: 'current-sdk-session',
+        sessionId: 'runtime-session',
+        runtimeSessionId: 'current-runtime-session',
         messages: [
           { id: 'msg-1', role: 'user', content: 'Hello', timestamp: 1700000100 },
         ],
@@ -1145,8 +1145,8 @@ describe('SessionStorage', () => {
       expect(metadata.createdAt).toBe(1700000000);
       expect(metadata.updatedAt).toBe(1700001000);
       expect(metadata.lastResponseAt).toBe(1700000900);
-      expect(metadata.sessionId).toBe('sdk-session');
-      expect(metadata.sdkSessionId).toBe('current-sdk-session');
+      expect(metadata.sessionId).toBe('runtime-session');
+      expect(metadata.runtimeSessionId).toBe('current-runtime-session');
       expect(metadata.legacyCutoffAt).toBe(1700000050);
       expect(metadata.currentNote).toBe('notes/test.md');
       expect(metadata.externalContextPaths).toEqual(['/external/path']);
@@ -1183,7 +1183,7 @@ describe('SessionStorage', () => {
         title: 'No Fork',
         createdAt: 1700000000,
         updatedAt: 1700001000,
-        sessionId: 'sdk-session',
+        sessionId: 'runtime-session',
         messages: [],
       };
 

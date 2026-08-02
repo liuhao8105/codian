@@ -48,7 +48,7 @@ export interface CodianMcpServer {
   description?: string;
 }
 
-/** MCP configuration file format (Claude Code compatible). */
+/** MCP configuration file format (Codex compatible). */
 export interface McpConfigFile {
   mcpServers: Record<string, McpServerConfig>;
 }
@@ -94,9 +94,6 @@ export function isValidMcpServerConfig(obj: unknown): obj is McpServerConfig {
 
   return false;
 }
-
-export type ClaudianMcpServer = CodianMcpServer;
-export type ClaudianMcpConfigFile = CodianMcpConfigFile;
 
 export const DEFAULT_MCP_SERVER: Omit<CodianMcpServer, 'name' | 'config'> = {
   enabled: true,

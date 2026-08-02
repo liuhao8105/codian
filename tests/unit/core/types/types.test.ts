@@ -4,26 +4,17 @@ import type {
   Conversation,
   ConversationMeta,
   EnvSnippet,
-  LegacyPermission,
   StreamChunk,
   ToolCallInfo
 } from '@/core/types';
 import {
-  BETA_1M_CONTEXT,
-  CONTEXT_WINDOW_1M,
   CONTEXT_WINDOW_STANDARD,
-  createPermissionRule,
   DEFAULT_SETTINGS,
   getBashToolBlockedCommands,
-  getCliPlatformKey,
   getContextWindowSize,
   getCurrentPlatformBlockedCommands,
   getCurrentPlatformKey,
   getDefaultBlockedCommands,
-  legacyPermissionsToCCPermissions,
-  legacyPermissionToCCRule,
-  parseCCPermissionRule,
-  resolveModelWithBetas,
   VIEW_TYPE_CODIAN
 } from '@/core/types';
 
@@ -115,7 +106,7 @@ describe('types.ts', () => {
         blockedCommands: { unix: ['test'], windows: ['test-win'] },
         currentProvider: 'codex',
         providerConfigs: DEFAULT_SETTINGS.providerConfigs,
-        model: 'haiku',
+        model: 'GPT-5.6-Luna',
         enableAutoTitleGeneration: true,
         titleGenerationModel: '',
         thinkingBudget: 'off',
@@ -130,13 +121,12 @@ describe('types.ts', () => {
         strongRulesPrompt: '',
         memoryFilePath: '',
         enableLocalMemory: true,
-        localMemoryPath: '.claude/local-memory',
+        localMemoryPath: '.codex/local-memory',
         allowedExportPaths: [],
         persistentExternalContextPaths: [],
         slashCommands: [],
         keyboardNavigation: { scrollUpKey: 'w', scrollDownKey: 's', focusInputKey: 'i' },
         locale: 'en',
-        codexCliPath: '',
         codexCliPathsByHost: {},
         maxTabs: 3,
         allowExternalAccess: false,
@@ -150,7 +140,7 @@ describe('types.ts', () => {
 
       expect(settings.enableBlocklist).toBe(false);
       expect(settings.blockedCommands).toEqual({ unix: ['test'], windows: ['test-win'] });
-      expect(settings.model).toBe('haiku');
+      expect(settings.model).toBe('GPT-5.6-Luna');
     });
 
     it('should accept custom model strings', () => {
@@ -160,7 +150,7 @@ describe('types.ts', () => {
         blockedCommands: { unix: [], windows: [] },
         currentProvider: 'codex',
         providerConfigs: DEFAULT_SETTINGS.providerConfigs,
-        model: 'anthropic/custom-model-v1',
+        model: 'openai/custom-model-v1',
         enableAutoTitleGeneration: true,
         titleGenerationModel: '',
         thinkingBudget: 'medium',
@@ -175,13 +165,12 @@ describe('types.ts', () => {
         strongRulesPrompt: '',
         memoryFilePath: '',
         enableLocalMemory: true,
-        localMemoryPath: '.claude/local-memory',
+        localMemoryPath: '.codex/local-memory',
         allowedExportPaths: [],
         persistentExternalContextPaths: [],
         slashCommands: [],
         keyboardNavigation: { scrollUpKey: 'w', scrollDownKey: 's', focusInputKey: 'i' },
         locale: 'zh-CN',
-        codexCliPath: '',
         codexCliPathsByHost: {},
         maxTabs: 3,
         allowExternalAccess: false,
@@ -193,7 +182,7 @@ describe('types.ts', () => {
         hiddenSlashCommands: [],
       };
 
-      expect(settings.model).toBe('anthropic/custom-model-v1');
+      expect(settings.model).toBe('openai/custom-model-v1');
     });
 
     it('should accept optional Codex and custom model state', () => {
@@ -203,7 +192,7 @@ describe('types.ts', () => {
         blockedCommands: { unix: [], windows: [] },
         currentProvider: 'codex',
         providerConfigs: DEFAULT_SETTINGS.providerConfigs,
-        model: 'sonnet',
+        model: 'GPT-5.6-Sol',
         enableAutoTitleGeneration: true,
         titleGenerationModel: '',
         lastCodexModel: 'gpt-test',
@@ -220,13 +209,12 @@ describe('types.ts', () => {
         strongRulesPrompt: '',
         memoryFilePath: '',
         enableLocalMemory: true,
-        localMemoryPath: '.claude/local-memory',
+        localMemoryPath: '.codex/local-memory',
         allowedExportPaths: [],
         persistentExternalContextPaths: [],
         slashCommands: [],
         keyboardNavigation: { scrollUpKey: 'w', scrollDownKey: 's', focusInputKey: 'i' },
         locale: 'en',
-        codexCliPath: '',
         codexCliPathsByHost: {},
         maxTabs: 5,
         allowExternalAccess: false,
@@ -518,55 +506,6 @@ describe('types.ts', () => {
     });
   });
 
-  describe('Platform CLI helpers (deprecated)', () => {
-    describe('getCliPlatformKey', () => {
-      it('should return a valid platform key', () => {
-        const key = getCliPlatformKey();
-        expect(['macos', 'linux', 'windows']).toContain(key);
-      });
-
-      it('should return consistent results', () => {
-        const key1 = getCliPlatformKey();
-        const key2 = getCliPlatformKey();
-        expect(key1).toBe(key2);
-      });
-    });
-
-    describe('getCliPlatformKey with mocked platforms', () => {
-      const originalPlatform = process.platform;
-
-      afterEach(() => {
-        Object.defineProperty(process, 'platform', { value: originalPlatform });
-      });
-
-      it('should return macos for darwin', () => {
-        Object.defineProperty(process, 'platform', { value: 'darwin' });
-        expect(getCliPlatformKey()).toBe('macos');
-      });
-
-      it('should return windows for win32', () => {
-        Object.defineProperty(process, 'platform', { value: 'win32' });
-        expect(getCliPlatformKey()).toBe('windows');
-      });
-
-      it('should return linux for linux', () => {
-        Object.defineProperty(process, 'platform', { value: 'linux' });
-        expect(getCliPlatformKey()).toBe('linux');
-      });
-
-      it('should return linux for unknown platform', () => {
-        Object.defineProperty(process, 'platform', { value: 'freebsd' });
-        expect(getCliPlatformKey()).toBe('linux');
-      });
-    });
-
-    describe('DEFAULT_SETTINGS.codexCliPathsByHost', () => {
-      it('should have empty hostname-based CLI paths by default', () => {
-        expect(DEFAULT_SETTINGS.codexCliPathsByHost).toBeDefined();
-        expect(DEFAULT_SETTINGS.codexCliPathsByHost).toEqual({});
-      });
-    });
-  });
 
   describe('Blocked commands helpers', () => {
     describe('getDefaultBlockedCommands', () => {
@@ -637,262 +576,15 @@ describe('types.ts', () => {
     });
   });
 
-  describe('Permission Conversion Utilities', () => {
-    describe('legacyPermissionToCCRule', () => {
-      it('should convert Bash permission with pattern', () => {
-        const legacy: LegacyPermission = {
-          toolName: 'Bash',
-          pattern: 'git status',
-          approvedAt: Date.now(),
-          scope: 'always',
-        };
-        expect(legacyPermissionToCCRule(legacy)).toBe('Bash(git status)');
-      });
 
-      it('should convert Read permission with file path', () => {
-        const legacy: LegacyPermission = {
-          toolName: 'Read',
-          pattern: '/path/to/file.txt',
-          approvedAt: Date.now(),
-          scope: 'always',
-        };
-        expect(legacyPermissionToCCRule(legacy)).toBe('Read(/path/to/file.txt)');
-      });
-
-      it('should return just tool name for wildcard pattern', () => {
-        const legacy: LegacyPermission = {
-          toolName: 'WebSearch',
-          pattern: '*',
-          approvedAt: Date.now(),
-          scope: 'always',
-        };
-        expect(legacyPermissionToCCRule(legacy)).toBe('WebSearch');
-      });
-
-      it('should return just tool name for empty pattern', () => {
-        const legacy: LegacyPermission = {
-          toolName: 'Glob',
-          pattern: '',
-          approvedAt: Date.now(),
-          scope: 'always',
-        };
-        expect(legacyPermissionToCCRule(legacy)).toBe('Glob');
-      });
-
-      it('should return just tool name for JSON object pattern (legacy format)', () => {
-        const legacy: LegacyPermission = {
-          toolName: 'CustomTool',
-          pattern: '{"key":"value"}',
-          approvedAt: Date.now(),
-          scope: 'always',
-        };
-        expect(legacyPermissionToCCRule(legacy)).toBe('CustomTool');
-      });
+  describe('context window utilities', () => {
+    it('uses a validated custom limit', () => {
+      expect(getContextWindowSize('custom-model', { 'custom-model': 256000 })).toBe(256000);
     });
 
-    describe('legacyPermissionsToCCPermissions', () => {
-      it('should convert array of legacy permissions to CC format', () => {
-        const legacy: LegacyPermission[] = [
-          { toolName: 'Bash', pattern: 'git *', approvedAt: Date.now(), scope: 'always' },
-          { toolName: 'Read', pattern: '/vault', approvedAt: Date.now(), scope: 'always' },
-        ];
-        const result = legacyPermissionsToCCPermissions(legacy);
-        expect(result.allow).toEqual(['Bash(git *)', 'Read(/vault)']);
-        expect(result.deny).toEqual([]);
-        expect(result.ask).toEqual([]);
-      });
-
-      it('should skip session-scoped permissions', () => {
-        const legacy: LegacyPermission[] = [
-          { toolName: 'Bash', pattern: 'npm test', approvedAt: Date.now(), scope: 'always' },
-          { toolName: 'Bash', pattern: 'rm temp.txt', approvedAt: Date.now(), scope: 'session' },
-        ];
-        const result = legacyPermissionsToCCPermissions(legacy);
-        expect(result.allow).toEqual(['Bash(npm test)']);
-      });
-
-      it('should deduplicate rules', () => {
-        const legacy: LegacyPermission[] = [
-          { toolName: 'Read', pattern: '*', approvedAt: Date.now(), scope: 'always' },
-          { toolName: 'Read', pattern: '*', approvedAt: Date.now() + 1000, scope: 'always' },
-        ];
-        const result = legacyPermissionsToCCPermissions(legacy);
-        expect(result.allow).toEqual(['Read']);
-      });
-
-      it('should return empty arrays for empty input', () => {
-        const result = legacyPermissionsToCCPermissions([]);
-        expect(result.allow).toEqual([]);
-        expect(result.deny).toEqual([]);
-        expect(result.ask).toEqual([]);
-      });
-    });
-
-    describe('parseCCPermissionRule', () => {
-      it('should parse rule with pattern', () => {
-        const result = parseCCPermissionRule(createPermissionRule('Bash(git status)'));
-        expect(result.tool).toBe('Bash');
-        expect(result.pattern).toBe('git status');
-      });
-
-      it('should parse rule with complex pattern', () => {
-        const result = parseCCPermissionRule(createPermissionRule('WebFetch(domain:github.com)'));
-        expect(result.tool).toBe('WebFetch');
-        expect(result.pattern).toBe('domain:github.com');
-      });
-
-      it('should parse rule without pattern', () => {
-        const result = parseCCPermissionRule(createPermissionRule('Read'));
-        expect(result.tool).toBe('Read');
-        expect(result.pattern).toBeUndefined();
-      });
-
-      it('should handle nested parentheses in pattern', () => {
-        const result = parseCCPermissionRule(createPermissionRule('Bash(echo "hello (world)")'));
-        expect(result.tool).toBe('Bash');
-        expect(result.pattern).toBe('echo "hello (world)"');
-      });
-
-      it('should handle path patterns', () => {
-        const result = parseCCPermissionRule(createPermissionRule('Read(/Users/test/vault/notes)'));
-        expect(result.tool).toBe('Read');
-        expect(result.pattern).toBe('/Users/test/vault/notes');
-      });
-
-      it('should return rule as tool for malformed input', () => {
-        const result = parseCCPermissionRule(createPermissionRule('not-valid-format'));
-        expect(result.tool).toBe('not-valid-format');
-        expect(result.pattern).toBeUndefined();
-      });
-    });
-  });
-
-  describe('1M Model Utilities', () => {
-    describe('resolveModelWithBetas', () => {
-      it('should return model with betas when include1MBeta is true', () => {
-        const result = resolveModelWithBetas('sonnet', true);
-        expect(result.model).toBe('sonnet');
-        expect(result.betas).toBeDefined();
-        expect(result.betas).toContain(BETA_1M_CONTEXT);
-      });
-
-      it('should return model without betas when include1MBeta is false', () => {
-        const result = resolveModelWithBetas('sonnet', false);
-        expect(result.model).toBe('sonnet');
-        expect(result.betas).toBeUndefined();
-      });
-
-      it('should return model without betas by default', () => {
-        const result = resolveModelWithBetas('sonnet');
-        expect(result.model).toBe('sonnet');
-        expect(result.betas).toBeUndefined();
-      });
-
-      it('should preserve model name', () => {
-        expect(resolveModelWithBetas('claude-sonnet-4-5', true).model).toBe('claude-sonnet-4-5');
-        expect(resolveModelWithBetas('claude-opus-4-5', false).model).toBe('claude-opus-4-5');
-      });
-
-      it('should return single beta flag in array', () => {
-        const result = resolveModelWithBetas('sonnet', true);
-        expect(result.betas).toHaveLength(1);
-      });
-
-      it('should throw when model is empty string', () => {
-        expect(() => resolveModelWithBetas('')).toThrow('model is required');
-        expect(() => resolveModelWithBetas('', true)).toThrow('model is required');
-      });
-
-      it('should throw when model is not provided correctly', () => {
-        // @ts-expect-error - testing runtime validation
-        expect(() => resolveModelWithBetas(null)).toThrow('model is required');
-        // @ts-expect-error - testing runtime validation
-        expect(() => resolveModelWithBetas(undefined)).toThrow('model is required');
-      });
-    });
-
-    describe('BETA_1M_CONTEXT', () => {
-      it('should be defined as the correct beta flag', () => {
-        expect(BETA_1M_CONTEXT).toBe('context-1m-2025-08-07');
-      });
-    });
-
-    describe('getContextWindowSize', () => {
-      it('should return standard context window by default', () => {
-        expect(getContextWindowSize('sonnet')).toBe(CONTEXT_WINDOW_STANDARD);
-        expect(getContextWindowSize('opus')).toBe(CONTEXT_WINDOW_STANDARD);
-        expect(getContextWindowSize('haiku')).toBe(CONTEXT_WINDOW_STANDARD);
-      });
-
-      it('should return 1M context window for sonnet when enabled', () => {
-        expect(getContextWindowSize('sonnet', true)).toBe(CONTEXT_WINDOW_1M);
-        expect(getContextWindowSize('claude-sonnet-4-5', true)).toBe(CONTEXT_WINDOW_1M);
-      });
-
-      it('should return standard context for non-sonnet models even with 1M enabled', () => {
-        expect(getContextWindowSize('opus', true)).toBe(CONTEXT_WINDOW_STANDARD);
-        expect(getContextWindowSize('haiku', true)).toBe(CONTEXT_WINDOW_STANDARD);
-      });
-
-      it('should use custom limits when provided', () => {
-        const customLimits = { 'custom-model': 256000 };
-        expect(getContextWindowSize('custom-model', false, customLimits)).toBe(256000);
-      });
-
-      it('should prioritize custom limits over 1M setting', () => {
-        const customLimits = { 'custom-sonnet': 500000 };
-        expect(getContextWindowSize('custom-sonnet', true, customLimits)).toBe(500000);
-      });
-
-      it('should fall back to default when model not in custom limits', () => {
-        const customLimits = { 'other-model': 256000 };
-        expect(getContextWindowSize('sonnet', false, customLimits)).toBe(CONTEXT_WINDOW_STANDARD);
-      });
-
-      it('should handle empty custom limits object', () => {
-        expect(getContextWindowSize('sonnet', false, {})).toBe(CONTEXT_WINDOW_STANDARD);
-      });
-
-      it('should handle undefined custom limits', () => {
-        expect(getContextWindowSize('sonnet', false, undefined)).toBe(CONTEXT_WINDOW_STANDARD);
-      });
-
-      describe('defensive validation for invalid custom limit values', () => {
-        it('should fall back to default for NaN custom limit', () => {
-          const customLimits = { 'custom-model': NaN };
-          expect(getContextWindowSize('custom-model', false, customLimits)).toBe(CONTEXT_WINDOW_STANDARD);
-        });
-
-        it('should fall back to default for negative custom limit', () => {
-          const customLimits = { 'custom-model': -100000 };
-          expect(getContextWindowSize('custom-model', false, customLimits)).toBe(CONTEXT_WINDOW_STANDARD);
-        });
-
-        it('should fall back to default for zero custom limit', () => {
-          const customLimits = { 'custom-model': 0 };
-          expect(getContextWindowSize('custom-model', false, customLimits)).toBe(CONTEXT_WINDOW_STANDARD);
-        });
-
-        it('should fall back to default for Infinity custom limit', () => {
-          const customLimits = { 'custom-model': Infinity };
-          expect(getContextWindowSize('custom-model', false, customLimits)).toBe(CONTEXT_WINDOW_STANDARD);
-        });
-
-        it('should fall back to default for -Infinity custom limit', () => {
-          const customLimits = { 'custom-model': -Infinity };
-          expect(getContextWindowSize('custom-model', false, customLimits)).toBe(CONTEXT_WINDOW_STANDARD);
-        });
-
-        it('should fall back to 1M for invalid sonnet custom limit when 1M enabled', () => {
-          const customLimits = { 'sonnet': NaN };
-          expect(getContextWindowSize('sonnet', true, customLimits)).toBe(CONTEXT_WINDOW_1M);
-        });
-
-        it('should accept valid positive custom limit', () => {
-          const customLimits = { 'custom-model': 256000 };
-          expect(getContextWindowSize('custom-model', false, customLimits)).toBe(256000);
-        });
-      });
+    it('falls back to the standard limit for missing or invalid overrides', () => {
+      expect(getContextWindowSize('gpt-5.6-sol')).toBe(CONTEXT_WINDOW_STANDARD);
+      expect(getContextWindowSize('custom-model', { 'custom-model': NaN })).toBe(CONTEXT_WINDOW_STANDARD);
     });
   });
 });

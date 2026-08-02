@@ -28,7 +28,7 @@ describe('Codex CLI discovery', () => {
     mockedExists.mockImplementation(candidate => String(candidate) === '/host/codex');
     mockedStat.mockReturnValue({ isFile: () => true } as fs.Stats);
 
-    expect(resolveCodexCliPath('/host/codex', '/fallback/codex', '')).toBe('/host/codex');
+    expect(resolveCodexCliPath('/host/codex', '')).toBe('/host/codex');
   });
 
   it('caches unchanged resolution inputs', () => {
@@ -36,8 +36,8 @@ describe('Codex CLI discovery', () => {
     mockedStat.mockReturnValue({ isFile: () => true } as fs.Stats);
     const resolver = new CodexCliResolver();
 
-    expect(resolver.resolve({ test: '/host/codex' }, '', '', 'test')).toBe('/host/codex');
-    expect(resolver.resolve({ test: '/host/codex' }, '', '', 'test')).toBe('/host/codex');
+    expect(resolver.resolve({ test: '/host/codex' }, '', 'test')).toBe('/host/codex');
+    expect(resolver.resolve({ test: '/host/codex' }, '', 'test')).toBe('/host/codex');
     expect(mockedStat).toHaveBeenCalledTimes(1);
   });
 });

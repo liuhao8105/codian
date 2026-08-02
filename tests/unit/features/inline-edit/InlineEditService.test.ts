@@ -41,7 +41,7 @@ function getLastOptions(): Record<string, any> | undefined {
 function createMockPlugin(settings = {}) {
   return {
     settings: {
-      model: 'sonnet',
+      model: 'GPT-5.6-Sol',
       thinkingBudget: 'off',
       ...settings,
     },
@@ -519,7 +519,7 @@ describe('InlineEditService', () => {
       });
 
       const options = getLastOptions();
-      expect(options?.model).toBe('sonnet');
+      expect(options?.model).toBe('GPT-5.6-Sol');
     });
 
     it('should capture session ID for conversation continuity', async () => {

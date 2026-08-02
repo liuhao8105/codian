@@ -205,7 +205,7 @@ argument-hint: "[file] [focus]"
 allowed-tools:
   - Read
   - Grep
-model: claude-sonnet-4-5
+model: gpt-5.6-sol
 ---
 Review this code: $ARGUMENTS`;
 
@@ -214,7 +214,7 @@ Review this code: $ARGUMENTS`;
       expect(parsed.description).toBe('Review code for issues');
       expect(parsed.argumentHint).toBe('[file] [focus]');
       expect(parsed.allowedTools).toEqual(['Read', 'Grep']);
-      expect(parsed.model).toBe('claude-sonnet-4-5');
+      expect(parsed.model).toBe('gpt-5.6-sol');
       expect(parsed.promptContent).toBe('Review this code: $ARGUMENTS');
     });
 

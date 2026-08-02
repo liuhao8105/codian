@@ -62,7 +62,6 @@ export interface HookCallbackMatcher {
   timeout?: number;
 }
 
-export type RuntimeBeta = 'context-1m-2025-08-07';
 
 export interface ApprovalCallbackOptions {
   decisionReason?: string;

@@ -100,10 +100,10 @@ describe('serializeAgent', () => {
   it('serializes agent with model (non-inherit)', () => {
     const agent: AgentDefinition = {
       ...baseAgent,
-      model: 'sonnet',
+      model: 'GPT-5.6-Sol',
     };
     const result = serializeAgent(agent);
-    expect(result).toContain('model: sonnet');
+    expect(result).toContain('model: GPT-5.6-Sol');
   });
 
   it('omits model when inherit', () => {
@@ -175,7 +175,7 @@ describe('serializeAgent', () => {
       ...baseAgent,
       tools: ['Read'],
       disallowedTools: ['Bash'],
-      model: 'opus',
+      model: 'GPT-5.6-Terra',
       permissionMode: 'acceptEdits',
       skills: ['review'],
     };
@@ -184,7 +184,7 @@ describe('serializeAgent', () => {
     expect(result).toContain('description: A test agent');
     expect(result).toContain('tools:\n  - Read');
     expect(result).toContain('disallowedTools:\n  - Bash');
-    expect(result).toContain('model: opus');
+    expect(result).toContain('model: GPT-5.6-Terra');
     expect(result).toContain('permissionMode: acceptEdits');
     expect(result).toContain('skills:\n  - review');
   });
@@ -265,7 +265,7 @@ describe('serializeAgent / parseAgentFile round-trip', () => {
       prompt: 'Do everything.',
       tools: ['Read', 'Grep'],
       disallowedTools: ['Bash'],
-      model: 'opus',
+      model: 'GPT-5.6-Terra',
       permissionMode: 'acceptEdits',
       skills: ['review', 'deploy'],
       hooks: { preToolUse: { command: 'echo test' } },

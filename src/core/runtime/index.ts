@@ -31,7 +31,7 @@ import { DeepSeekRuntime } from './DeepSeekRuntime';
 export interface AgentRuntime {
   onReadyStateChange(listener: (ready: boolean) => void): () => void;
   setPendingResumeAt(uuid: string | undefined): void;
-  applyForkState(conv: Pick<Conversation, 'sessionId' | 'sdkSessionId' | 'forkSource'>): string | null;
+  applyForkState(conv: Pick<Conversation, 'sessionId' | 'runtimeSessionId' | 'forkSource'>): string | null;
   reloadMcpServers(): Promise<void>;
   ensureReady(options?: {
     sessionId?: string;
@@ -54,15 +54,15 @@ export interface AgentRuntime {
   getSupportedCommands(): Promise<SlashCommand[]>;
   setSessionId(id: string | null, externalContextPaths?: string[]): void;
   cleanup(): void;
-  rewindFiles(sdkUserUuid: string, dryRun?: boolean): Promise<RewindFilesResult>;
-  rewind(sdkUserUuid: string, sdkAssistantUuid: string): Promise<RewindFilesResult>;
+  rewindFiles(runtimeUserUuid: string, dryRun?: boolean): Promise<RewindFilesResult>;
+  rewind(runtimeUserUuid: string, runtimeAssistantUuid: string): Promise<RewindFilesResult>;
   setApprovalCallback(callback: ApprovalCallback | null): void;
   setApprovalDismisser(dismisser: (() => void) | null): void;
   setAskUserQuestionCallback(
     callback: ((input: Record<string, unknown>, signal?: AbortSignal) => Promise<Record<string, string> | null>) | null
   ): void;
   setExitPlanModeCallback(callback: ExitPlanModeCallback | null): void;
-  setPermissionModeSyncCallback(callback: ((sdkMode: string) => void) | null): void;
+  setPermissionModeSyncCallback(callback: ((runtimeMode: string) => void) | null): void;
   setSubagentHookProvider(getState: () => SubagentHookState): void;
   setAutoTurnCallback(callback: ((chunks: StreamChunk[]) => void) | null): void;
 }

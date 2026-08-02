@@ -232,7 +232,7 @@ export class MessageRenderer {
       return;
     }
 
-    // Skip rebuilt context messages (history sent to SDK on session reset)
+    // Skip rebuilt context messages (history sent to Runtime on session reset)
     // These are internal context for the AI, not actual user messages to display
     if (msg.isRebuiltContext) {
       return;
@@ -268,7 +268,7 @@ export class MessageRenderer {
         void this.renderContent(textEl, textToShow);
         this.addUserCopyButton(msgEl, textToShow);
       }
-      if (msg.sdkUserUuid && this.isRewindEligible(allMessages, index)) {
+      if (msg.runtimeUserUuid && this.isRewindEligible(allMessages, index)) {
         if (this.rewindCallback) {
           this.addRewindButton(msgEl, msg.id);
         }
@@ -288,7 +288,7 @@ export class MessageRenderer {
   }
 
   /**
-   * Renders an interrupt indicator (stored interrupts from SDK history).
+   * Renders an interrupt indicator (stored interrupts from Runtime history).
    * Uses the same styling as streaming interrupts.
    */
   private renderInterruptMessage(): void {
@@ -673,7 +673,7 @@ export class MessageRenderer {
   }
 
   refreshActionButtons(msg: ChatMessage, allMessages?: ChatMessage[], index?: number): void {
-    if (!msg.sdkUserUuid) return;
+    if (!msg.runtimeUserUuid) return;
     if (!this.isRewindEligible(allMessages, index)) return;
     const msgEl = this.liveMessageEls.get(msg.id);
     if (!msgEl) return;

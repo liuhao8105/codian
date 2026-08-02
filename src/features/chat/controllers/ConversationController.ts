@@ -358,7 +358,7 @@ export class ConversationController {
       return;
     }
     const userMsg = msgs[userIdx];
-    if (!userMsg.sdkUserUuid) {
+    if (!userMsg.runtimeUserUuid) {
       new Notice(t('chat.rewind.unavailableNoUuid'));
       return;
     }
@@ -390,7 +390,7 @@ export class ConversationController {
 
     let result;
     try {
-      result = await agentService.rewind(userMsg.sdkUserUuid, prevAssistantUuid);
+      result = await agentService.rewind(userMsg.runtimeUserUuid, prevAssistantUuid);
     } catch (e) {
       new Notice(t('chat.rewind.failed', { error: e instanceof Error ? e.message : 'Unknown error' }));
       return;
@@ -432,8 +432,8 @@ export class ConversationController {
    * If we're at an entry point (no conversation yet) and have messages,
    * creates a new conversation first (lazy creation).
    *
-   * For native sessions (new conversations with sessionId from SDK),
-   * only metadata is saved - the SDK handles message persistence.
+   * For native sessions (new conversations with sessionId from Runtime),
+   * only metadata is saved - the Runtime handles message persistence.
    */
   async save(updateLastResponse = false, options?: SaveOptions): Promise<void> {
     const { plugin, state } = this.deps;
@@ -448,7 +448,7 @@ export class ConversationController {
     const sessionInvalidated = agentService?.consumeSessionInvalidation?.() ?? false;
 
     // Entry point with messages - create conversation lazily
-    // New conversations always use SDK-native storage.
+    // New conversations always use Runtime-native storage.
     if (!state.currentConversationId && state.messages.length > 0) {
       const conversation = await plugin.createConversation(sessionId ?? undefined);
       state.currentConversationId = conversation.id;
@@ -462,7 +462,7 @@ export class ConversationController {
     const mcpServerSelector = this.deps.getMcpServerSelector();
     const enabledMcpServers = mcpServerSelector ? Array.from(mcpServerSelector.getEnabledServers()) : [];
 
-    // Check if this is a native session and promote legacy sessions after first SDK session capture
+    // Check if this is a native session and promote legacy sessions after first Runtime session capture
     const conversation = await plugin.getConversationById(state.currentConversationId!);
     const wasNative = conversation?.isNative ?? false;
     const shouldPromote = !wasNative && !!sessionId;
@@ -472,20 +472,20 @@ export class ConversationController {
       ? legacyMessages[legacyMessages.length - 1]?.timestamp
       : conversation?.legacyCutoffAt;
 
-    // Detect session change (resume failed, SDK created new session)
-    // Move old sdkSessionId to previousSdkSessionIds for history merging on reload
+    // Detect session change (resume failed, Runtime created new session)
+    // Move old runtimeSessionId to previousRuntimeSessionIds for history merging on reload
     // Use Set to deduplicate in case of race conditions or repeated session changes
-    const oldSdkSessionId = conversation?.sdkSessionId;
-    const sessionChanged = isNative && sessionId && oldSdkSessionId && sessionId !== oldSdkSessionId;
-    const previousSdkSessionIds = sessionChanged
-      ? [...new Set([...(conversation?.previousSdkSessionIds || []), oldSdkSessionId])]
-      : conversation?.previousSdkSessionIds;
+    const oldRuntimeSessionId = conversation?.runtimeSessionId;
+    const sessionChanged = isNative && sessionId && oldRuntimeSessionId && sessionId !== oldRuntimeSessionId;
+    const previousRuntimeSessionIds = sessionChanged
+      ? [...new Set([...(conversation?.previousRuntimeSessionIds || []), oldRuntimeSessionId])]
+      : conversation?.previousRuntimeSessionIds;
 
     // Don't persist the fork source session ID as the conversation's own session.
     // The agent service holds it for resume purposes only; the conversation gets
-    // its own ID after SDK captureSession() returns a new session.
+    // its own ID after Runtime captureSession() returns a new session.
     const isForkSourceOnly = !!conversation?.forkSource &&
-      !conversation?.sdkSessionId &&
+      !conversation?.runtimeSessionId &&
       sessionId === conversation.forkSource.sessionId;
 
     let resolvedSessionId: string | null;
@@ -500,11 +500,11 @@ export class ConversationController {
     const updates: Partial<Conversation> = {
       messages: isNative ? state.messages : state.getPersistedMessages(),
       sessionId: resolvedSessionId,
-      sdkSessionId: isNative && sessionId && !isForkSourceOnly ? sessionId : conversation?.sdkSessionId,
-      previousSdkSessionIds,
+      runtimeSessionId: isNative && sessionId && !isForkSourceOnly ? sessionId : conversation?.runtimeSessionId,
+      previousRuntimeSessionIds,
       isNative: isNative || undefined,
       legacyCutoffAt,
-      sdkMessagesLoaded: isNative ? true : undefined,
+      runtimeMessagesLoaded: isNative ? true : undefined,
       currentNote: currentNote,
       attachedFiles: attachedFiles.length > 0 ? attachedFiles : undefined,
       externalContextPaths: externalContextPaths.length > 0 ? externalContextPaths : undefined,
@@ -523,7 +523,7 @@ export class ConversationController {
     // Clear fork metadata after first save with a new session ID (one-time use)
     if (conversation?.forkSource && sessionId && sessionId !== conversation.forkSource.sessionId) {
       updates.forkSource = undefined;
-      // Don't add forkSource.sessionId to previousSdkSessionIds
+      // Don't add forkSource.sessionId to previousRuntimeSessionIds
       // (the source session belongs to the original conversation)
     }
 

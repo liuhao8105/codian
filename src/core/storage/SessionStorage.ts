@@ -6,7 +6,7 @@
  *
  * JSONL format:
  * ```
- * {"type":"meta","id":"conv-123","title":"Fix bug","createdAt":1703500000,"sessionId":"sdk-xyz"}
+ * {"type":"meta","id":"conv-123","title":"Fix bug","createdAt":1703500000,"sessionId":"runtime-xyz"}
  * {"type":"message","id":"msg-1","role":"user","content":"...","timestamp":1703500001}
  * {"type":"message","id":"msg-2","role":"assistant","content":"...","timestamp":1703500002}
  * ```
@@ -264,11 +264,11 @@ export class SessionStorage {
   }
 
   /**
-   * Detects if a session uses SDK-native storage.
+   * Detects if a session uses Runtime-native storage.
    * A session is "native" if no legacy JSONL file exists.
    *
    * Legacy sessions have id.jsonl (and optionally id.meta.json).
-   * Native sessions have only id.meta.json or no files yet (SDK stores messages).
+   * Native sessions have only id.meta.json or no files yet (Runtime stores messages).
    */
   async isNativeSession(id: string): Promise<boolean> {
     const legacyPath = `${SESSIONS_PATH}/${id}.jsonl`;
@@ -370,7 +370,7 @@ export class SessionStorage {
           updatedAt: meta.updatedAt,
           lastResponseAt: meta.lastResponseAt,
           messageCount: 0, // Native sessions don't track message count in metadata
-          preview: 'SDK session', // SDK stores messages, we don't parse them for preview
+          preview: 'Runtime session', // Runtime stores messages, we don't parse them for preview
           titleGenerationStatus: meta.titleGenerationStatus,
           isNative: true,
         });
@@ -394,8 +394,8 @@ export class SessionStorage {
       updatedAt: conversation.updatedAt,
       lastResponseAt: conversation.lastResponseAt,
       sessionId: conversation.sessionId,
-      sdkSessionId: conversation.sdkSessionId,
-      previousSdkSessionIds: conversation.previousSdkSessionIds,
+      runtimeSessionId: conversation.runtimeSessionId,
+      previousRuntimeSessionIds: conversation.previousRuntimeSessionIds,
       currentNote: conversation.currentNote,
       attachedFiles: conversation.attachedFiles,
       externalContextPaths: conversation.externalContextPaths,

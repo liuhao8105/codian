@@ -6,7 +6,7 @@ import {
 
 describe('interrupt utils', () => {
   describe('isBracketInterruptText', () => {
-    it('matches canonical SDK interrupt markers', () => {
+    it('matches canonical Runtime interrupt markers', () => {
       expect(isBracketInterruptText('[Request interrupted by user]')).toBe(true);
       expect(isBracketInterruptText('[Request interrupted by user for tool use]')).toBe(true);
     });

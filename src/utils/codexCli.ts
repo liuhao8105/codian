@@ -23,45 +23,37 @@ function existingFile(candidate: string | undefined): string | null {
 
 export function resolveCodexCliPath(
   hostnamePath: string | undefined,
-  fallbackPath: string | undefined,
   envText: string,
 ): string | null {
   return existingFile(hostnamePath)
-    ?? existingFile(fallbackPath)
     ?? findCodexCliPath(parseEnvironmentVariables(envText || '').PATH);
 }
 
 export class CodexCliResolver {
   private resolvedPath: string | null = null;
   private lastHostnamePath = '';
-  private lastFallbackPath = '';
   private lastEnvText = '';
 
   resolve(
     hostnamePaths: HostnameCliPaths | undefined,
-    fallbackPath: string | undefined,
     envText: string,
     hostnameKey = getHostnameKey(),
   ): string | null {
     const hostnamePath = (hostnamePaths?.[hostnameKey] ?? '').trim();
-    const normalizedFallback = (fallbackPath ?? '').trim();
     const normalizedEnv = envText ?? '';
 
     if (
       this.resolvedPath &&
       hostnamePath === this.lastHostnamePath &&
-      normalizedFallback === this.lastFallbackPath &&
       normalizedEnv === this.lastEnvText
     ) {
       return this.resolvedPath;
     }
 
     this.lastHostnamePath = hostnamePath;
-    this.lastFallbackPath = normalizedFallback;
     this.lastEnvText = normalizedEnv;
     this.resolvedPath = resolveCodexCliPath(
       hostnamePath,
-      normalizedFallback,
       normalizedEnv,
     );
     return this.resolvedPath;
@@ -70,7 +62,6 @@ export class CodexCliResolver {
   reset(): void {
     this.resolvedPath = null;
     this.lastHostnamePath = '';
-    this.lastFallbackPath = '';
     this.lastEnvText = '';
   }
 }

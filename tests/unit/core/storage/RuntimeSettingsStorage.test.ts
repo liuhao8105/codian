@@ -161,40 +161,10 @@ describe('RuntimeSettingsStorage', () => {
             expect(writtenContent.permissions).toEqual({ allow: [], deny: [], ask: [] });
         });
 
-        it('should strip codian-only fields during migration', async () => {
-            mockAdapter.exists.mockResolvedValue(true);
-            mockAdapter.read.mockResolvedValue(JSON.stringify({
-                permissions: { allow: [], deny: [], ask: [] },
-                userName: 'Test',
-                model: 'haiku',
-            }));
-
-            await storage.save({
-                permissions: { allow: [], deny: [], ask: [] }
-            }, true);
-
-            const writeCall = mockAdapter.write.mock.calls[0];
-            const writtenContent = JSON.parse(writeCall[1]);
-            expect(writtenContent.userName).toBeUndefined();
-            expect(writtenContent.model).toBeUndefined();
-        });
-
-        it('should preserve enabledPlugins from settings argument', async () => {
-            mockAdapter.exists.mockResolvedValue(false);
-
-            await storage.save({
-                permissions: { allow: [], deny: [], ask: [] },
-                enabledPlugins: { 'my-plugin': true },
-            });
-
-            const writeCall = mockAdapter.write.mock.calls[0];
-            const writtenContent = JSON.parse(writeCall[1]);
-            expect(writtenContent.enabledPlugins).toEqual({ 'my-plugin': true });
-        });
     });
 
     describe('load edge cases', () => {
-        it('should handle legacy permissions format during load', async () => {
+        it('normalizes unsupported permission arrays to defaults', async () => {
             mockAdapter.exists.mockResolvedValue(true);
             mockAdapter.read.mockResolvedValue(JSON.stringify({
                 permissions: [
@@ -203,8 +173,13 @@ describe('RuntimeSettingsStorage', () => {
             }));
 
             const result = await storage.load();
-            expect(result.permissions?.allow).toBeDefined();
-            expect(result.permissions?.allow?.length).toBeGreaterThan(0);
+            expect(result.permissions).toEqual({
+                allow: [],
+                deny: [],
+                ask: [],
+                defaultMode: undefined,
+                additionalDirectories: undefined,
+            });
         });
 
         it('should normalize invalid permissions to defaults', async () => {
@@ -333,107 +308,4 @@ describe('RuntimeSettingsStorage', () => {
         });
     });
 
-    describe('enabledPlugins', () => {
-        it('should return empty object if enabledPlugins not set', async () => {
-            mockAdapter.exists.mockResolvedValue(true);
-            mockAdapter.read.mockResolvedValue(JSON.stringify({
-                permissions: { allow: [], deny: [], ask: [] }
-            }));
-
-            const result = await storage.getEnabledPlugins();
-            expect(result).toEqual({});
-        });
-
-        it('should return enabledPlugins from settings', async () => {
-            mockAdapter.exists.mockResolvedValue(true);
-            mockAdapter.read.mockResolvedValue(JSON.stringify({
-                permissions: { allow: [], deny: [], ask: [] },
-                enabledPlugins: { 'plugin-a': true, 'plugin-b': false }
-            }));
-
-            const result = await storage.getEnabledPlugins();
-            expect(result).toEqual({ 'plugin-a': true, 'plugin-b': false });
-        });
-
-        it('should set plugin enabled state and persist', async () => {
-            mockAdapter.exists.mockResolvedValue(true);
-            mockAdapter.read.mockResolvedValue(JSON.stringify({
-                permissions: { allow: [], deny: [], ask: [] },
-                enabledPlugins: { 'existing-plugin': true }
-            }));
-
-            await storage.setPluginEnabled('new-plugin@source', false);
-
-            const writeCall = mockAdapter.write.mock.calls[0];
-            const writtenContent = JSON.parse(writeCall[1]);
-            expect(writtenContent.enabledPlugins).toEqual({
-                'existing-plugin': true,
-                'new-plugin@source': false
-            });
-        });
-
-        it('should update existing plugin state', async () => {
-            mockAdapter.exists.mockResolvedValue(true);
-            mockAdapter.read.mockResolvedValue(JSON.stringify({
-                permissions: { allow: [], deny: [], ask: [] },
-                enabledPlugins: { 'plugin-a': true }
-            }));
-
-            await storage.setPluginEnabled('plugin-a', false);
-
-            const writeCall = mockAdapter.write.mock.calls[0];
-            const writtenContent = JSON.parse(writeCall[1]);
-            expect(writtenContent.enabledPlugins['plugin-a']).toBe(false);
-        });
-
-        it('should preserve enabledPlugins when saving other settings', async () => {
-            mockAdapter.exists.mockResolvedValue(true);
-            mockAdapter.read.mockResolvedValue(JSON.stringify({
-                permissions: { allow: ['rule1'], deny: [], ask: [] },
-                enabledPlugins: { 'plugin-a': false }
-            }));
-
-            // Add a permission rule (different operation)
-            await storage.addAllowRule(createPermissionRule('new-rule'));
-
-            const writeCall = mockAdapter.write.mock.calls[0];
-            const writtenContent = JSON.parse(writeCall[1]);
-            // enabledPlugins should be preserved from existing file
-            expect(writtenContent.enabledPlugins).toEqual({ 'plugin-a': false });
-        });
-
-        it('should return explicitly enabled plugin IDs', async () => {
-            mockAdapter.exists.mockResolvedValue(true);
-            mockAdapter.read.mockResolvedValue(JSON.stringify({
-                permissions: { allow: [], deny: [], ask: [] },
-                enabledPlugins: { 'plugin-a': true, 'plugin-b': false, 'plugin-c': true }
-            }));
-
-            const ids = await storage.getExplicitlyEnabledPluginIds();
-            expect(ids).toEqual(['plugin-a', 'plugin-c']);
-        });
-
-        it('should return empty array when no plugins explicitly enabled', async () => {
-            mockAdapter.exists.mockResolvedValue(true);
-            mockAdapter.read.mockResolvedValue(JSON.stringify({
-                permissions: { allow: [], deny: [], ask: [] },
-                enabledPlugins: { 'plugin-a': false }
-            }));
-
-            const ids = await storage.getExplicitlyEnabledPluginIds();
-            expect(ids).toEqual([]);
-        });
-
-        it('should check if a plugin is explicitly disabled', async () => {
-            mockAdapter.exists.mockResolvedValue(true);
-            mockAdapter.read.mockResolvedValue(JSON.stringify({
-                permissions: { allow: [], deny: [], ask: [] },
-                enabledPlugins: { 'plugin-a': false, 'plugin-b': true }
-            }));
-
-            expect(await storage.isPluginDisabled('plugin-a')).toBe(true);
-            expect(await storage.isPluginDisabled('plugin-b')).toBe(false);
-            expect(await storage.isPluginDisabled('plugin-c')).toBe(false);
-        });
-    });
 });

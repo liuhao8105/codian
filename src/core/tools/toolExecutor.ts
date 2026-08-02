@@ -192,7 +192,7 @@ async function executeBash(
 
   if (!plugin.settings.allowExternalAccess && !plugin.settings.temporaryExternalAccess) {
     const deepSeekBashContextPaths = [
-      '~/.codex/skills',
+      '~/.codian/skills',
       '~/.agents/skills',
     ];
     const violation = findBashCommandPathViolation(command, {

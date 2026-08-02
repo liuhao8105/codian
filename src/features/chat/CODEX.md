@@ -100,9 +100,9 @@ for await (const chunk of agentRuntime.query(prompt, images, history, queryOptio
 
 ## Gotchas
 
-- `CodexAgentRuntime` now streams through `Codex App Server`, not the old Claude SDK.
+- `CodexAgentRuntime` streams through `Codex App Server`, not a direct provider client.
 - `CodianView.onClose()` must abort all tabs and dispose services.
 - Tab switching preserves scroll position per-tab.
 - `ChatState` is per-tab; `TabManager` coordinates across tabs.
 - Title generation runs concurrently per conversation.
-- `/compact`, plan mode, bang-bash mode, and fork still contain legacy compatibility paths; change them carefully.
+- `/compact`, plan mode, bang-bash mode, and fork share session-recovery paths; change them carefully.

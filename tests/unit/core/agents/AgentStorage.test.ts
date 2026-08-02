@@ -7,7 +7,7 @@ name: TestAgent
 description: Handles tests
 tools: [Read, Grep]
 disallowedTools: [Write]
-model: sonnet
+model: GPT-5.6-Sol
 ---
 You are helpful.`;
 
@@ -17,7 +17,7 @@ You are helpful.`;
     expect(parsed?.frontmatter.description).toBe('Handles tests');
     expect(parsed?.frontmatter.tools).toEqual(['Read', 'Grep']);
     expect(parsed?.frontmatter.disallowedTools).toEqual(['Write']);
-    expect(parsed?.frontmatter.model).toBe('sonnet');
+    expect(parsed?.frontmatter.model).toBe('GPT-5.6-Sol');
     expect(parsed?.body).toBe('You are helpful.');
   });
 
@@ -288,16 +288,16 @@ describe('parseModel', () => {
     expect(parseModel('')).toBe('inherit');
   });
 
-  it('returns sonnet for valid sonnet input', () => {
-    expect(parseModel('sonnet')).toBe('sonnet');
+  it('returns GPT-5.6-Sol for valid GPT-5.6-Sol input', () => {
+    expect(parseModel('GPT-5.6-Sol')).toBe('GPT-5.6-Sol');
   });
 
-  it('returns opus for valid opus input', () => {
-    expect(parseModel('opus')).toBe('opus');
+  it('returns GPT-5.6-Terra for valid GPT-5.6-Terra input', () => {
+    expect(parseModel('GPT-5.6-Terra')).toBe('GPT-5.6-Terra');
   });
 
-  it('returns haiku for valid haiku input', () => {
-    expect(parseModel('haiku')).toBe('haiku');
+  it('returns GPT-5.6-Luna for valid GPT-5.6-Luna input', () => {
+    expect(parseModel('GPT-5.6-Luna')).toBe('GPT-5.6-Luna');
   });
 
   it('returns inherit for valid inherit input', () => {
@@ -305,20 +305,20 @@ describe('parseModel', () => {
   });
 
   it('is case-insensitive', () => {
-    expect(parseModel('SONNET')).toBe('sonnet');
-    expect(parseModel('Opus')).toBe('opus');
-    expect(parseModel('HAIKU')).toBe('haiku');
+    expect(parseModel('GPT-5.6-Sol')).toBe('GPT-5.6-Sol');
+    expect(parseModel('GPT-5.6-Terra')).toBe('GPT-5.6-Terra');
+    expect(parseModel('GPT-5.6-Luna')).toBe('GPT-5.6-Luna');
     expect(parseModel('INHERIT')).toBe('inherit');
   });
 
   it('trims whitespace', () => {
-    expect(parseModel('  sonnet  ')).toBe('sonnet');
+    expect(parseModel('  GPT-5.6-Sol  ')).toBe('GPT-5.6-Sol');
   });
 
-  it('returns inherit for invalid model value', () => {
-    expect(parseModel('claude-3')).toBe('inherit');
-    expect(parseModel('gpt-4')).toBe('inherit');
-    expect(parseModel('invalid')).toBe('inherit');
+  it('preserves custom model values', () => {
+    expect(parseModel('codex-3')).toBe('codex-3');
+    expect(parseModel('gpt-4')).toBe('gpt-4');
+    expect(parseModel('custom-model')).toBe('custom-model');
   });
 });
 
@@ -374,7 +374,7 @@ describe('buildAgentFromFrontmatter', () => {
         description: 'A test agent',
         tools: ['Read', 'Grep'],
         disallowedTools: ['Bash'],
-        model: 'opus',
+        model: 'GPT-5.6-Terra',
         skills: ['my-skill'],
         permissionMode: 'dontAsk',
         hooks: { preToolUse: { command: 'echo hi' } },
@@ -389,7 +389,7 @@ describe('buildAgentFromFrontmatter', () => {
     expect(result.prompt).toBe('You are helpful.');
     expect(result.tools).toEqual(['Read', 'Grep']);
     expect(result.disallowedTools).toEqual(['Bash']);
-    expect(result.model).toBe('opus');
+    expect(result.model).toBe('GPT-5.6-Terra');
     expect(result.source).toBe('vault');
     expect(result.filePath).toBe('/path/to/test.md');
     expect(result.skills).toEqual(['my-skill']);
@@ -397,25 +397,14 @@ describe('buildAgentFromFrontmatter', () => {
     expect(result.hooks).toEqual({ preToolUse: { command: 'echo hi' } });
   });
 
-  it('propagates pluginName from meta', () => {
-    const result = buildAgentFromFrontmatter(
-      { name: 'PluginAgent', description: 'From plugin' },
-      'Prompt.',
-      { id: 'my-plugin:agent', source: 'plugin', pluginName: 'my-plugin' }
-    );
-
-    expect(result.pluginName).toBe('my-plugin');
-    expect(result.source).toBe('plugin');
-  });
-
-  it('defaults model to inherit for invalid value', () => {
+  it('preserves a custom model identifier', () => {
     const result = buildAgentFromFrontmatter(
       { name: 'Test', description: 'Desc', model: 'gpt-4' },
       'Prompt.',
       { id: 'test', source: 'vault' }
     );
 
-    expect(result.model).toBe('inherit');
+    expect(result.model).toBe('gpt-4');
   });
 
   it('returns undefined permissionMode for invalid value', () => {

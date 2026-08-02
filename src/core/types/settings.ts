@@ -83,34 +83,6 @@ export function getBashToolBlockedCommands(commands: PlatformBlockedCommands): s
 }
 
 /**
- * Platform-specific Claude CLI paths.
- * @deprecated Use HostnameCliPaths instead. Kept for migration from older versions.
- */
-export interface PlatformCliPaths {
-  macos: string;
-  linux: string;
-  windows: string;
-}
-
-/** Platform key for CLI paths. Used for migration only. */
-export type CliPlatformKey = keyof PlatformCliPaths;
-
-/**
- * Map process.platform to CLI platform key.
- * @deprecated Used for migration only.
- */
-export function getCliPlatformKey(): CliPlatformKey {
-  switch (process.platform) {
-    case 'darwin':
-      return 'macos';
-    case 'win32':
-      return 'windows';
-    default:
-      return 'linux';
-  }
-}
-
-/**
  * Hostname-keyed CLI paths for per-device configuration.
  * Each device stores its path using its hostname as key.
  * This allows settings to sync across devices without conflicts.
@@ -143,18 +115,7 @@ export type PermissionMode = 'yolo' | 'plan' | 'normal';
 export type ApprovalDecision = 'allow' | 'allow-always' | 'deny' | 'cancel';
 
 /**
- * Legacy permission format (pre-CC compatibility).
- * @deprecated Use CCPermissions instead
- */
-export interface LegacyPermission {
-  toolName: string;
-  pattern: string;
-  approvedAt: number;
-  scope: 'session' | 'always';
-}
-
-/**
- * CC-compatible permission rule string.
+ * Runtime permission rule string.
  * Format: "Tool(pattern)" or "Tool" for all
  * Examples: "Bash(git *)", "Read(*.md)", "WebFetch(domain:github.com)"
  */
@@ -162,17 +123,16 @@ export type PermissionRule = string & { readonly __brand: 'PermissionRule' };
 
 /**
  * Create a PermissionRule from a string.
- * @internal Use legacyPermissionToCCRule instead.
+ * @internal Prefer this helper over direct casts.
  */
 export function createPermissionRule(rule: string): PermissionRule {
   return rule as PermissionRule;
 }
 
 /**
- * CC-compatible permissions object.
- * Stored in .codian/settings.json for interoperability with Claude Code CLI.
+ * Tool permission rules stored by Codian.
  */
-export interface CCPermissions {
+export interface RuntimePermissions {
   /** Rules that auto-approve tool actions */
   allow?: PermissionRule[];
   /** Rules that auto-deny tool actions (highest persistent priority) */
@@ -186,26 +146,11 @@ export interface CCPermissions {
 }
 
 /**
- * CC-compatible settings stored in .codian/settings.json.
- * These settings are shared with Claude Code CLI.
+ * Runtime settings stored in .codian/settings.json.
  */
-export interface CCSettings {
-  /** JSON Schema reference */
-  $schema?: string;
-  /** Tool permissions (CC format) */
-  permissions?: CCPermissions;
-  /** Model override */
-  model?: string;
-  /** Environment variables (object format) */
-  env?: Record<string, string>;
-  /** MCP server settings */
-  enableAllProjectMcpServers?: boolean;
-  enabledMcpjsonServers?: string[];
-  disabledMcpjsonServers?: string[];
-  /** Plugin enabled state (CC format: { "plugin-id": true/false }) */
-  enabledPlugins?: Record<string, boolean>;
-  /** Allow additional properties for CC compatibility */
-  [key: string]: unknown;
+export interface RuntimeSettings {
+  /** Tool permissions */
+  permissions?: RuntimePermissions;
 }
 
 /** Saved environment variable configuration. */
@@ -218,9 +163,9 @@ export interface EnvSnippet {
 }
 
 /** Source of a slash command. */
-export type SlashCommandSource = 'builtin' | 'user' | 'plugin' | 'sdk';
+export type SlashCommandSource = 'builtin' | 'user' | 'plugin' | 'runtime';
 
-/** Slash command configuration with Claude Code compatibility. */
+/** Slash command configuration with Codex compatibility. */
 export interface SlashCommand {
   id: string;
   name: string;                // Command name used after / (e.g., "review-code")
@@ -229,13 +174,13 @@ export interface SlashCommand {
   allowedTools?: string[];     // Restrict tools when command is used
   model?: AgentModel;          // Override model for this command
   content: string;             // Prompt template with placeholders
-  source?: SlashCommandSource; // Origin of the command (builtin, user, plugin, sdk)
+  source?: SlashCommandSource; // Origin of the command (builtin, user, plugin, runtime)
   // Skill fields (from .codian/skills/ definitions)
   disableModelInvocation?: boolean;  // Disable model invocation for this skill
   userInvocable?: boolean;           // Whether user can invoke this skill directly
   context?: 'fork';                  // Subagent execution mode
   agent?: string;                    // Subagent type when context='fork'
-  hooks?: Record<string, unknown>;   // Pass-through to SDK
+  hooks?: Record<string, unknown>;   // Pass-through to Runtime
 }
 
 /** Keyboard navigation settings for vim-style scrolling. */
@@ -250,18 +195,18 @@ export type TabBarPosition = 'input' | 'header';
 
 /**
  * Codian-specific settings stored in .codian/codian-settings.json.
- * These settings are NOT shared with Claude Code CLI.
+ * These settings are NOT shared with Codian runtime.
  */
 export interface CodianSettings {
   // User preferences
   userName: string;
 
-  // Security (Claudian-specific, CC uses permissions.deny instead)
+  // Security (Codian-specific, runtime uses permissions.deny instead)
   enableBlocklist: boolean;
   blockedCommands: PlatformBlockedCommands;
   permissionMode: PermissionMode;
 
-  // Model & thinking (Claudian uses enum, CC uses full model ID string)
+  // Model & thinking (Codian uses enum, runtime uses full model ID string)
   currentProvider: ProviderId;
   providerConfigs: ProviderConfigs;
   model: AgentModel;
@@ -285,14 +230,14 @@ export interface CodianSettings {
   allowedExportPaths: string[];
   persistentExternalContextPaths: string[];  // Paths that persist across all sessions
 
-  // Environment (string format, CC uses object format in settings.json)
+  // Environment (string format, runtime uses object format in settings.json)
   environmentVariables: string;
   envSnippets: EnvSnippet[];
   /**
    * Custom context window limits for models configured via environment variables.
-   * Keys are model IDs (from ANTHROPIC_MODEL, ANTHROPIC_DEFAULT_*_MODEL env vars).
+   * Keys are model IDs from the active model catalog or model override variables.
    * Values are token counts in range [1000, 10000000].
-   * Empty object means all models use default context limits (200k or 1M for Sonnet).
+   * Empty object means all models use the standard context limit.
    */
   customContextLimits: Record<string, number>;
 
@@ -303,7 +248,6 @@ export interface CodianSettings {
   locale: Locale;  // UI language setting
 
   // CLI paths
-  codexCliPath: string;
   codexCliPathsByHost: HostnameCliPaths;
 
   // State (merged from data.json)
@@ -383,7 +327,6 @@ export const DEFAULT_SETTINGS: CodianSettings = {
   locale: 'en',  // Default to English
 
   // CLI paths
-  codexCliPath: '',
   codexCliPathsByHost: {},
 
   lastCodexModel: 'gpt-5.6-sol',
@@ -403,8 +346,8 @@ export const DEFAULT_SETTINGS: CodianSettings = {
   hiddenSlashCommands: [],  // No commands hidden by default
 };
 
-/** Default CC-compatible settings. */
-export const DEFAULT_CC_SETTINGS: CCSettings = {
+/** Default runtime permission settings. */
+export const DEFAULT_RUNTIME_SETTINGS: RuntimeSettings = {
   permissions: {
     allow: [],
     deny: [],
@@ -412,8 +355,8 @@ export const DEFAULT_CC_SETTINGS: CCSettings = {
   },
 };
 
-/** Default CC permissions. */
-export const DEFAULT_CC_PERMISSIONS: CCPermissions = {
+/** Default runtime permissions. */
+export const DEFAULT_RUNTIME_PERMISSIONS: RuntimePermissions = {
   allow: [],
   deny: [],
   ask: [],
@@ -425,64 +368,4 @@ export interface InstructionRefineResult {
   refinedInstruction?: string;  // The refined instruction text
   clarification?: string;       // Agent's clarifying question (if any)
   error?: string;               // Error message (if failed)
-}
-
-/**
- * Convert a legacy permission to CC permission rule format.
- * Examples:
- *   { toolName: "Bash", pattern: "git *" } → "Bash(git *)"
- *   { toolName: "Read", pattern: "/path/to/file" } → "Read(/path/to/file)"
- *   { toolName: "WebSearch", pattern: "*" } → "WebSearch"
- */
-export function legacyPermissionToCCRule(legacy: LegacyPermission): PermissionRule {
-  const pattern = legacy.pattern.trim();
-
-  // If pattern is empty, wildcard, or JSON object (old format), just use tool name
-  if (!pattern || pattern === '*' || pattern.startsWith('{')) {
-    return createPermissionRule(legacy.toolName);
-  }
-
-  return createPermissionRule(`${legacy.toolName}(${pattern})`);
-}
-
-/**
- * Convert legacy permissions array to CC permissions object.
- * Only 'always' scope permissions are converted (session = ephemeral).
- */
-export function legacyPermissionsToCCPermissions(
-  legacyPermissions: LegacyPermission[]
-): CCPermissions {
-  const allow: PermissionRule[] = [];
-
-  for (const perm of legacyPermissions) {
-    if (perm.scope === 'always') {
-      allow.push(legacyPermissionToCCRule(perm));
-    }
-  }
-
-  return {
-    allow: [...new Set(allow)],  // Deduplicate
-    deny: [],
-    ask: [],
-  };
-}
-
-/**
- * Parse a CC permission rule into tool name and pattern.
- * Examples:
- *   "Bash(git *)" → { tool: "Bash", pattern: "git *" }
- *   "Read" → { tool: "Read", pattern: undefined }
- *   "WebFetch(domain:github.com)" → { tool: "WebFetch", pattern: "domain:github.com" }
- */
-export function parseCCPermissionRule(rule: PermissionRule): {
-  tool: string;
-  pattern?: string;
-} {
-  const match = rule.match(/^(\w+)(?:\((.+)\))?$/);
-  if (!match) {
-    return { tool: rule };
-  }
-
-  const [, tool, pattern] = match;
-  return { tool, pattern };
 }

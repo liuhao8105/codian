@@ -99,7 +99,7 @@ describe('matchesRulePattern', () => {
     expect(matchesRulePattern('Bash', 'npm install', 'git *')).toBe(false);
   });
 
-  it('matches Bash CC-format colon wildcard', () => {
+  it('matches Bash runtime-format colon wildcard', () => {
     expect(matchesRulePattern('Bash', 'npm install', 'npm:*')).toBe(true);
     expect(matchesRulePattern('Bash', 'npm run build', 'npm run:*')).toBe(true);
     expect(matchesRulePattern('Bash', 'yarn install', 'npm:*')).toBe(false);
@@ -140,7 +140,7 @@ describe('matchesRulePattern', () => {
     expect(matchesRulePattern('Glob', 'src/**', 'tests/**')).toBe(false);
   });
 
-  it('matches exact Bash prefix without trailing space/wildcard via CC format', () => {
+  it('matches exact Bash prefix without trailing space/wildcard via runtime format', () => {
     // matchesBashPrefix exact match: action === prefix
     expect(matchesRulePattern('Bash', 'npm', 'npm:*')).toBe(true);
   });
@@ -171,7 +171,7 @@ describe('buildPermissionUpdates', () => {
     expect(updates[0].destination).toBe('projectSettings');
   });
 
-  it('uses SDK suggestions when available', () => {
+  it('uses Runtime suggestions when available', () => {
     const suggestions = [{
       type: 'addRules' as const,
       behavior: 'allow' as const,

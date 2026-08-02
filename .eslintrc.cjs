@@ -30,14 +30,11 @@ module.exports = {
   overrides: [
     {
       files: [
-        'src/ClaudianService.ts',
-        'src/InlineEditService.ts',
-        'src/InstructionRefineService.ts',
-        'src/images/**/*.ts',
-        'src/prompt/**/*.ts',
-        'src/sdk/**/*.ts',
-        'src/security/**/*.ts',
-        'src/tools/**/*.ts',
+        'src/features/inline-edit/InlineEditService.ts',
+        'src/features/chat/services/InstructionRefineService.ts',
+        'src/core/runtime/**/*.ts',
+        'src/core/security/**/*.ts',
+        'src/core/tools/**/*.ts',
       ],
       rules: {
         'no-restricted-imports': [
@@ -49,7 +46,7 @@ module.exports = {
                 message: 'Service and shared modules must not import UI modules.',
               },
               {
-                group: ['./ClaudianView', '../ClaudianView'],
+                group: ['./CodianView', '../CodianView', '../chat/CodianView'],
                 message: 'Service and shared modules must not import the view.',
               },
             ],

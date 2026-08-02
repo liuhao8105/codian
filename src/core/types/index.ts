@@ -16,15 +16,10 @@ export {
 // Model types
 export {
   type AgentModel,
-  BETA_1M_CONTEXT,
-  CONTEXT_WINDOW_1M,
   CONTEXT_WINDOW_STANDARD,
   DEFAULT_CODEX_MODELS,
   DEFAULT_THINKING_BUDGET,
   getContextWindowSize,
-  type ModelWithBetas,
-  type ModelWithoutBetas,
-  resolveModelWithBetas,
   THINKING_BUDGETS,
   type ThinkingBudget,
 } from './models';
@@ -32,35 +27,28 @@ export {
 // Settings types
 export {
   type ApprovalDecision,
-  type CCPermissions,
-  type CCSettings,
-  type CliPlatformKey,
   type CodianSettings,
   createPermissionRule,
   type DeepSeekProviderConfig,
-  DEFAULT_CC_PERMISSIONS,
-  DEFAULT_CC_SETTINGS,
+  DEFAULT_RUNTIME_PERMISSIONS,
+  DEFAULT_RUNTIME_SETTINGS,
   DEFAULT_SETTINGS,
   type EnvSnippet,
   getBashToolBlockedCommands,
-  getCliPlatformKey,  // Kept for migration
   getCurrentPlatformBlockedCommands,
   getCurrentPlatformKey,
   getDefaultBlockedCommands,
   type HostnameCliPaths,
   type InstructionRefineResult,
   type KeyboardNavigationSettings,
-  type LegacyPermission,
-  legacyPermissionsToCCPermissions,
-  legacyPermissionToCCRule,
-  parseCCPermissionRule,
   type PermissionMode,
   type PermissionRule,
   type PlatformBlockedCommands,
-  type PlatformCliPaths,  // Kept for migration
   type ProviderConfigBase,
   type ProviderConfigs,
   type ProviderId,
+  type RuntimePermissions,
+  type RuntimeSettings,
   type SlashCommand,
   type TabBarPosition,
 } from './settings';
@@ -72,7 +60,7 @@ export { getHostnameKey } from '../../utils/env';
 export {
   type DiffLine,
   type DiffStats,
-  type SDKToolUseResult,
+  type RuntimeToolUseResult,
   type StructuredPatchHunk,
 } from './diff';
 
@@ -92,8 +80,6 @@ export {
 
 // MCP types
 export {
-  type ClaudianMcpConfigFile,
-  type ClaudianMcpServer,
   type CodianMcpConfigFile,
   type CodianMcpServer,
   DEFAULT_MCP_SERVER,

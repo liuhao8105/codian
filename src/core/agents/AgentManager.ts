@@ -30,7 +30,7 @@ function makeBuiltinAgent(name: string): AgentDefinition {
     id: name,
     name: name.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
     description: BUILTIN_AGENT_DESCRIPTIONS[name] ?? '',
-    prompt: '', // Built-in — prompt managed by SDK
+    prompt: '', // Built-in — prompt managed by Runtime
     source: 'builtin',
   };
 }

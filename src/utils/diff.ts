@@ -2,7 +2,7 @@ import type { DiffLine, DiffStats, StructuredPatchHunk } from '../core/types/dif
 import type { ToolCallInfo, ToolDiffData } from '../core/types/tools';
 
 /**
- * Convert SDK structuredPatch hunks to DiffLine[].
+ * Convert Runtime structuredPatch hunks to DiffLine[].
  * Each line in the hunk is prefixed with '+' (insert), '-' (delete), or ' ' (context).
  */
 export function structuredPatchToDiffLines(hunks: StructuredPatchHunk[]): DiffLine[] {
@@ -42,9 +42,9 @@ export function countLineChanges(diffLines: DiffLine[]): DiffStats {
 }
 
 /**
- * Extracts ToolDiffData from an SDK toolUseResult object.
+ * Extracts ToolDiffData from an Runtime toolUseResult object.
  *
- * Primary: Use structuredPatch hunks from the SDK result.
+ * Primary: Use structuredPatch hunks from the Runtime result.
  * Fallback: Compute diff from tool input (Edit: old/new string, Write: content as inserts).
  */
 export function extractDiffData(toolUseResult: unknown, toolCall: ToolCallInfo): ToolDiffData | undefined {

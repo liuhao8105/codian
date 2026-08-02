@@ -2,7 +2,7 @@
  * Chat and conversation type definitions.
  */
 
-import type { SDKToolUseResult } from './diff';
+import type { RuntimeToolUseResult } from './diff';
 import type { SubagentInfo, SubagentMode, ToolCallInfo } from './tools';
 
 /** Fork origin reference: identifies the source session and resume point. */
@@ -65,18 +65,18 @@ export interface ChatMessage {
   contentBlocks?: ContentBlock[];
   currentNote?: string;
   images?: ImageAttachment[];
-  /** True if this message represents a user interrupt (from SDK storage). */
+  /** True if this message represents a user interrupt (from Runtime storage). */
   isInterrupt?: boolean;
-  /** True if this message is rebuilt context sent to SDK on session reset (should be hidden). */
+  /** True if this message is rebuilt context sent to Runtime on session reset (should be hidden). */
   isRebuiltContext?: boolean;
   /** Duration in seconds from user send to response completion. */
   durationSeconds?: number;
   /** Flavor word used for duration display (e.g., "Baked", "Cooked"). */
   durationFlavorWord?: string;
-  /** SDK user message UUID for rewind. */
-  sdkUserUuid?: string;
-  /** SDK assistant message UUID for resumeSessionAt. */
-  sdkAssistantUuid?: string;
+  /** Runtime user message UUID for rewind. */
+  runtimeUserUuid?: string;
+  /** Runtime assistant message UUID for resumeSessionAt. */
+  runtimeAssistantUuid?: string;
 }
 
 /** Persisted conversation with messages and session state. */
@@ -89,17 +89,17 @@ export interface Conversation {
   lastResponseAt?: number;
   sessionId: string | null;
   /**
-   * Current SDK session ID for native sessions.
-   * May differ from sessionId when SDK creates a new session (session expired, API key changed).
-   * Used for loading messages from SDK storage. Falls back to sessionId if not set.
+   * Current Runtime session ID for native sessions.
+   * May differ from sessionId when Runtime creates a new session (session expired, API key changed).
+   * Used for loading messages from Runtime storage. Falls back to sessionId if not set.
    */
-  sdkSessionId?: string;
+  runtimeSessionId?: string;
   /**
-   * Previous SDK session IDs from session rebuilds.
-   * When resume fails and SDK creates a new session, the old sdkSessionId is moved here.
+   * Previous Runtime session IDs from session rebuilds.
+   * When resume fails and Runtime creates a new session, the old runtimeSessionId is moved here.
    * Used to load and merge messages from all session files for display.
    */
-  previousSdkSessionIds?: string[];
+  previousRuntimeSessionIds?: string[];
   messages: ChatMessage[];
   currentNote?: string;
   attachedFiles?: string[];
@@ -111,12 +111,12 @@ export interface Conversation {
   titleGenerationStatus?: 'pending' | 'success' | 'failed';
   /** UI-enabled MCP servers for this session (context-saving servers activated via selector). */
   enabledMcpServers?: string[];
-  /** True if this conversation uses SDK-native storage (messages in ~/.codian/projects/). */
+  /** True if this conversation is backed by a Codex session under ~/.codex/sessions/. */
   isNative?: boolean;
-  /** Timestamp of the last legacy JSONL message (used to merge SDK history). */
+  /** Timestamp of the last legacy JSONL message (used to merge Runtime history). */
   legacyCutoffAt?: number;
-  /** Internal flag to avoid reloading SDK history repeatedly. */
-  sdkMessagesLoaded?: boolean;
+  /** Internal flag to avoid reloading Runtime history repeatedly. */
+  runtimeMessagesLoaded?: boolean;
   /**
    * Cached subagent data for Task tool operations.
    * Loaded from metadata for native sessions to restore tool count and status on reload.
@@ -124,7 +124,7 @@ export interface Conversation {
   subagentData?: Record<string, SubagentInfo>;
   /** Assistant UUID for resumeSessionAt after rewind. */
   resumeSessionAt?: string;
-  /** Fork origin: source session to resume + fork from. Cleared after first SDK session init. */
+  /** Fork origin: source session to resume + fork from. Cleared after first Runtime session init. */
   forkSource?: ForkSource;
 }
 
@@ -140,14 +140,14 @@ export interface ConversationMeta {
   preview: string;
   /** Status of AI title generation. */
   titleGenerationStatus?: 'pending' | 'success' | 'failed';
-  /** True if this conversation uses SDK-native storage. */
+  /** True if this conversation uses Runtime-native storage. */
   isNative?: boolean;
 }
 
 /**
- * Session metadata overlay for SDK-native storage.
+ * Session metadata overlay for Runtime-native storage.
  * Stored in vault/.codian/sessions/{id}.meta.json
- * SDK handles message storage; this stores UI-only state.
+ * Runtime handles message storage; this stores UI-only state.
  */
 export interface SessionMetadata {
   id: string;
@@ -156,44 +156,44 @@ export interface SessionMetadata {
   createdAt: number;
   updatedAt: number;
   lastResponseAt?: number;
-  /** Session ID used for SDK resume (may be cleared when invalidated). */
+  /** Session ID used for Runtime resume (may be cleared when invalidated). */
   sessionId?: string | null;
   /**
-   * Current SDK session ID. May differ from id when SDK creates a new session.
-   * Used to locate the correct SDK session file for message loading.
+   * Current Runtime session ID. May differ from id when Runtime creates a new session.
+   * Used to locate the correct Runtime session file for message loading.
    */
-  sdkSessionId?: string;
+  runtimeSessionId?: string;
   /**
-   * Previous SDK session IDs from session rebuilds.
-   * When resume fails and SDK creates a new session, the old sdkSessionId is moved here.
+   * Previous Runtime session IDs from session rebuilds.
+   * When resume fails and Runtime creates a new session, the old runtimeSessionId is moved here.
    * Used to load and merge messages from all session files for display.
    */
-  previousSdkSessionIds?: string[];
+  previousRuntimeSessionIds?: string[];
   currentNote?: string;
   attachedFiles?: string[];
   externalContextPaths?: string[];
   enabledMcpServers?: string[];
   usage?: UsageInfo;
-  /** Timestamp of the last legacy JSONL message (used to merge SDK history). */
+  /** Timestamp of the last legacy JSONL message (used to merge Runtime history). */
   legacyCutoffAt?: number;
   /**
    * Subagent data for Task tool operations.
    * Maps toolUseId to subagent info (tool count, status, result).
-   * Stored here because SDK session files don't preserve this Claudian-specific data.
+   * Stored here because Runtime session files don't preserve this Codian-specific data.
    */
   subagentData?: Record<string, SubagentInfo>;
   /** Assistant UUID for resumeSessionAt after rewind. */
   resumeSessionAt?: string;
-  /** Fork origin: source session to resume + fork from. Cleared after first SDK session init. */
+  /** Fork origin: source session to resume + fork from. Cleared after first Runtime session init. */
   forkSource?: ForkSource;
 }
 
-/** Normalized stream chunk from the Claude Agent SDK. */
+/** Normalized stream chunk from the Codex Agent Runtime. */
 export type StreamChunk =
   | { type: 'text'; content: string; parentToolUseId?: string | null }
   | { type: 'thinking'; content: string; parentToolUseId?: string | null }
   | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown>; parentToolUseId?: string | null }
-  | { type: 'tool_result'; id: string; content: string; isError?: boolean; parentToolUseId?: string | null; toolUseResult?: SDKToolUseResult }
+  | { type: 'tool_result'; id: string; content: string; isError?: boolean; parentToolUseId?: string | null; toolUseResult?: RuntimeToolUseResult }
   | {
       type: 'plan_update';
       explanation?: string | null;
@@ -222,9 +222,9 @@ export type StreamChunk =
   | { type: 'done' }
   | { type: 'usage'; usage: UsageInfo; sessionId?: string | null }
   | { type: 'compact_boundary' }
-  | { type: 'sdk_user_uuid'; uuid: string }
-  | { type: 'sdk_user_sent'; uuid: string }
-  | { type: 'sdk_assistant_uuid'; uuid: string };
+  | { type: 'runtime_user_uuid'; uuid: string }
+  | { type: 'runtime_user_sent'; uuid: string }
+  | { type: 'runtime_assistant_uuid'; uuid: string };
 
 /** Context window usage information. */
 export interface UsageInfo {

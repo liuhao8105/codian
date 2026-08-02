@@ -1,6 +1,6 @@
 export { AGENTS_PATH, AgentVaultStorage } from './AgentVaultStorage';
 export {
-  CLAUDIAN_SETTINGS_PATH,
+  CODIAN_SETTINGS_PATH,
   CodianSettingsStorage,
   type StoredCodianSettings,
 } from './CodianSettingsStorage';
@@ -22,7 +22,7 @@ export {
   type RecoveryJournalEntry,
   type RecoveryState,
 } from './RecoveryJournal';
-export { isLegacyPermissionsFormat,RUNTIME_SETTINGS_PATH, RuntimeSettingsStorage } from './RuntimeSettingsStorage';
+export { RUNTIME_SETTINGS_PATH, RuntimeSettingsStorage } from './RuntimeSettingsStorage';
 export { SESSIONS_PATH, SessionStorage } from './SessionStorage';
 export { SKILLS_PATH, SkillStorage } from './SkillStorage';
 export { COMMANDS_PATH, SlashCommandStorage } from './SlashCommandStorage';

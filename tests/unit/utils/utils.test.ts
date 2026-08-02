@@ -6,7 +6,6 @@ import { getCurrentModelFromEnvironment, getModelsFromEnvironment, parseEnvironm
 import { appendMarkdownSnippet } from '@/utils/markdown';
 import {
   expandHomePath,
-  findClaudeCLIPath,
   getPathAccessType,
   getVaultPath,
   isPathInAllowedExportPaths,
@@ -224,7 +223,7 @@ describe('utils.ts', () => {
   });
 
   describe('expandHomePath', () => {
-    const envKey = 'CLAUDIAN_TEST_PATH';
+    const envKey = 'CODIAN_TEST_PATH';
     const envValue = path.join(os.tmpdir(), 'codian-env');
     let originalValue: string | undefined;
 
@@ -264,8 +263,8 @@ describe('utils.ts', () => {
     });
 
     it('should leave unknown environment variables untouched', () => {
-      expect(expandHomePath('%CLAUDIAN_MISSING_VAR%')).toBe('%CLAUDIAN_MISSING_VAR%');
-      expect(expandHomePath('$CLAUDIAN_MISSING_VAR')).toBe('$CLAUDIAN_MISSING_VAR');
+      expect(expandHomePath('%CODIAN_MISSING_VAR%')).toBe('%CODIAN_MISSING_VAR%');
+      expect(expandHomePath('$CODIAN_MISSING_VAR')).toBe('$CODIAN_MISSING_VAR');
     });
   });
 
@@ -282,7 +281,7 @@ describe('utils.ts', () => {
     });
 
     it('expands environment variables before filesystem use', () => {
-      const envKey = 'CLAUDIAN_FS_TEST_PATH';
+      const envKey = 'CODIAN_FS_TEST_PATH';
       const originalValue = process.env[envKey];
       process.env[envKey] = '/tmp/codian-test';
 
@@ -326,7 +325,7 @@ describe('utils.ts', () => {
     });
 
     it('handles chained home and environment variable expansions', () => {
-      const envKey = 'CLAUDIAN_TEST_SUBDIR';
+      const envKey = 'CODIAN_TEST_SUBDIR';
       const originalValue = process.env[envKey];
       process.env[envKey] = 'project';
 
@@ -410,40 +409,24 @@ describe('utils.ts', () => {
   });
 
   describe('getModelsFromEnvironment', () => {
-    it('should extract model from ANTHROPIC_MODEL', () => {
-      const envVars = { ANTHROPIC_MODEL: 'claude-3-opus' };
+    it('extracts Codex and OpenAI-compatible model overrides', () => {
+      const envVars = { CODEX_MODEL: 'gpt-5.6-sol', OPENAI_MODEL: 'deepseek-chat' };
       const result = getModelsFromEnvironment(envVars);
 
-      expect(result).toHaveLength(1);
-      expect(result[0].value).toBe('claude-3-opus');
-      expect(result[0].description).toContain('model');
-    });
-
-    it('should extract models from ANTHROPIC_DEFAULT_*_MODEL variables', () => {
-      const envVars = {
-        ANTHROPIC_DEFAULT_OPUS_MODEL: 'custom-opus',
-        ANTHROPIC_DEFAULT_SONNET_MODEL: 'custom-sonnet',
-        ANTHROPIC_DEFAULT_HAIKU_MODEL: 'custom-haiku',
-      };
-      const result = getModelsFromEnvironment(envVars);
-
-      expect(result).toHaveLength(3);
-      expect(result.map(m => m.value)).toContain('custom-opus');
-      expect(result.map(m => m.value)).toContain('custom-sonnet');
-      expect(result.map(m => m.value)).toContain('custom-haiku');
+      expect(result.map(model => model.value)).toEqual(['gpt-5.6-sol', 'deepseek-chat']);
     });
 
     it('should deduplicate models with same value', () => {
       const envVars = {
-        ANTHROPIC_MODEL: 'same-model',
-        ANTHROPIC_DEFAULT_OPUS_MODEL: 'same-model',
+        CODEX_MODEL: 'same-model',
+        OPENAI_MODEL: 'same-model',
       };
       const result = getModelsFromEnvironment(envVars);
 
       expect(result).toHaveLength(1);
       expect(result[0].value).toBe('same-model');
-      expect(result[0].description).toContain('model');
-      expect(result[0].description).toContain('opus');
+      expect(result[0].description).toContain('codex');
+      expect(result[0].description).toContain('openai');
     });
 
     it('should return empty array when no model variables are set', () => {
@@ -454,74 +437,48 @@ describe('utils.ts', () => {
     });
 
     it('should handle model names with slashes (provider/model format)', () => {
-      const envVars = { ANTHROPIC_MODEL: 'anthropic/claude-3-opus' };
+      const envVars = { OPENAI_MODEL: 'deepseek/deepseek-chat' };
       const result = getModelsFromEnvironment(envVars);
 
       expect(result).toHaveLength(1);
-      expect(result[0].value).toBe('anthropic/claude-3-opus');
-      expect(result[0].label).toBe('claude-3-opus');
+      expect(result[0].value).toBe('deepseek/deepseek-chat');
+      expect(result[0].label).toBe('deepseek-chat');
     });
 
     it('should fallback to full value when slash-split yields empty', () => {
-      const envVars = { ANTHROPIC_MODEL: 'trailing-slash/' };
+      const envVars = { OPENAI_MODEL: 'trailing-slash/' };
       const result = getModelsFromEnvironment(envVars);
 
       expect(result).toHaveLength(1);
       expect(result[0].label).toBe('trailing-slash/');
     });
 
-    it('should sort models by priority (model > haiku > sonnet > opus)', () => {
+    it('sorts Codex before the OpenAI-compatible override', () => {
       const envVars = {
-        ANTHROPIC_DEFAULT_OPUS_MODEL: 'opus-model',
-        ANTHROPIC_MODEL: 'main-model',
-        ANTHROPIC_DEFAULT_SONNET_MODEL: 'sonnet-model',
+        OPENAI_MODEL: 'deepseek-chat',
+        CODEX_MODEL: 'gpt-5.6-sol',
       };
       const result = getModelsFromEnvironment(envVars);
 
-      expect(result[0].value).toBe('main-model');
-      expect(result[1].value).toBe('sonnet-model');
-      expect(result[2].value).toBe('opus-model');
+      expect(result[0].value).toBe('gpt-5.6-sol');
+      expect(result[1].value).toBe('deepseek-chat');
     });
   });
 
   describe('getCurrentModelFromEnvironment', () => {
-    it('should return ANTHROPIC_MODEL if set', () => {
+    it('prefers the OpenAI-compatible model override', () => {
       const envVars = {
-        ANTHROPIC_MODEL: 'main-model',
-        ANTHROPIC_DEFAULT_OPUS_MODEL: 'opus-model',
+        OPENAI_MODEL: 'deepseek-chat',
+        CODEX_MODEL: 'gpt-5.6-sol',
       };
       const result = getCurrentModelFromEnvironment(envVars);
 
-      expect(result).toBe('main-model');
+      expect(result).toBe('deepseek-chat');
     });
 
-    it('should return ANTHROPIC_DEFAULT_HAIKU_MODEL if ANTHROPIC_MODEL not set', () => {
-      const envVars = {
-        ANTHROPIC_DEFAULT_HAIKU_MODEL: 'haiku-model',
-        ANTHROPIC_DEFAULT_SONNET_MODEL: 'sonnet-model',
-      };
-      const result = getCurrentModelFromEnvironment(envVars);
-
-      expect(result).toBe('haiku-model');
-    });
-
-    it('should return ANTHROPIC_DEFAULT_SONNET_MODEL if higher priority not set', () => {
-      const envVars = {
-        ANTHROPIC_DEFAULT_SONNET_MODEL: 'sonnet-model',
-        ANTHROPIC_DEFAULT_OPUS_MODEL: 'opus-model',
-      };
-      const result = getCurrentModelFromEnvironment(envVars);
-
-      expect(result).toBe('sonnet-model');
-    });
-
-    it('should return ANTHROPIC_DEFAULT_HAIKU_MODEL if only that is set', () => {
-      const envVars = {
-        ANTHROPIC_DEFAULT_HAIKU_MODEL: 'haiku-model',
-      };
-      const result = getCurrentModelFromEnvironment(envVars);
-
-      expect(result).toBe('haiku-model');
+    it('returns the Codex model when no compatible override is set', () => {
+      expect(getCurrentModelFromEnvironment({ CODEX_MODEL: 'gpt-5.6-sol' }))
+        .toBe('gpt-5.6-sol');
     });
 
     it('should return null if no model variables are set', () => {
@@ -538,173 +495,6 @@ describe('utils.ts', () => {
     });
   });
 
-  describe('findClaudeCLIPath', () => {
-    const originalPlatform = process.platform;
-    let originalEnv: NodeJS.ProcessEnv;
-
-    beforeEach(() => {
-      originalEnv = { ...process.env };
-      process.env.PATH = '';
-    });
-
-    afterEach(() => {
-      jest.restoreAllMocks();
-      Object.defineProperty(process, 'platform', { value: originalPlatform });
-      process.env = originalEnv;
-    });
-
-    describe('on Unix/macOS', () => {
-      beforeEach(() => {
-        Object.defineProperty(process, 'platform', { value: 'darwin' });
-      });
-
-      function mockExistingFile(...paths: string[]) {
-        const pathSet = new Set(paths);
-        jest.spyOn(fs, 'existsSync').mockImplementation((p: any) => pathSet.has(p));
-        jest.spyOn(fs, 'statSync').mockImplementation((p: any) => ({
-          isFile: () => pathSet.has(String(p)),
-        }) as fs.Stats);
-      }
-
-      it('should return first matching Claude CLI path', () => {
-        jest.spyOn(os, 'homedir').mockReturnValue('/home/test');
-        mockExistingFile('/home/test/.local/bin/claude');
-
-        expect(findClaudeCLIPath()).toBe('/home/test/.local/bin/claude');
-      });
-
-      it('should return null when Claude CLI is not found', () => {
-        jest.spyOn(os, 'homedir').mockReturnValue('/home/test');
-        jest.spyOn(fs, 'existsSync').mockReturnValue(false as any);
-
-        expect(findClaudeCLIPath()).toBeNull();
-      });
-
-      it('should check cli.js paths as fallback on Unix', () => {
-        jest.spyOn(os, 'homedir').mockReturnValue('/home/test');
-        mockExistingFile('/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js');
-
-        expect(findClaudeCLIPath()).toBe('/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js');
-      });
-
-      it('should resolve Claude CLI from custom PATH', () => {
-        mockExistingFile('/custom/bin/claude');
-
-        const customPath = '/custom/bin:/usr/bin';
-        expect(findClaudeCLIPath(customPath)).toBe('/custom/bin/claude');
-      });
-
-      it('should expand home directory in custom PATH', () => {
-        jest.spyOn(os, 'homedir').mockReturnValue('/home/test');
-        mockExistingFile('/home/test/bin/claude');
-
-        const customPath = '~/bin:/usr/bin';
-        expect(findClaudeCLIPath(customPath)).toBe('/home/test/bin/claude');
-      });
-
-      it('should not return a directory path even if it exists', () => {
-        jest.spyOn(os, 'homedir').mockReturnValue('/home/test');
-        const dirPath = path.join('/home/test', '.local', 'bin', 'claude');
-        jest.spyOn(fs, 'existsSync').mockImplementation((p: any) => p === dirPath);
-        jest.spyOn(fs, 'statSync').mockImplementation(() => ({
-          isFile: () => false,
-        }) as fs.Stats);
-
-        expect(findClaudeCLIPath()).toBeNull();
-      });
-    });
-
-    describe('on Windows', () => {
-      beforeEach(() => {
-        Object.defineProperty(process, 'platform', { value: 'win32' });
-        process.env.ProgramFiles = 'C:\\Program Files';
-        process.env['ProgramFiles(x86)'] = 'C:\\Program Files (x86)';
-        process.env.APPDATA = 'C:\\Users\\test\\AppData\\Roaming';
-      });
-
-      function mockExistingFile(...paths: string[]) {
-        const pathSet = new Set(paths);
-        jest.spyOn(fs, 'existsSync').mockImplementation((p: any) => pathSet.has(p));
-        jest.spyOn(fs, 'statSync').mockImplementation((p: any) => ({
-          isFile: () => pathSet.has(String(p)),
-        }) as fs.Stats);
-      }
-
-      it('should prefer .exe when both .exe and cli.js exist', () => {
-        jest.spyOn(os, 'homedir').mockReturnValue('C:\\Users\\test');
-        const exePath = path.join('C:\\Users\\test', '.claude', 'local', 'claude.exe');
-        const cliJsPath = path.join('C:\\Users\\test', 'AppData', 'Roaming', 'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'cli.js');
-        mockExistingFile(exePath, cliJsPath);
-
-        expect(findClaudeCLIPath()).toBe(exePath);
-      });
-
-      it('should prioritize cli.js over .cmd files on Windows', () => {
-        jest.spyOn(os, 'homedir').mockReturnValue('C:\\Users\\test');
-        // Note: path.join uses actual platform separator, so we match against that
-        const cliJsPath = path.join('C:\\Users\\test', 'AppData', 'Roaming', 'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'cli.js');
-        const cmdPath = path.join('C:\\Users\\test', 'AppData', 'Roaming', 'npm', 'claude.cmd');
-        // Both .cmd and cli.js exist, but cli.js should be returned (cmd is ignored entirely)
-        mockExistingFile(cmdPath, cliJsPath);
-
-        // Should return cli.js, not claude.cmd
-        expect(findClaudeCLIPath()).toBe(cliJsPath);
-      });
-
-      it('should find cli.js in custom npm global path via npm_config_prefix', () => {
-        jest.spyOn(os, 'homedir').mockReturnValue('C:\\Users\\test');
-        process.env.npm_config_prefix = 'D:\\nodejs\\node_global';
-        const expectedPath = path.join('D:\\nodejs\\node_global', 'node_modules', '@anthropic-ai', 'claude-code', 'cli.js');
-        mockExistingFile(expectedPath);
-
-        expect(findClaudeCLIPath()).toBe(expectedPath);
-      });
-
-      it('should fall back to .exe if cli.js not found', () => {
-        jest.spyOn(os, 'homedir').mockReturnValue('C:\\Users\\test');
-        const expectedPath = path.join('C:\\Users\\test', '.claude', 'local', 'claude.exe');
-        mockExistingFile(expectedPath);
-
-        expect(findClaudeCLIPath()).toBe(expectedPath);
-      });
-
-      it('should ignore .cmd fallback on Windows', () => {
-        jest.spyOn(os, 'homedir').mockReturnValue('C:\\Users\\test');
-        const expectedPath = path.join('C:\\Users\\test', 'AppData', 'Roaming', 'npm', 'claude.cmd');
-        mockExistingFile(expectedPath);
-
-        expect(findClaudeCLIPath()).toBeNull();
-      });
-
-      it('should return null when no CLI is found on Windows', () => {
-        jest.spyOn(os, 'homedir').mockReturnValue('C:\\Users\\test');
-        jest.spyOn(fs, 'existsSync').mockReturnValue(false as any);
-
-        expect(findClaudeCLIPath()).toBeNull();
-      });
-
-      it('should resolve cli.js from custom PATH npm prefix', () => {
-        const npmBin = 'C:\\Users\\test\\AppData\\Roaming\\npm';
-        const cliJsPath = path.join(npmBin, 'node_modules', '@anthropic-ai', 'claude-code', 'cli.js');
-        mockExistingFile(cliJsPath);
-
-        const customPath = `${npmBin};C:\\Windows\\System32`;
-        expect(findClaudeCLIPath(customPath)).toBe(cliJsPath);
-      });
-
-      it('should not return a directory path even if it exists', () => {
-        jest.spyOn(os, 'homedir').mockReturnValue('C:\\Users\\test');
-        const dirPath = path.join('C:\\Users\\test', '.claude', 'local', 'claude');
-        // Simulate a directory named 'claude' (exists but isFile returns false)
-        jest.spyOn(fs, 'existsSync').mockImplementation((p: any) => p === dirPath);
-        jest.spyOn(fs, 'statSync').mockImplementation(() => ({
-          isFile: () => false,
-        }) as fs.Stats);
-
-        expect(findClaudeCLIPath()).toBeNull();
-      });
-    });
-  });
 
   describe('isPathInAllowedExportPaths', () => {
     afterEach(() => {

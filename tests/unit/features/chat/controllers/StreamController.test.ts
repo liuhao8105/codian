@@ -50,11 +50,6 @@ jest.mock('@/utils/path', () => ({
   getVaultPath: jest.fn().mockReturnValue('/test/vault'),
 }));
 
-jest.mock('@/utils/sdkSession', () => ({
-  loadSubagentToolCalls: jest.fn().mockResolvedValue([]),
-  loadSubagentFinalResult: jest.fn().mockResolvedValue(null),
-}));
-
 function createMockDeps(): StreamControllerDeps {
   const state = new ChatState();
   const messagesEl = createMockEl();
@@ -98,7 +93,6 @@ function createMockDeps(): StreamControllerDeps {
       handleAgentOutputToolUse: jest.fn(),
       handleTaskToolUse: jest.fn().mockReturnValue({ action: 'buffered' }),
       handleTaskToolResult: jest.fn(),
-      refreshAsyncSubagent: jest.fn(),
       hasPendingTask: jest.fn().mockReturnValue(false),
       renderPendingTask: jest.fn().mockReturnValue(null),
       renderPendingTaskFromTaskResult: jest.fn().mockReturnValue(null),
@@ -318,28 +312,28 @@ describe('StreamController - Text Content', () => {
     });
   });
 
-  describe('sdk_assistant_uuid handling', () => {
-    it('should set sdkAssistantUuid on message', async () => {
+  describe('runtime_assistant_uuid handling', () => {
+    it('should set runtimeAssistantUuid on message', async () => {
       const msg = createTestMessage();
 
       await controller.handleStreamChunk(
-        { type: 'sdk_assistant_uuid', uuid: 'asst-uuid-123' } as any,
+        { type: 'runtime_assistant_uuid', uuid: 'asst-uuid-123' } as any,
         msg
       );
 
-      expect(msg.sdkAssistantUuid).toBe('asst-uuid-123');
+      expect(msg.runtimeAssistantUuid).toBe('asst-uuid-123');
     });
 
-    it('should overwrite previous sdkAssistantUuid', async () => {
+    it('should overwrite previous runtimeAssistantUuid', async () => {
       const msg = createTestMessage();
-      msg.sdkAssistantUuid = 'old-uuid';
+      msg.runtimeAssistantUuid = 'old-uuid';
 
       await controller.handleStreamChunk(
-        { type: 'sdk_assistant_uuid', uuid: 'new-uuid' } as any,
+        { type: 'runtime_assistant_uuid', uuid: 'new-uuid' } as any,
         msg
       );
 
-      expect(msg.sdkAssistantUuid).toBe('new-uuid');
+      expect(msg.runtimeAssistantUuid).toBe('new-uuid');
     });
   });
 
@@ -1502,199 +1496,6 @@ describe('StreamController - Text Content', () => {
       expect(updateToolCallResult).not.toHaveBeenCalled();
     });
 
-    it('hydrates async subagent tool calls from sidecar during streaming completion', async () => {
-      const { loadSubagentToolCalls, loadSubagentFinalResult } = jest.requireMock('@/utils/sdkSession');
-      const msg = createTestMessage();
-      deps.state.currentContentEl = createMockEl();
-
-      const completedSubagent = {
-        id: 'task-1',
-        description: 'Background task',
-        prompt: 'Do work',
-        mode: 'async',
-        status: 'completed',
-        toolCalls: [],
-        isExpanded: false,
-        asyncStatus: 'completed',
-        agentId: 'agent-1',
-        result: 'Done',
-      };
-
-      (deps.subagentManager.isLinkedAgentOutputTool as jest.Mock).mockReturnValueOnce(true);
-      (deps.subagentManager.handleAgentOutputToolResult as jest.Mock).mockReturnValueOnce(completedSubagent);
-      loadSubagentToolCalls.mockResolvedValueOnce([
-        {
-          id: 'read-1',
-          name: 'Read',
-          input: { file_path: 'notes.md' },
-          status: 'completed',
-          result: 'content',
-          isExpanded: false,
-        },
-      ]);
-
-      await controller.handleStreamChunk(
-        { type: 'tool_result', id: 'agent-out-1', content: 'agent result' },
-        msg
-      );
-
-      expect(loadSubagentToolCalls).toHaveBeenCalledWith(
-        '/test/vault',
-        'session-1',
-        'agent-1'
-      );
-      expect(loadSubagentFinalResult).toHaveBeenCalledWith(
-        '/test/vault',
-        'session-1',
-        'agent-1'
-      );
-      expect(completedSubagent.toolCalls).toHaveLength(1);
-      expect(deps.subagentManager.refreshAsyncSubagent).toHaveBeenCalledWith(completedSubagent);
-    });
-
-    it('hydrates async subagent final result from sidecar even when tool calls already exist', async () => {
-      const { loadSubagentFinalResult, loadSubagentToolCalls } = jest.requireMock('@/utils/sdkSession');
-      const msg = createTestMessage();
-      deps.state.currentContentEl = createMockEl();
-
-      const completedSubagent = {
-        id: 'task-2',
-        description: 'Background task',
-        prompt: 'Do work',
-        mode: 'async',
-        status: 'completed',
-        toolCalls: [
-          {
-            id: 'existing-tool',
-            name: 'Read',
-            input: { file_path: 'notes.md' },
-            status: 'completed',
-            result: 'existing',
-            isExpanded: false,
-          },
-        ],
-        isExpanded: false,
-        asyncStatus: 'completed',
-        agentId: 'agent-2',
-        result: 'Short placeholder',
-      };
-
-      (deps.subagentManager.isLinkedAgentOutputTool as jest.Mock).mockReturnValueOnce(true);
-      (deps.subagentManager.handleAgentOutputToolResult as jest.Mock).mockReturnValueOnce(completedSubagent);
-      loadSubagentFinalResult.mockResolvedValueOnce('Recovered final result from sidecar');
-
-      await controller.handleStreamChunk(
-        { type: 'tool_result', id: 'agent-out-2', content: 'agent result' },
-        msg
-      );
-
-      expect(loadSubagentToolCalls).not.toHaveBeenCalled();
-      expect(loadSubagentFinalResult).toHaveBeenCalledWith(
-        '/test/vault',
-        'session-1',
-        'agent-2'
-      );
-      expect(completedSubagent.result).toBe('Recovered final result from sidecar');
-      expect(deps.subagentManager.refreshAsyncSubagent).toHaveBeenCalledWith(completedSubagent);
-    });
-
-    it('does not retry async subagent final result hydration when sidecar matches current result', async () => {
-      const { loadSubagentFinalResult, loadSubagentToolCalls } = jest.requireMock('@/utils/sdkSession');
-      const msg = createTestMessage();
-      deps.state.currentContentEl = createMockEl();
-
-      const completedSubagent = {
-        id: 'task-2b',
-        description: 'Background task',
-        prompt: 'Do work',
-        mode: 'async',
-        status: 'completed',
-        toolCalls: [
-          {
-            id: 'existing-tool',
-            name: 'Read',
-            input: { file_path: 'notes.md' },
-            status: 'completed',
-            result: 'existing',
-            isExpanded: false,
-          },
-        ],
-        isExpanded: false,
-        asyncStatus: 'completed',
-        agentId: 'agent-2b',
-        result: 'Already final',
-      };
-
-      (deps.subagentManager.isLinkedAgentOutputTool as jest.Mock).mockReturnValueOnce(true);
-      (deps.subagentManager.handleAgentOutputToolResult as jest.Mock).mockReturnValueOnce(completedSubagent);
-      loadSubagentFinalResult.mockResolvedValueOnce('Already final');
-
-      await controller.handleStreamChunk(
-        { type: 'tool_result', id: 'agent-out-2b', content: 'agent result' },
-        msg
-      );
-
-      expect(loadSubagentToolCalls).not.toHaveBeenCalled();
-      expect(loadSubagentFinalResult).toHaveBeenCalledTimes(1);
-      expect(deps.subagentManager.refreshAsyncSubagent).not.toHaveBeenCalled();
-
-      jest.advanceTimersByTime(3000);
-      await Promise.resolve();
-      await Promise.resolve();
-
-      expect(loadSubagentFinalResult).toHaveBeenCalledTimes(1);
-    });
-
-    it('retries async subagent final result hydration when first sidecar read is stale', async () => {
-      const { loadSubagentFinalResult, loadSubagentToolCalls } = jest.requireMock('@/utils/sdkSession');
-      const msg = createTestMessage();
-      deps.state.currentContentEl = createMockEl();
-
-      const completedSubagent = {
-        id: 'task-3',
-        description: 'Background task',
-        prompt: 'Do work',
-        mode: 'async',
-        status: 'completed',
-        toolCalls: [
-          {
-            id: 'existing-tool',
-            name: 'Read',
-            input: { file_path: 'notes.md' },
-            status: 'completed',
-            result: 'existing',
-            isExpanded: false,
-          },
-        ],
-        isExpanded: false,
-        asyncStatus: 'completed',
-        agentId: 'agent-3',
-        result: 'Intermediate line',
-      };
-
-      (deps.subagentManager.isLinkedAgentOutputTool as jest.Mock).mockReturnValueOnce(true);
-      (deps.subagentManager.handleAgentOutputToolResult as jest.Mock).mockReturnValueOnce(completedSubagent);
-      loadSubagentFinalResult
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce('Recovered final result after delayed flush');
-
-      await controller.handleStreamChunk(
-        { type: 'tool_result', id: 'agent-out-3', content: 'agent result' },
-        msg
-      );
-
-      expect(loadSubagentToolCalls).not.toHaveBeenCalled();
-      expect(loadSubagentFinalResult).toHaveBeenCalledTimes(1);
-      expect(deps.subagentManager.refreshAsyncSubagent).not.toHaveBeenCalled();
-
-      jest.advanceTimersByTime(200);
-      await Promise.resolve();
-      await Promise.resolve();
-
-      expect(loadSubagentFinalResult).toHaveBeenCalledTimes(2);
-      expect(completedSubagent.result).toBe('Recovered final result after delayed flush');
-      expect(deps.subagentManager.refreshAsyncSubagent).toHaveBeenCalledWith(completedSubagent);
-    });
   });
 
   describe('Tool header update on input re-dispatch', () => {

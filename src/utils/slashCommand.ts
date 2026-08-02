@@ -71,7 +71,7 @@ export function parseSlashCommandContent(content: string): ParsedSlashCommandCon
     allowedTools: extractStringArray(fm, 'allowed-tools') ?? extractStringArray(fm, 'allowedTools'),
     model: extractString(fm, 'model'),
     promptContent: parsed.body,
-    // Skill fields — kebab-case preferred (CC file format), camelCase for backwards compat
+    // Skill fields — kebab-case preferred (runtime file format), camelCase for backwards compat
     disableModelInvocation:
       extractBoolean(fm, 'disable-model-invocation') ?? extractBoolean(fm, 'disableModelInvocation'),
     userInvocable:

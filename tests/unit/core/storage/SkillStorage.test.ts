@@ -142,7 +142,7 @@ disableModelInvocation: true
 userInvocable: true
 context: fork
 agent: code-reviewer
-model: sonnet
+model: GPT-5.6-Sol
 allowed-tools:
   - Read
   - Grep
@@ -159,7 +159,7 @@ Full prompt`,
       expect(skill.userInvocable).toBe(true);
       expect(skill.context).toBe('fork');
       expect(skill.agent).toBe('code-reviewer');
-      expect(skill.model).toBe('sonnet');
+      expect(skill.model).toBe('GPT-5.6-Sol');
       expect(skill.allowedTools).toEqual(['Read', 'Grep']);
       expect(skill.content).toBe('Full prompt');
     });

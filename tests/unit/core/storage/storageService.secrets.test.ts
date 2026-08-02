@@ -19,7 +19,7 @@ function createPlugin(initialSettings: Record<string, unknown>) {
   const files = new Map<string, string>([
     ['.codian/codian-settings.json', JSON.stringify(initialSettings)],
   ]);
-  const folders = new Set<string>(['.claude']);
+  const folders = new Set<string>(['.codex']);
   let pluginData: Record<string, unknown> = {};
   const adapter = {
     exists: jest.fn(async (path: string) => files.has(path) || folders.has(path)),

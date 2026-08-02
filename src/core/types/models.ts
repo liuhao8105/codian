@@ -2,8 +2,6 @@
  * Model type definitions and constants.
  */
 
-import type { RuntimeBeta } from '../runtime/contracts';
-
 /** Model identifier (string to support custom models via environment variables). */
 export type AgentModel = string;
 
@@ -130,35 +128,6 @@ export function reconcileCodexModelSelection(
   return { model: defaultModel, migrated: true };
 }
 
-export const BETA_1M_CONTEXT: RuntimeBeta = 'context-1m-2025-08-07';
-
-export interface ModelWithBetas {
-  model: string;
-  betas: RuntimeBeta[];
-}
-
-export interface ModelWithoutBetas {
-  model: string;
-  betas?: undefined;
-}
-
-/** Resolves a model to its base model and optional beta flags. */
-export function resolveModelWithBetas(model: string, include1MBeta: true): ModelWithBetas;
-export function resolveModelWithBetas(model: string, include1MBeta?: false): ModelWithoutBetas;
-export function resolveModelWithBetas(model: string, include1MBeta: boolean): ModelWithBetas | ModelWithoutBetas;
-export function resolveModelWithBetas(model: string, include1MBeta = false): ModelWithBetas | ModelWithoutBetas {
-  if (!model || typeof model !== 'string') {
-    throw new Error('resolveModelWithBetas: model is required and must be a non-empty string');
-  }
-  if (include1MBeta) {
-    return {
-      model,
-      betas: [BETA_1M_CONTEXT],
-    };
-  }
-  return { model };
-}
-
 export type ThinkingBudget = 'off' | 'low' | 'medium' | 'high' | 'xhigh';
 
 export const THINKING_BUDGETS: { value: ThinkingBudget; label: string; tokens: number }[] = [
@@ -180,11 +149,8 @@ export const DEFAULT_THINKING_BUDGET: Record<string, ThinkingBudget> = {
 };
 
 export const CONTEXT_WINDOW_STANDARD = 200_000;
-export const CONTEXT_WINDOW_1M = 1_000_000;
-
 export function getContextWindowSize(
   model: string,
-  is1MEnabled = false,
   customLimits?: Record<string, number>
 ): number {
   if (customLimits && model in customLimits) {
@@ -194,9 +160,5 @@ export function getContextWindowSize(
     }
   }
 
-  // Legacy 1M handling is retained only for backward compatibility.
-  if (is1MEnabled && model.includes('sonnet')) {
-    return CONTEXT_WINDOW_1M;
-  }
   return CONTEXT_WINDOW_STANDARD;
 }

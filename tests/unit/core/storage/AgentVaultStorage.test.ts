@@ -8,7 +8,7 @@ describe('AgentVaultStorage', () => {
   const validAgentMd = `---
 name: code-reviewer
 description: Reviews code for issues
-model: sonnet
+model: GPT-5.6-Sol
 ---
 You are a code reviewer.`;
 
@@ -52,7 +52,7 @@ Run the tests.`;
       expect(agents).toHaveLength(2);
       expect(agents[0].name).toBe('code-reviewer');
       expect(agents[0].description).toBe('Reviews code for issues');
-      expect(agents[0].model).toBe('sonnet');
+      expect(agents[0].model).toBe('GPT-5.6-Sol');
       expect(agents[0].source).toBe('vault');
       expect(agents[0].prompt).toBe('You are a code reviewer.');
       expect(agents[1].name).toBe('test-runner');
@@ -170,7 +170,7 @@ Be strict.`;
         name: 'my-agent',
         description: 'My agent',
         prompt: 'Do stuff.',
-        model: 'opus',
+        model: 'GPT-5.6-Terra',
         tools: ['Read', 'Grep'],
         source: 'vault',
       });
@@ -178,7 +178,7 @@ Be strict.`;
       const written = mockAdapter.write.mock.calls[0][1] as string;
       expect(written).toContain('name: my-agent');
       expect(written).toContain('description: My agent');
-      expect(written).toContain('model: opus');
+      expect(written).toContain('model: GPT-5.6-Terra');
       expect(written).toContain('tools:\n  - Read\n  - Grep');
       expect(written).toContain('Do stuff.');
     });
@@ -254,7 +254,7 @@ Be strict.`;
       expect(result).not.toBeNull();
       expect(result!.name).toBe('code-reviewer');
       expect(result!.prompt).toBe('You are a code reviewer.');
-      expect(result!.model).toBe('sonnet');
+      expect(result!.model).toBe('GPT-5.6-Sol');
     });
 
     it('returns null when file is not found', async () => {

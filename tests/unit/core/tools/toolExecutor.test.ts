@@ -85,13 +85,13 @@ describe('executeDeepSeekToolCall Bash', () => {
       {
         id: 'tool-1',
         name: 'Bash',
-        arguments: { command: 'echo ok ~/.codex/skills/example/scripts/run.py' },
+        arguments: { command: 'echo ok ~/.codian/skills/example/scripts/run.py' },
       },
       createContext(vaultPath, { enableDeepSeekBash: true }),
     );
 
     expect(result).toContain('ok');
-    expect(result).toContain('.codex/skills/example/scripts/run.py');
+    expect(result).toContain('.codian/skills/example/scripts/run.py');
     expect(result).not.toContain('Access denied');
   });
 

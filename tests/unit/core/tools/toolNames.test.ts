@@ -336,7 +336,7 @@ describe('isMcpTool', () => {
   });
 
   it('should return false for mcp-prefixed tool name (not in MCP_TOOLS)', () => {
-    // MCP tools invoked via SDK have mcp__ prefix but are not in MCP_TOOLS
+    // MCP tools invoked via Runtime have mcp__ prefix but are not in MCP_TOOLS
     expect(isMcpTool('mcp__server__tool')).toBe(false);
   });
 });

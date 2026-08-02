@@ -12,7 +12,7 @@ describe('SlashCommandStorage', () => {
     description: 'Review code for issues',
     argumentHint: '[file] [focus]',
     allowedTools: ['Read', 'Grep'],
-    model: 'claude-sonnet-4-5',
+    model: 'gpt-5.6-sol',
     content: 'Please review $ARGUMENTS for any issues.',
   };
 
@@ -31,7 +31,7 @@ argument-hint: "[file] [focus]"
 allowed-tools:
   - Read
   - Grep
-model: claude-sonnet-4-5
+model: gpt-5.6-sol
 ---
 Please review $ARGUMENTS for any issues.`;
 
@@ -238,7 +238,7 @@ Do the thing`;
       );
       expect(mockAdapter.write).toHaveBeenCalledWith(
         '.codian/commands/review-code.md',
-        expect.stringContaining('model: claude-sonnet-4-5')
+        expect.stringContaining('model: gpt-5.6-sol')
       );
       expect(mockAdapter.write).toHaveBeenCalledWith(
         '.codian/commands/review-code.md',

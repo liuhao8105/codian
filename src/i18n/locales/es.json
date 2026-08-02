@@ -98,7 +98,7 @@
     "titleModel": {
       "name": "Modelo de generación de títulos",
       "desc": "Modelo utilizado para generar automáticamente títulos de conversación.",
-      "auto": "Automático (Haiku)"
+      "auto": "Automático (GPT-5.6-Luna)"
     },
     "navMappings": {
       "name": "Mapeos de navegación estilo Vim",
@@ -153,10 +153,6 @@
       "name": "Servidores MCP",
       "desc": "Configura servidores Model Context Protocol para extender las capacidades de Codex con herramientas y fuentes de datos externas. Los servidores con modo de guardado de contexto requieren @mention para activarse."
     },
-    "plugins": {
-      "name": "Plugins heredados",
-      "desc": "Habilita o deshabilita plugins heredados descubiertos desde ~/.claude/plugins. Los plugins habilitados se almacenan por bóveda."
-    },
     "subagents": {
       "name": "Subagentes",
       "desc": "Configura subagentes personalizados a los que Codex puede delegar.",
@@ -196,10 +192,6 @@
       }
     },
     "safety": "Seguridad",
-    "loadUserSettings": {
-      "name": "Cargar configuración heredada del usuario",
-      "desc": "Carga ~/.claude/settings.json para mantener compatibilidad durante la migración. Cuando está habilitado, estas reglas heredadas de permisos pueden eludir el modo seguro."
-    },
     "enableBlocklist": {
       "name": "Habilitar lista negra de comandos",
       "desc": "Bloquea comandos bash potencialmente peligrosos"
@@ -244,14 +236,6 @@
       "invalid": "Formato inválido. Use: 256k, 1m o número exacto (1000-10000000)."
     },
     "advanced": "Avanzado",
-    "show1MModel": {
-      "name": "Habilitar Sonnet con ventana de contexto de 1M",
-      "desc": "Reemplazar Sonnet estándar con Sonnet (1M) en el selector de modelos. Mismo precio bajo 200k tokens. Requiere suscripción Max."
-    },
-    "enableChrome": {
-      "name": "Habilitar extensión de Chrome",
-      "desc": "Permitir que Codian interactúe con Chrome a través de la extensión claude-in-chrome. Requiere que la extensión esté instalada. Requiere reinicio de sesión."
-    },
     "enableBangBash": {
       "name": "Habilitar modo bash (!)",
       "desc": "Escribe ! en una entrada vacía para entrar en modo bash. Ejecuta comandos directamente mediante Node.js child_process. Requiere volver a abrir la vista.",

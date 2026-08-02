@@ -200,7 +200,7 @@ export class CodexAgentRuntime implements AgentRuntime {
   private askUserQuestionCallback:
     ((input: Record<string, unknown>, signal?: AbortSignal) => Promise<Record<string, string> | null>) | null = null;
   private exitPlanModeCallback: ExitPlanModeCallback | null = null;
-  private permissionModeSyncCallback: ((sdkMode: string) => void) | null = null;
+  private permissionModeSyncCallback: ((runtimeMode: string) => void) | null = null;
   private subagentStateProvider: (() => SubagentHookState) | null = null;
 
   constructor(plugin: CodianPlugin, mcpManager: McpServerManager) {
@@ -540,7 +540,7 @@ ${prompt}
     this.pendingResumeAt = uuid;
   }
 
-  applyForkState(conv: Pick<Conversation, 'sessionId' | 'sdkSessionId' | 'forkSource'>): string | null {
+  applyForkState(conv: Pick<Conversation, 'sessionId' | 'runtimeSessionId' | 'forkSource'>): string | null {
     this.pendingResumeAt = conv.forkSource?.resumeAt;
     this.threadId = conv.sessionId ?? conv.forkSource?.sessionId ?? null;
     return this.threadId;
@@ -716,7 +716,7 @@ ${prompt}
             markTurnActivity();
           }
           if (item?.type === 'userMessage') {
-            queue.push({ type: 'sdk_user_sent', uuid: asString(item.id) || '' });
+            queue.push({ type: 'runtime_user_sent', uuid: asString(item.id) || '' });
           }
           if (item?.type === 'agentMessage') {
             const itemId = asString(item.id);
@@ -1110,7 +1110,7 @@ ${prompt}
         const turn = asRecord(startedTurn.turn);
         this.activeTurnId = asString(turn?.id);
         void appendRuntimeDiagnosticLog(`turn-started ${this.activeTurnId ?? 'null'}`);
-        queue.push({ type: 'sdk_user_sent', uuid: this.activeTurnId || '' });
+        queue.push({ type: 'runtime_user_sent', uuid: this.activeTurnId || '' });
         armWatchdog?.(generation);
       } catch (error) {
         if (generation !== attemptGeneration || this.activeAbortController?.signal.aborted) {
@@ -1215,7 +1215,7 @@ ${prompt}
     this.exitPlanModeCallback = callback;
   }
 
-  setPermissionModeSyncCallback(callback: ((sdkMode: string) => void) | null): void {
+  setPermissionModeSyncCallback(callback: ((runtimeMode: string) => void) | null): void {
     this.permissionModeSyncCallback = callback;
   }
 
@@ -1224,6 +1224,6 @@ ${prompt}
   }
 
   setAutoTurnCallback(_callback: ((chunks: StreamChunk[]) => void) | null): void {
-    // Codex runtime currently does not emit SDK auto-turn callbacks.
+    // Codex runtime currently does not emit Runtime auto-turn callbacks.
   }
 }

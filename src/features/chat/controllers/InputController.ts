@@ -335,7 +335,7 @@ export class InputController {
 
   private isResumeSessionAtStillNeeded(resumeUuid: string, previousMessages: ChatMessage[]): boolean {
     for (let i = previousMessages.length - 1; i >= 0; i--) {
-      if (previousMessages[i].role === 'assistant' && previousMessages[i].sdkAssistantUuid === resumeUuid) {
+      if (previousMessages[i].role === 'assistant' && previousMessages[i].runtimeAssistantUuid === resumeUuid) {
         // Still needed only if no messages follow the resume point
         return i === previousMessages.length - 1;
       }
@@ -506,8 +506,8 @@ export class InputController {
 
     fileContextManager?.startSession();
 
-    // Slash commands are passed directly to SDK for handling
-    // SDK handles expansion, $ARGUMENTS, @file references, and frontmatter options
+    // Slash commands are passed directly to Runtime for handling
+    // Runtime handles expansion, $ARGUMENTS, @file references, and frontmatter options
     const shouldSendCurrentNote = fileContextManager?.shouldSendCurrentNote(currentNotePath) ?? false;
 
     const editorContextOverride = options?.editorContextOverride;
@@ -539,7 +539,7 @@ export class InputController {
     let promptToSend = effectiveContent;
     let currentNoteForHistory: string | undefined;
 
-    // SDK built-in commands (e.g., /compact) must be sent bare — context XML breaks detection
+    // Runtime built-in commands (e.g., /compact) must be sent bare — context XML breaks detection
     if (!isCompact) {
       // Append current note context if available
       if (shouldSendCurrentNote && currentNotePath) {
@@ -748,13 +748,13 @@ export class InputController {
       scheduleLongRunningFeedback();
       for await (const chunk of agentService.query(promptToSend, imagesForMessage, previousMessages, queryOptions)) {
         clearLongRunningFeedback();
-        if (chunk.type === 'sdk_user_uuid') {
-          userMsg.sdkUserUuid = chunk.uuid;
+        if (chunk.type === 'runtime_user_uuid') {
+          userMsg.runtimeUserUuid = chunk.uuid;
           scheduleLongRunningFeedback();
           continue;
         }
 
-        if (chunk.type === 'sdk_user_sent') {
+        if (chunk.type === 'runtime_user_sent') {
           didEnqueueToSdk = true;
           scheduleLongRunningFeedback();
           continue;

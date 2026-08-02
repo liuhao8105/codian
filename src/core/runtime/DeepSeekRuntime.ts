@@ -645,7 +645,7 @@ export class DeepSeekRuntime implements AgentRuntime {
     messages.push({ role: 'user', content: prompt });
 
     const turnId = `deepseek-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    yield { type: 'sdk_user_sent', uuid: turnId };
+    yield { type: 'runtime_user_sent', uuid: turnId };
 
     this.activeAbortController = new AbortController();
 
@@ -949,7 +949,7 @@ export class DeepSeekRuntime implements AgentRuntime {
   setApprovalDismisser(_dismisser: (() => void) | null): void {}
   setAskUserQuestionCallback(_callback: ((input: Record<string, unknown>, signal?: AbortSignal) => Promise<Record<string, string> | null>) | null): void {}
   setExitPlanModeCallback(_callback: ((input: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown> | null) | null): void {}
-  setPermissionModeSyncCallback(_callback: ((sdkMode: string) => void) | null): void {}
+  setPermissionModeSyncCallback(_callback: ((runtimeMode: string) => void) | null): void {}
   setSubagentHookProvider(_getState: () => unknown): void {}
   setAutoTurnCallback(_callback: ((chunks: StreamChunk[]) => void) | null): void {}
 }

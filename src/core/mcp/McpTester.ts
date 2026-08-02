@@ -31,7 +31,7 @@ interface UrlServerConfig {
 
 /**
  * Use Node's HTTP stack for MCP server verification to avoid renderer CORS restrictions.
- * We still rely on official SDK transports for MCP protocol semantics.
+ * We still rely on official Runtime transports for MCP protocol semantics.
  */
 export function createNodeFetch(): (input: string | URL | Request, init?: RequestInit) => Promise<Response> {
   return async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
