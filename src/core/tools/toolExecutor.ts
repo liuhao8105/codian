@@ -12,6 +12,7 @@ import { getEnhancedPath } from '../../utils/env';
 import { getPathAccessType, getVaultPath, isPathWithinVault } from '../../utils/path';
 import type { McpServerManager } from '../mcp';
 import type { ApprovalCallbackOptions } from '../runtime/contracts';
+import { boundText, MAX_TOOL_RESULT_CHARS } from '../runtime/deepseekLimits';
 import { findBashCommandPathViolation } from '../security/BashPathValidator';
 import { isCommandBlocked } from '../security/BlocklistChecker';
 import {
@@ -22,6 +23,7 @@ import {
 import { getBashToolBlockedCommands } from '../types';
 import { callMcpTool, classifyMcpToolRisk } from './mcpBridge';
 import type { TransactionLog } from './transactionLog';
+import { searchVaultMarkdown } from './vaultGrep';
 
 export interface ToolExecutionContext {
   plugin: CodianPlugin;
@@ -46,6 +48,14 @@ const DEEPSEEK_BASH_MAX_BUFFER = 10 * 1024 * 1024;
  * Execute a single tool call and return the result string to feed back to the LLM.
  */
 export async function executeDeepSeekToolCall(
+  toolCall: { id: string; name: string; arguments: Record<string, unknown> },
+  context: ToolExecutionContext,
+): Promise<string> {
+  const result = await executeDeepSeekToolCallUnbounded(toolCall, context);
+  return boundText(result, MAX_TOOL_RESULT_CHARS, 'tool result');
+}
+
+async function executeDeepSeekToolCallUnbounded(
   toolCall: { id: string; name: string; arguments: Record<string, unknown> },
   context: ToolExecutionContext,
 ): Promise<string> {
@@ -139,35 +149,11 @@ async function executeGrep(
   const pattern = String(args.pattern || '');
   if (!pattern.trim()) return 'Error: No pattern provided.';
 
-  const vaultPath = getVaultPath(context.plugin.app);
-  if (!vaultPath) return 'Error: Cannot determine vault path.';
-
-  const searchPath = args.path
-    ? path.resolve(vaultPath, String(args.path))
-    : vaultPath;
-
-  const safePattern = pattern.replace(/'/g, "'\\''");
-
-  return new Promise<string>((resolve) => {
-    exec(
-      `grep -rn --include='*.md' '${safePattern}' '${searchPath}'`,
-      { timeout: 10000, maxBuffer: 1024 * 1024 },
-      (error, stdout) => {
-        if (error && error.code !== 1) {
-          resolve(`Grep error: ${error.message}`);
-        } else if (!stdout.trim()) {
-          resolve('No matches found.');
-        } else {
-          const lines = stdout.trim().split('\n');
-          if (lines.length > 200) {
-            resolve(lines.slice(0, 200).join('\n') + `\n\n... (${lines.length - 200} more matches truncated)`);
-          } else {
-            resolve(stdout.trim());
-          }
-        }
-      },
-    );
-  });
+  return searchVaultMarkdown(
+    context.plugin.app,
+    pattern,
+    args.path === undefined ? undefined : String(args.path),
+  );
 }
 
 async function executeBash(
@@ -639,11 +625,7 @@ async function executeMcpCall(
   // Classify risk
   const classification = classifyMcpToolRisk(actualToolName);
 
-  // Diagnostic: log tool call with arguments
-  const argSummary = JSON.stringify(toolCall.arguments);
-  console.debug(
-    `[Codian MCP] call: ${actualToolName} [${classification.level}] args=${argSummary.slice(0, 300)}`,
-  );
+  console.debug(`[Codian MCP] call: ${actualToolName} [${classification.level}]`);
 
   // Blocked tools rejected before execution
   if (classification.level === 'blocked') {

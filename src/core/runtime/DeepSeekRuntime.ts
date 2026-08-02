@@ -18,6 +18,13 @@ import type {
   StreamChunk,
 } from '../types';
 import type { ApprovalCallback, QueryOptions, RewindFilesResult } from './contracts';
+import {
+  assertPromptWithinLimit,
+  assertSerializedRequestWithinLimit,
+  boundConversationHistory,
+  MAX_SSE_BUFFER_CHARS,
+  MAX_STREAM_ACCUMULATED_CHARS,
+} from './deepseekLimits';
 import type { AgentRuntime } from './index';
 
 /** Maximum tool-calling rounds per user message (final safety net). */
@@ -28,6 +35,98 @@ const MAX_NO_PROGRESS_ROUNDS = 3;
 const MAX_DUPLICATE_TOOLS = 3;
 /** After this round, require the model to answer based on gathered context. */
 const WARN_ROUND = 6;
+const RESPONSE_HEADER_TIMEOUT_MS = 30_000;
+const SSE_IDLE_TIMEOUT_MS = 90_000;
+
+function abortError(): DOMException {
+  return new DOMException('The operation was aborted.', 'AbortError');
+}
+
+export async function fetchDeepSeekResponseWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  signal: AbortSignal,
+  timeoutMs = RESPONSE_HEADER_TIMEOUT_MS,
+): Promise<Response> {
+  if (signal.aborted) throw abortError();
+
+  const controller = new AbortController();
+  return new Promise<Response>((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', onAbort);
+    };
+    const finish = (action: () => void) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      action();
+    };
+    const onAbort = () => {
+      controller.abort();
+      finish(() => reject(abortError()));
+    };
+    const timer = setTimeout(() => {
+      controller.abort();
+      finish(() => reject(new Error(`DeepSeek API connection timed out after ${timeoutMs}ms.`)));
+    }, timeoutMs);
+
+    signal.addEventListener('abort', onAbort, { once: true });
+    void fetch(input, { ...init, signal: controller.signal }).then(
+      (response) => finish(() => resolve(response)),
+      (error) => finish(() => reject(signal.aborted ? abortError() : error)),
+    );
+  });
+}
+
+export async function readSseChunkWithTimeout(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  signal: AbortSignal,
+  timeoutMs = SSE_IDLE_TIMEOUT_MS,
+): Promise<ReadableStreamReadResult<Uint8Array>> {
+  if (signal.aborted) throw abortError();
+
+  return new Promise<ReadableStreamReadResult<Uint8Array>>((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', onAbort);
+    };
+    const finish = (action: () => void) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      action();
+    };
+    const cancelReader = () => { void reader.cancel().catch(() => undefined); };
+    const onAbort = () => {
+      cancelReader();
+      finish(() => reject(abortError()));
+    };
+    const timer = setTimeout(() => {
+      cancelReader();
+      finish(() => reject(new Error(`DeepSeek stream was idle for ${timeoutMs}ms.`)));
+    }, timeoutMs);
+
+    signal.addEventListener('abort', onAbort, { once: true });
+    void reader.read().then(
+      (result) => finish(() => resolve(result)),
+      (error) => finish(() => reject(signal.aborted ? abortError() : error)),
+    );
+  });
+}
+
+export function appendWithinDeepSeekStreamLimit(
+  current: string,
+  addition: string,
+  label: string,
+): string {
+  if (current.length + addition.length > MAX_STREAM_ACCUMULATED_CHARS) {
+    throw new Error(`DeepSeek ${label} exceeds ${MAX_STREAM_ACCUMULATED_CHARS} characters.`);
+  }
+  return current + addition;
+}
 
 interface DeepSeekMessage {
   role: string;
@@ -122,7 +221,7 @@ interface StreamResult {
  * Yields parsed SSEChoice objects for each non-empty data line.
  * Resolves when the [DONE] marker is received or the stream ends.
  */
-async function* parseSSEStream(
+export async function* parseSSEStream(
   response: Response,
   signal: AbortSignal,
 ): AsyncGenerator<SSEChoice> {
@@ -140,15 +239,21 @@ async function* parseSSEStream(
 
   try {
     while (true) {
-      const { done, value } = await reader.read();
+      const { done, value } = await readSseChunkWithTimeout(reader, signal);
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
+      if (buffer.length > MAX_SSE_BUFFER_CHARS && !buffer.includes('\n')) {
+        throw new Error(`DeepSeek SSE buffer exceeds ${MAX_SSE_BUFFER_CHARS} characters.`);
+      }
       const lines = buffer.split('\n');
       // Keep the last potentially incomplete line in the buffer
       buffer = lines.pop() || '';
 
       for (const line of lines) {
+        if (line.length > MAX_SSE_BUFFER_CHARS) {
+          throw new Error(`DeepSeek SSE buffer exceeds ${MAX_SSE_BUFFER_CHARS} characters.`);
+        }
         const trimmed = line.trim();
         if (!trimmed || !trimmed.startsWith('data:')) continue;
 
@@ -356,7 +461,11 @@ async function* consumeSSEToResult(
 
       // Accumulate reasoning_content (not buffered — not displayed, just preserved)
       if (delta.reasoning_content) {
-        accumulatedReasoning += delta.reasoning_content;
+        accumulatedReasoning = appendWithinDeepSeekStreamLimit(
+          accumulatedReasoning,
+          delta.reasoning_content,
+          'reasoning',
+        );
       }
 
       // Accumulate tool_calls by index
@@ -373,7 +482,13 @@ async function* consumeSSEToResult(
           const existing = toolCallsByIndex.get(tc.index);
           if (existing) {
             if (tc.function?.name) existing.function.name += tc.function.name;
-            if (tc.function?.arguments) existing.function.arguments += tc.function.arguments;
+            if (tc.function?.arguments) {
+              existing.function.arguments = appendWithinDeepSeekStreamLimit(
+                existing.function.arguments,
+                tc.function.arguments,
+                'tool arguments',
+              );
+            }
           } else {
             toolCallsByIndex.set(tc.index, {
               id: tc.id || '',
@@ -393,7 +508,11 @@ async function* consumeSSEToResult(
         let visibleText = dsmlCarryOver + delta.content;
         dsmlCarryOver = '';
         if (dsmlToolCallBuffer !== null) {
-          dsmlToolCallBuffer += visibleText;
+          dsmlToolCallBuffer = appendWithinDeepSeekStreamLimit(
+            dsmlToolCallBuffer,
+            visibleText,
+            'tool arguments',
+          );
           const endIndex = normalizeDeepSeekDSML(dsmlToolCallBuffer).indexOf(DEEPSEEK_DSML_TOOL_CALLS_END);
           if (endIndex === -1) {
             continue;
@@ -411,15 +530,19 @@ async function* consumeSSEToResult(
           const dsmlAndAfter = normalizedVisibleText.slice(dsmlStartIndex);
           const dsmlEndIndex = dsmlAndAfter.indexOf(DEEPSEEK_DSML_TOOL_CALLS_END);
 
-          textBuffer += stripDeepSeekDSMLToolCallBlocks(beforeDSML);
+          textBuffer = appendWithinDeepSeekStreamLimit(
+            textBuffer,
+            stripDeepSeekDSMLToolCallBlocks(beforeDSML),
+            'text',
+          );
           if (textBuffer) {
-            accumulatedText += textBuffer;
+            accumulatedText = appendWithinDeepSeekStreamLimit(accumulatedText, textBuffer, 'text');
             yield { type: 'text', content: textBuffer };
             textBuffer = '';
           }
 
           if (dsmlEndIndex === -1) {
-            dsmlToolCallBuffer = dsmlAndAfter;
+            dsmlToolCallBuffer = appendWithinDeepSeekStreamLimit('', dsmlAndAfter, 'tool arguments');
             continue;
           }
 
@@ -430,7 +553,11 @@ async function* consumeSSEToResult(
 
         const { clean, carryOver: newCarry } = stripDSML(visibleText, dsmlCarryOver);
         dsmlCarryOver = newCarry;
-        textBuffer += stripDeepSeekDSMLToolCallBlocks(clean);
+        textBuffer = appendWithinDeepSeekStreamLimit(
+          textBuffer,
+          stripDeepSeekDSMLToolCallBlocks(clean),
+          'text',
+        );
 
         const now = performance.now();
         const timeSinceLastFlush = now - lastFlushTime;
@@ -440,7 +567,7 @@ async function* consumeSSEToResult(
         const reachedInterval = timeSinceLastFlush >= FLUSH_INTERVAL;
 
         if (hasSentenceEnd || hasClauseEnd || reachedSize || reachedInterval) {
-          accumulatedText += textBuffer;
+          accumulatedText = appendWithinDeepSeekStreamLimit(accumulatedText, textBuffer, 'text');
           yield { type: 'text', content: textBuffer };
           textBuffer = '';
           lastFlushTime = now;
@@ -455,7 +582,7 @@ async function* consumeSSEToResult(
   } finally {
     // Final flush — must not lose any remaining buffered text
     if (textBuffer) {
-      accumulatedText += textBuffer;
+      accumulatedText = appendWithinDeepSeekStreamLimit(accumulatedText, textBuffer, 'text');
       yield { type: 'text', content: textBuffer };
       textBuffer = '';
     }
@@ -556,15 +683,16 @@ export class DeepSeekRuntime implements AgentRuntime {
       throw new Error('DeepSeek query cancelled — no active AbortController.');
     }
 
-    const response = await fetch(`${baseUrl}/chat/completions`, {
+    assertSerializedRequestWithinLimit(body);
+
+    const response = await fetchDeepSeekResponseWithTimeout(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${config.apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
-      signal,
-    });
+    }, signal);
 
     if (!response.ok) {
       let errorBody = '';
@@ -604,6 +732,13 @@ export class DeepSeekRuntime implements AgentRuntime {
       return;
     }
 
+    try {
+      assertPromptWithinLimit(prompt);
+    } catch (error) {
+      yield { type: 'error', content: error instanceof Error ? error.message : String(error) };
+      return;
+    }
+
     const baseUrl = config.baseUrl.replace(/\/+$/, '');
     const systemPrompt = this.buildSystemPromptContent();
 
@@ -632,7 +767,7 @@ export class DeepSeekRuntime implements AgentRuntime {
 
     // Conversation history
     if (conversationHistory) {
-      for (const msg of conversationHistory) {
+      for (const msg of boundConversationHistory(conversationHistory)) {
         if (msg.role === 'user') {
           messages.push({ role: 'user', content: msg.content });
         } else if (msg.role === 'assistant') {

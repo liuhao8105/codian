@@ -19,6 +19,7 @@ import { getEnhancedPath } from '../../utils/env';
 import { parseCommand } from '../../utils/mcp';
 import type { McpServerManager } from '../mcp';
 import { createNodeFetch } from '../mcp/McpTester';
+import { boundText, MAX_TOOL_RESULT_CHARS } from '../runtime/deepseekLimits';
 import type { CodianMcpServer,McpServerConfig } from '../types/mcp';
 import type { DeepSeekToolDefinition } from './toolSchemas';
 
@@ -350,10 +351,7 @@ export async function callMcpTool(
 
     if (textParts.length > 0) {
       const combined = textParts.join('\n');
-      if (combined.length > 50000) {
-        return combined.slice(0, 50000) + '\n\n... (result truncated at 50000 characters)';
-      }
-      return combined;
+      return boundText(combined, MAX_TOOL_RESULT_CHARS, 'tool result');
     }
 
     try {

@@ -209,6 +209,8 @@ export default class CodianPlugin extends Plugin {
   private codexThinkingBudgets: Record<string, ThinkingBudget> = {
     ...DEFAULT_THINKING_BUDGET,
   };
+  private lastSuccessfulCodexModelRefreshAt = 0;
+  private codexModelCatalogRefreshPromise: Promise<boolean> | null = null;
 
   async onload() {
     this.cliResolver = new CodexCliResolver();
@@ -393,6 +395,7 @@ export default class CodianPlugin extends Plugin {
     if (leaf) {
       workspace.revealLeaf(leaf);
     }
+    void this.refreshCodexModelCatalogIfStale();
   }
 
   /** Loads settings and conversations from persistent storage. */
@@ -607,6 +610,30 @@ export default class CodianPlugin extends Plugin {
   }
 
   async refreshCodexModelCatalog(): Promise<boolean> {
+    if (this.codexModelCatalogRefreshPromise) {
+      return await this.codexModelCatalogRefreshPromise;
+    }
+
+    const refresh = this.performCodexModelCatalogRefresh();
+    this.codexModelCatalogRefreshPromise = refresh;
+    try {
+      return await refresh;
+    } finally {
+      if (this.codexModelCatalogRefreshPromise === refresh) {
+        this.codexModelCatalogRefreshPromise = null;
+      }
+    }
+  }
+
+  private async refreshCodexModelCatalogIfStale(now = Date.now()): Promise<boolean> {
+    const MODEL_CATALOG_REFRESH_TTL_MS = 6 * 60 * 60 * 1000;
+    if (now - this.lastSuccessfulCodexModelRefreshAt < MODEL_CATALOG_REFRESH_TTL_MS) {
+      return false;
+    }
+    return await this.refreshCodexModelCatalog();
+  }
+
+  private async performCodexModelCatalogRefresh(): Promise<boolean> {
     const envVars = parseEnvironmentVariables(this.getActiveEnvironmentVariables());
     if (getProviderModels('codex', envVars).length > 0) {
       return false;
@@ -640,6 +667,7 @@ export default class CodianPlugin extends Plugin {
       }
 
       this.getView()?.refreshToolbarState();
+      this.lastSuccessfulCodexModelRefreshAt = Date.now();
       return true;
     } catch {
       return false;

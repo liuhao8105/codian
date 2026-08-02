@@ -4,7 +4,11 @@ import * as os from 'os';
 import * as path from 'path';
 
 import type CodianPlugin from '../../main';
-import { appendBoundedLog } from '../../utils/boundedLog';
+import {
+  appendBoundedLog,
+  classifyDiagnosticError,
+  sanitizeDiagnosticValue,
+} from '../../utils/boundedLog';
 import { stripCurrentNoteContext } from '../../utils/context';
 import { isProviderConfigured, parseEnvironmentVariables } from '../../utils/env';
 import { getVaultPath } from '../../utils/path';
@@ -43,6 +47,7 @@ const MCP_STARTUP_TIMEOUT_MS = 20_000;
 const FIRST_TURN_ACTIVITY_TIMEOUT_MS = 90_000;
 const MAX_STALL_RECOVERY_ATTEMPTS = 1;
 const TEMP_IMAGE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const GLOBAL_MCP_DISCOVERY_TTL_MS = 60_000;
 const CHATGPT_TRANSPORT_DISCONNECT_MESSAGE =
   'Codex 与 ChatGPT 的连接已中断，自动重试后仍未恢复。请检查网络或代理设置，然后重新发送消息。';
 const CODEX_STALL_MESSAGE =
@@ -157,6 +162,15 @@ function getAppServerErrorMessage(params: Record<string, unknown>): string {
   return asString(nested?.message) || 'Codex App Server 执行失败。';
 }
 
+export function summarizeNotificationForLog(notification: AppServerNotification): string {
+  const keys = Object.keys(notification.params).sort().join(',') || 'none';
+  const base = `notification method=${sanitizeDiagnosticValue(notification.method, 80)} keys=${keys}`;
+  if (notification.method !== 'error') return base;
+
+  const message = getAppServerErrorMessage(notification.params);
+  return `${base} retry=${isRetryableAppServerError(notification.params)} category=${classifyDiagnosticError(message)} message=${sanitizeDiagnosticValue(message)}`;
+}
+
 function mapPlanStepStatus(value: unknown): 'pending' | 'in_progress' | 'completed' {
   switch (value) {
     case 'completed':
@@ -193,6 +207,7 @@ export class CodexAgentRuntime implements AgentRuntime {
   private activeTurnId: string | null = null;
   private threadId: string | null = null;
   private globalMcpNamesPromise: Promise<string[]> | null = null;
+  private globalMcpNamesPromiseCreatedAt = 0;
   private readonly temporaryImagePaths = new Set<string>();
   private pendingResumeAt?: string;
   private approvalCallback: ApprovalCallback | null = null;
@@ -421,12 +436,17 @@ ${prompt}
 
   private async getGlobalMcpNames(): Promise<string[]> {
     if (this.plugin.settings.currentProvider !== 'codex') return [];
-    if (!this.globalMcpNamesPromise) {
+    const now = Date.now();
+    if (
+      !this.globalMcpNamesPromise
+      || now - this.globalMcpNamesPromiseCreatedAt >= GLOBAL_MCP_DISCOVERY_TTL_MS
+    ) {
       const customEnv = parseEnvironmentVariables(this.plugin.getActiveEnvironmentVariables());
       this.globalMcpNamesPromise = discoverConfiguredCodexMcpServerNames({
         ...process.env,
         ...customEnv,
       });
+      this.globalMcpNamesPromiseCreatedAt = now;
     }
     return await this.globalMcpNamesPromise;
   }
@@ -547,6 +567,8 @@ ${prompt}
   }
 
   async reloadMcpServers(): Promise<void> {
+    this.globalMcpNamesPromise = null;
+    this.globalMcpNamesPromiseCreatedAt = 0;
     await this.mcpManager.loadServers();
   }
 
@@ -911,7 +933,7 @@ ${prompt}
 
         case 'error': {
           const rawMessage = getAppServerErrorMessage(notification.params);
-          void appendRuntimeDiagnosticLog(`notification-error raw=${rawMessage} fullParams=${JSON.stringify(notification.params)}`);
+          void appendRuntimeDiagnosticLog(summarizeNotificationForLog(notification));
           if (isRetryableAppServerError(notification.params)) {
             void appendRuntimeDiagnosticLog('notification-error-retryable-ignored');
             break;
@@ -945,12 +967,12 @@ ${prompt}
         }
 
         case 'warning': {
-          void appendRuntimeDiagnosticLog(`notification-warning params=${JSON.stringify(notification.params)}`);
+          void appendRuntimeDiagnosticLog(summarizeNotificationForLog(notification));
           break;
         }
 
         default:
-          void appendRuntimeDiagnosticLog(`notification-unhandled method=${notification.method} params=${JSON.stringify(notification.params)}`);
+          void appendRuntimeDiagnosticLog(summarizeNotificationForLog(notification));
           break;
       }
     };
@@ -1150,7 +1172,7 @@ ${prompt}
     if (!this.activeAbortController) {
       return;
     }
-    void appendRuntimeDiagnosticLog(`cancel called activeTurnId=${this.activeTurnId ?? 'null'} stack=${new Error().stack?.replace(/\n/g, ' ← ') ?? 'none'}`);
+    void appendRuntimeDiagnosticLog(`cancel activeTurn=${this.activeTurnId ? 'true' : 'false'}`);
     this.activeAbortController.abort();
     this.activeClient?.kill();
     this.activeClient = null;
