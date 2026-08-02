@@ -108,7 +108,13 @@ async function collectManifest(
       const stat = await fs.lstat(absolutePath);
 
       if (stat.isSymbolicLink()) {
-        throw new Error(`unsupported entry: ${relativePath}`);
+        const target = Buffer.from(await fs.readlink(absolutePath), 'utf8');
+        entries.push({
+          relativePath,
+          size: target.length,
+          sha256: createHash('sha256').update(target).digest('hex'),
+        });
+        continue;
       }
       if (stat.isDirectory()) {
         await walk(absolutePath);
@@ -168,7 +174,8 @@ async function copyTree(
     const stat = await fs.lstat(sourcePath);
 
     if (stat.isSymbolicLink()) {
-      throw new Error(`unsupported entry: ${path.relative(source, sourcePath)}`);
+      await fs.symlink(await fs.readlink(sourcePath), destinationPath);
+      continue;
     }
     if (stat.isDirectory()) {
       await copyTree(sourcePath, destinationPath, sourceRoot);

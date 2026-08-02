@@ -106,7 +106,7 @@ describe('migrateVaultRoot', () => {
       .toBe('different');
   });
 
-  it('rejects symbolic links before creating the destination', async () => {
+  it('preserves symbolic links without following their targets', async () => {
     await write('outside.txt', 'outside');
     await fs.mkdir(path.join(vaultRoot, '.claude'), { recursive: true });
     await fs.symlink(
@@ -114,10 +114,14 @@ describe('migrateVaultRoot', () => {
       path.join(vaultRoot, '.claude/link'),
     );
 
-    await expect(migrateVaultRoot(options())).rejects.toThrow('unsupported entry');
+    await expect(migrateVaultRoot(options())).resolves.toMatchObject({
+      status: 'migrated',
+      fileCount: 1,
+    });
 
-    await expect(fs.stat(path.join(vaultRoot, '.codian')))
-      .rejects.toMatchObject({ code: 'ENOENT' });
+    expect(await fs.readlink(path.join(vaultRoot, '.codian/link')))
+      .toBe(path.join(vaultRoot, 'outside.txt'));
+    expect(await fs.readFile(path.join(vaultRoot, 'outside.txt'), 'utf8')).toBe('outside');
   });
 
   it('returns not-needed when the source directory does not exist', async () => {
