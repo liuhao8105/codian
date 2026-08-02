@@ -1,7 +1,6 @@
-import type { HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk';
-
 import { getInlineEditSystemPrompt } from '../../core/prompts/inlineEdit';
 import { execCodexPrompt } from '../../core/runtime/codexExec';
+import type { HookCallbackMatcher } from '../../core/runtime/contracts';
 import { getPathFromToolInput } from '../../core/tools/toolInput';
 import {
   isReadOnlyTool,

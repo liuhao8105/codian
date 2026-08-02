@@ -4,10 +4,10 @@
  * PreToolUse hooks for enforcing blocklist and vault restriction.
  */
 
-import type { HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk';
 import { Notice } from 'obsidian';
 
 import type { PathAccessType } from '../../utils/path';
+import type { HookCallbackMatcher } from '../runtime/contracts';
 import type { PathCheckContext } from '../security/BashPathValidator';
 import { findBashCommandPathViolation } from '../security/BashPathValidator';
 import { isCommandBlocked } from '../security/BlocklistChecker';

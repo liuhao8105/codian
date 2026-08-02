@@ -1,4 +1,3 @@
-import type { RewindFilesResult } from '@anthropic-ai/claude-agent-sdk';
 import { createHash } from 'crypto';
 import { promises as fs } from 'fs';
 import * as os from 'os';
@@ -14,7 +13,6 @@ import {
   buildPromptWithHistoryContext,
   getLastUserMessage,
 } from '../../utils/session';
-import type { ApprovalCallback, QueryOptions } from '../agent';
 import type { SubagentHookState } from '../hooks';
 import type { McpServerManager } from '../mcp';
 import { buildSystemPrompt } from '../prompts/mainAgent';
@@ -34,6 +32,7 @@ import {
   normalizeCodexModelForRuntime,
   resolveCodexCliPath,
 } from './codexExec';
+import type { ApprovalCallback, QueryOptions, RewindFilesResult } from './contracts';
 import type { AgentRuntime } from './index';
 
 type Waiter = () => void;

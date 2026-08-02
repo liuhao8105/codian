@@ -2,7 +2,7 @@
  * Model type definitions and constants.
  */
 
-import type { SdkBeta } from '@anthropic-ai/claude-agent-sdk';
+import type { RuntimeBeta } from '../runtime/contracts';
 
 /** Model identifier (string to support custom models via environment variables). */
 export type ClaudeModel = string;
@@ -132,11 +132,11 @@ export function reconcileCodexModelSelection(
   return { model: defaultModel, migrated: true };
 }
 
-export const BETA_1M_CONTEXT: SdkBeta = 'context-1m-2025-08-07';
+export const BETA_1M_CONTEXT: RuntimeBeta = 'context-1m-2025-08-07';
 
 export interface ModelWithBetas {
   model: string;
-  betas: SdkBeta[];
+  betas: RuntimeBeta[];
 }
 
 export interface ModelWithoutBetas {

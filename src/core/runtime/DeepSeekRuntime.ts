@@ -1,9 +1,6 @@
-import type { RewindFilesResult } from '@anthropic-ai/claude-agent-sdk';
-
 import type CodianPlugin from '../../main';
 import { isProviderConfigured } from '../../utils/env';
 import { getVaultPath } from '../../utils/path';
-import type { ApprovalCallback, QueryOptions } from '../agent';
 import type { McpServerManager } from '../mcp';
 import { buildSystemPrompt } from '../prompts/mainAgent';
 import { classifyMcpToolRisk, enumerateMcpToolsForDeepSeek } from '../tools/mcpBridge';
@@ -20,6 +17,7 @@ import type {
   ImageAttachment,
   StreamChunk,
 } from '../types';
+import type { ApprovalCallback, QueryOptions, RewindFilesResult } from './contracts';
 import type { AgentRuntime } from './index';
 
 /** Maximum tool-calling rounds per user message (final safety net). */

@@ -1,7 +1,6 @@
 /** Permission utilities for tool action approval. */
 
-import type { PermissionUpdate, PermissionUpdateDestination } from '@anthropic-ai/claude-agent-sdk';
-
+import type { PermissionUpdate, PermissionUpdateDestination } from '../runtime/contracts';
 import {
   TOOL_BASH,
   TOOL_EDIT,
