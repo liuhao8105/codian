@@ -271,7 +271,7 @@ export function getMissingNodeError(cliPath: string, enhancedPath?: string): str
     return null;
   }
 
-  return 'Claude Code CLI requires Node.js, but Node was not found on PATH. Install Node.js or use the native Claude Code binary, then restart Obsidian.';
+  return 'The configured CLI requires Node.js, but Node was not found on PATH. Install Node.js or use the native Codex binary, then restart Obsidian.';
 }
 
 /**
@@ -499,7 +499,7 @@ export function getModelsFromEnvironment(envVars: Record<string, string>): { val
   }
 
   const models: { value: string; label: string; description: string }[] = [];
-  const typePriority = { 'model': 4, 'haiku': 3, 'sonnet': 2, 'opus': 1 };
+  const typePriority = { model: 6, codex: 5, openai: 4, haiku: 3, sonnet: 2, opus: 1 };
 
   const sortedEntries = Array.from(modelMap.entries()).sort(([, aInfo], [, bInfo]) => {
     const aPriority = Math.max(...aInfo.types.map(t => typePriority[t as keyof typeof typePriority] || 0));

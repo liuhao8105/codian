@@ -449,6 +449,41 @@ export function findClaudeCLIPath(pathValue?: string): string | null {
   return null;
 }
 
+export function findCodexCliPath(pathValue?: string): string | null {
+  const homeDir = os.homedir();
+  const customEntries = dedupePaths(parsePathEntries(pathValue));
+  const customResolution = findFirstExistingPath(
+    customEntries,
+    process.platform === 'win32' ? ['codex.exe', 'codex'] : ['codex'],
+  );
+  if (customResolution) return customResolution;
+
+  const candidates = process.platform === 'win32'
+    ? [
+        path.join(homeDir, '.local', 'bin', 'codex.exe'),
+        path.join(homeDir, 'AppData', 'Roaming', 'npm', 'codex.exe'),
+      ]
+    : [
+        path.join(homeDir, '.local', 'bin', 'codex'),
+        path.join(homeDir, '.volta', 'bin', 'codex'),
+        path.join(homeDir, '.asdf', 'shims', 'codex'),
+        '/opt/homebrew/bin/codex',
+        '/usr/local/bin/codex',
+      ];
+
+  const nvmBin = resolveNvmDefaultBin(homeDir);
+  if (nvmBin) candidates.push(path.join(nvmBin, process.platform === 'win32' ? 'codex.exe' : 'codex'));
+
+  for (const candidate of candidates) {
+    if (isExistingFile(candidate)) return candidate;
+  }
+
+  return findFirstExistingPath(
+    dedupePaths(parsePathEntries(getEnvValue('PATH'))),
+    process.platform === 'win32' ? ['codex.exe', 'codex'] : ['codex'],
+  );
+}
+
 // ============================================
 // Path Resolution
 // ============================================

@@ -188,7 +188,7 @@ export async function discoverConfiguredCodexMcpServerNames(
 }
 
 export function resolveCodexCliPath(plugin: CodianPlugin): string | null {
-  const configuredPath = plugin.getResolvedClaudeCliPath();
+  const configuredPath = plugin.getResolvedCodexCliPath();
   if (configuredPath && isExistingFile(configuredPath) && isLikelyCodexExecutable(configuredPath)) {
     return configuredPath;
   }

@@ -308,8 +308,8 @@ describe('StorageService migration', () => {
 
     const saved = JSON.parse(files.get('.claude/codian-settings.json') || '{}') as Record<string, unknown>;
     expect(saved.lastEnvHash).toBe('abc123');
-    // lastClaudeModel has a truthy current default, so migration doesn't overwrite it
-    expect(saved.lastClaudeModel).toBe(DEFAULT_SETTINGS.lastClaudeModel);
+    // The current default takes precedence over the older data.json value.
+    expect(saved.lastCodexModel).toBe(DEFAULT_SETTINGS.lastCodexModel);
     expect(saved.lastCustomModel).toBe('custom-model');
   });
 
@@ -323,7 +323,7 @@ describe('StorageService migration', () => {
         '.claude/codian-settings.json': JSON.stringify({
           userName: 'Test User',
           lastEnvHash: 'existing-hash',
-          lastClaudeModel: 'existing-model',
+          lastCodexModel: 'existing-model',
         }),
       },
     });
@@ -333,7 +333,7 @@ describe('StorageService migration', () => {
 
     const saved = JSON.parse(files.get('.claude/codian-settings.json') || '{}') as Record<string, unknown>;
     expect(saved.lastEnvHash).toBe('existing-hash');
-    expect(saved.lastClaudeModel).toBe('existing-model');
+    expect(saved.lastCodexModel).toBe('existing-model');
   });
 
   it('skips existing slash commands during migration', async () => {
@@ -492,7 +492,7 @@ describe('StorageService migration', () => {
     expect(ccSettings.permissions.ask).toEqual([]);
   });
 
-  it('migrates lastClaudeModel from data.json when codian-settings has falsy value', async () => {
+  it('migrates the previous model state when Codian settings has a falsy value', async () => {
     const { plugin, files } = createMockPlugin({
       dataJson: {
         lastClaudeModel: 'claude-3-sonnet',
@@ -503,7 +503,7 @@ describe('StorageService migration', () => {
         }),
         '.claude/codian-settings.json': JSON.stringify({
           userName: 'Test User',
-          lastClaudeModel: '',
+          lastCodexModel: '',
         }),
       },
     });
@@ -512,7 +512,7 @@ describe('StorageService migration', () => {
     await storage.initialize();
 
     const saved = JSON.parse(files.get('.claude/codian-settings.json') || '{}') as Record<string, unknown>;
-    expect(saved.lastClaudeModel).toBe('claude-3-sonnet');
+    expect(saved.lastCodexModel).toBe('claude-3-sonnet');
   });
 
   it('preserves persistentExternalContextPaths from existing settings', async () => {

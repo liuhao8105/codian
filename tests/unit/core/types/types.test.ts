@@ -1,6 +1,6 @@
 import type {
   ChatMessage,
-  ClaudianSettings,
+  CodianSettings,
   Conversation,
   ConversationMeta,
   EnvSnippet,
@@ -91,7 +91,7 @@ describe('types.ts', () => {
 
     it('should enable local memory by default', () => {
       expect(DEFAULT_SETTINGS.enableLocalMemory).toBe(true);
-      expect(DEFAULT_SETTINGS.localMemoryPath).toBe('.claude/local-memory');
+      expect(DEFAULT_SETTINGS.localMemoryPath).toBe('.codian/local-memory');
     });
 
     it('should have envSnippets as empty array by default', () => {
@@ -99,7 +99,7 @@ describe('types.ts', () => {
     });
 
     it('should remember the current default Codex model', () => {
-      expect(DEFAULT_SETTINGS.lastClaudeModel).toBe('gpt-5.6-sol');
+      expect(DEFAULT_SETTINGS.lastCodexModel).toBe('gpt-5.6-sol');
     });
 
     it('should have lastCustomModel as empty string by default', () => {
@@ -107,9 +107,9 @@ describe('types.ts', () => {
     });
   });
 
-  describe('ClaudianSettings type', () => {
+  describe('CodianSettings type', () => {
     it('should be assignable with valid settings', () => {
-      const settings: ClaudianSettings = {
+      const settings: CodianSettings = {
         userName: '',
         enableBlocklist: false,
         blockedCommands: { unix: ['test'], windows: ['test-win'] },
@@ -136,13 +136,10 @@ describe('types.ts', () => {
         slashCommands: [],
         keyboardNavigation: { scrollUpKey: 'w', scrollDownKey: 's', focusInputKey: 'i' },
         locale: 'en',
-        claudeCliPath: '',
-        claudeCliPathsByHost: {},
-        loadUserClaudeSettings: false,
+        codexCliPath: '',
+        codexCliPathsByHost: {},
         maxTabs: 3,
-        show1MModel: false,
         allowExternalAccess: false,
-        enableChrome: false,
         enableBangBash: false,
         enableDeepSeekBash: false,
         tabBarPosition: 'input',
@@ -157,7 +154,7 @@ describe('types.ts', () => {
     });
 
     it('should accept custom model strings', () => {
-      const settings: ClaudianSettings = {
+      const settings: CodianSettings = {
         userName: '',
         enableBlocklist: true,
         blockedCommands: { unix: [], windows: [] },
@@ -184,13 +181,10 @@ describe('types.ts', () => {
         slashCommands: [],
         keyboardNavigation: { scrollUpKey: 'w', scrollDownKey: 's', focusInputKey: 'i' },
         locale: 'zh-CN',
-        claudeCliPath: '',
-        claudeCliPathsByHost: {},
-        loadUserClaudeSettings: false,
+        codexCliPath: '',
+        codexCliPathsByHost: {},
         maxTabs: 3,
-        show1MModel: false,
         allowExternalAccess: false,
-        enableChrome: false,
         enableBangBash: false,
         enableDeepSeekBash: false,
         tabBarPosition: 'input',
@@ -202,8 +196,8 @@ describe('types.ts', () => {
       expect(settings.model).toBe('anthropic/custom-model-v1');
     });
 
-    it('should accept optional lastClaudeModel and lastCustomModel', () => {
-      const settings: ClaudianSettings = {
+    it('should accept optional Codex and custom model state', () => {
+      const settings: CodianSettings = {
         userName: '',
         enableBlocklist: true,
         blockedCommands: { unix: [], windows: [] },
@@ -212,7 +206,7 @@ describe('types.ts', () => {
         model: 'sonnet',
         enableAutoTitleGeneration: true,
         titleGenerationModel: '',
-        lastClaudeModel: 'opus',
+        lastCodexModel: 'gpt-test',
         lastCustomModel: 'custom/model',
         thinkingBudget: 'high',
         permissionMode: 'yolo',
@@ -232,13 +226,10 @@ describe('types.ts', () => {
         slashCommands: [],
         keyboardNavigation: { scrollUpKey: 'w', scrollDownKey: 's', focusInputKey: 'i' },
         locale: 'en',
-        claudeCliPath: '',
-        claudeCliPathsByHost: {},
-        loadUserClaudeSettings: false,
+        codexCliPath: '',
+        codexCliPathsByHost: {},
         maxTabs: 5,
-        show1MModel: true,
         allowExternalAccess: false,
-        enableChrome: false,
         enableBangBash: false,
         enableDeepSeekBash: false,
         tabBarPosition: 'header',
@@ -247,7 +238,7 @@ describe('types.ts', () => {
         hiddenSlashCommands: [],
       };
 
-      expect(settings.lastClaudeModel).toBe('opus');
+      expect(settings.lastCodexModel).toBe('gpt-test');
       expect(settings.lastCustomModel).toBe('custom/model');
     });
   });
@@ -569,10 +560,10 @@ describe('types.ts', () => {
       });
     });
 
-    describe('DEFAULT_SETTINGS.claudeCliPathsByHost', () => {
+    describe('DEFAULT_SETTINGS.codexCliPathsByHost', () => {
       it('should have empty hostname-based CLI paths by default', () => {
-        expect(DEFAULT_SETTINGS.claudeCliPathsByHost).toBeDefined();
-        expect(DEFAULT_SETTINGS.claudeCliPathsByHost).toEqual({});
+        expect(DEFAULT_SETTINGS.codexCliPathsByHost).toBeDefined();
+        expect(DEFAULT_SETTINGS.codexCliPathsByHost).toEqual({});
       });
     });
   });

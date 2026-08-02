@@ -19,7 +19,7 @@ import * as os from 'os';
 import * as path from 'path';
 
 import { appendBoundedLogSync } from '../../utils/boundedLog';
-import type { ClaudeModel, CodianSettings, PlatformBlockedCommands } from '../types';
+import type { AgentModel, CodianSettings, PlatformBlockedCommands } from '../types';
 import { DEFAULT_SETTINGS, getDefaultBlockedCommands } from '../types';
 import type { VaultFileAdapter } from './VaultFileAdapter';
 
@@ -112,15 +112,18 @@ export class CodianSettingsStorage {
     const { activeConversationId: _activeConversationId, ...storedWithoutLegacy } = stored;
 
     const blockedCommands = normalizeBlockedCommands(stored.blockedCommands);
-    const hostnameCliPaths = normalizeHostnameCliPaths(stored.claudeCliPathsByHost);
-    const legacyCliPath = typeof stored.claudeCliPath === 'string' ? stored.claudeCliPath : '';
+    const hostnameCliPaths = normalizeHostnameCliPaths(
+      stored.codexCliPathsByHost ?? stored.claudeCliPathsByHost,
+    );
+    const rawCliPath = stored.codexCliPath ?? stored.claudeCliPath;
+    const cliPath = typeof rawCliPath === 'string' ? rawCliPath : '';
 
     return {
       ...this.getDefaults(),
       ...storedWithoutLegacy,
       blockedCommands,
-      claudeCliPath: legacyCliPath,
-      claudeCliPathsByHost: hostnameCliPaths,
+      codexCliPath: cliPath,
+      codexCliPathsByHost: hostnameCliPaths,
     } as StoredCodianSettings;
   }
 
@@ -184,11 +187,11 @@ export class CodianSettingsStorage {
     await this.adapter.write(activePath, nextContent);
   }
 
-  async setLastModel(model: ClaudeModel, isCustom: boolean): Promise<void> {
+  async setLastModel(model: AgentModel, isCustom: boolean): Promise<void> {
     if (isCustom) {
       await this.update({ lastCustomModel: model });
     } else {
-      await this.update({ lastClaudeModel: model });
+      await this.update({ lastCodexModel: model });
     }
   }
 

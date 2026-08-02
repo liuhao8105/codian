@@ -3,7 +3,7 @@
  */
 
 import type { Locale } from '../../i18n/types';
-import type { ClaudeModel, ThinkingBudget } from './models';
+import type { AgentModel, ThinkingBudget } from './models';
 
 const UNIX_BLOCKED_COMMANDS = [
   'rm -rf',
@@ -227,7 +227,7 @@ export interface SlashCommand {
   description?: string;        // Optional description shown in dropdown
   argumentHint?: string;       // Placeholder text for arguments (e.g., "[file] [focus]")
   allowedTools?: string[];     // Restrict tools when command is used
-  model?: ClaudeModel;         // Override model for this command
+  model?: AgentModel;          // Override model for this command
   content: string;             // Prompt template with placeholders
   source?: SlashCommandSource; // Origin of the command (builtin, user, plugin, sdk)
   // Skill fields (from .claude/skills/ definitions)
@@ -264,14 +264,12 @@ export interface CodianSettings {
   // Model & thinking (Claudian uses enum, CC uses full model ID string)
   currentProvider: ProviderId;
   providerConfigs: ProviderConfigs;
-  model: ClaudeModel;
+  model: AgentModel;
   thinkingBudget: ThinkingBudget;
   enableAutoTitleGeneration: boolean;
   titleGenerationModel: string;  // Model for auto title generation (empty = auto)
-  show1MModel: boolean;  // Legacy Anthropic option, hidden in Codian UI
   allowExternalAccess: boolean;  // Allow tools to access files outside the vault
   temporaryExternalAccess?: boolean;  // Transient per-turn external access; never a persisted user setting
-  enableChrome: boolean;  // Enable Chrome extension support (passes --chrome flag)
   enableBangBash: boolean;  // Enable ! bash mode for direct command execution
   enableDeepSeekBash: boolean;  // Allow DeepSeek tool loop to execute local Bash commands
 
@@ -305,13 +303,12 @@ export interface CodianSettings {
   locale: Locale;  // UI language setting
 
   // CLI paths
-  claudeCliPath: string;  // Legacy: single CLI path (for backwards compatibility)
-  claudeCliPathsByHost: HostnameCliPaths;  // Per-device paths keyed by hostname (preferred)
-  loadUserClaudeSettings: boolean;  // Load ~/.claude/settings.json (may override permissions)
+  codexCliPath: string;
+  codexCliPathsByHost: HostnameCliPaths;
 
   // State (merged from data.json)
-  lastClaudeModel?: ClaudeModel;
-  lastCustomModel?: ClaudeModel;
+  lastCodexModel?: AgentModel;
+  lastCustomModel?: AgentModel;
   lastEnvHash?: string;
 
   // Slash commands (loaded separately from .claude/commands/)
@@ -326,8 +323,6 @@ export interface CodianSettings {
   // Slash commands
   hiddenSlashCommands: string[];  // Command names to hide from dropdown (user preference)
 }
-
-export type ClaudianSettings = CodianSettings;
 
 /** Default Codian-specific settings. */
 export const DEFAULT_SETTINGS: CodianSettings = {
@@ -356,9 +351,7 @@ export const DEFAULT_SETTINGS: CodianSettings = {
   thinkingBudget: 'low',
   enableAutoTitleGeneration: true,
   titleGenerationModel: '',  // Empty = auto (OPENAI_MODEL / CODEX_MODEL / gpt-5.6-sol)
-  show1MModel: false,  // Hidden legacy setting
   allowExternalAccess: false,  // Keep vault restriction enabled by default
-  enableChrome: false,  // Disabled by default
   enableBangBash: false,  // Disabled by default
   enableDeepSeekBash: false,  // Disabled by default
 
@@ -370,7 +363,7 @@ export const DEFAULT_SETTINGS: CodianSettings = {
   strongRulesPrompt: '',
   memoryFilePath: '',
   enableLocalMemory: true,
-  localMemoryPath: '.claude/local-memory',
+  localMemoryPath: '.codian/local-memory',
   allowedExportPaths: ['~/Desktop', '~/Downloads'],
   persistentExternalContextPaths: [],
 
@@ -390,11 +383,10 @@ export const DEFAULT_SETTINGS: CodianSettings = {
   locale: 'en',  // Default to English
 
   // CLI paths
-  claudeCliPath: '',  // Legacy field (empty = not migrated)
-  claudeCliPathsByHost: {},  // Per-device paths keyed by hostname
-  loadUserClaudeSettings: true,  // Default on for compatibility
+  codexCliPath: '',
+  codexCliPathsByHost: {},
 
-  lastClaudeModel: 'gpt-5.6-sol',
+  lastCodexModel: 'gpt-5.6-sol',
   lastCustomModel: '',
   lastEnvHash: '',
 
@@ -413,7 +405,6 @@ export const DEFAULT_SETTINGS: CodianSettings = {
 
 /** Default CC-compatible settings. */
 export const DEFAULT_CC_SETTINGS: CCSettings = {
-  $schema: 'https://json.schemastore.org/claude-code-settings.json',
   permissions: {
     allow: [],
     deny: [],

@@ -1,4 +1,4 @@
-import type { ClaudeModel, SlashCommand } from '../core/types';
+import type { AgentModel, SlashCommand } from '../core/types';
 import {
   extractBoolean,
   extractString,
@@ -45,7 +45,7 @@ export function parsedToSlashCommand(
     description: parsed.description,
     argumentHint: parsed.argumentHint,
     allowedTools: parsed.allowedTools,
-    model: parsed.model as ClaudeModel | undefined,
+    model: parsed.model as AgentModel | undefined,
     content: parsed.promptContent,
     disableModelInvocation: parsed.disableModelInvocation,
     userInvocable: parsed.userInvocable,

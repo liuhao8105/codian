@@ -28,9 +28,9 @@ import {
   SecureSecretStorage,
 } from '../security';
 import type {
+  AgentModel,
   CCPermissions,
   CCSettings,
-  ClaudeModel,
   Conversation,
   LegacyPermission,
   SlashCommand,
@@ -124,8 +124,8 @@ interface LegacySettingsJson {
 interface LegacyDataJson {
   activeConversationId?: string | null;
   lastEnvHash?: string;
-  lastClaudeModel?: ClaudeModel;
-  lastCustomModel?: ClaudeModel;
+  lastClaudeModel?: AgentModel;
+  lastCustomModel?: AgentModel;
   conversations?: Conversation[];
   slashCommands?: SlashCommand[];
   migrationVersion?: number;
@@ -325,7 +325,7 @@ export class StorageService {
       blockedCommands: normalizeBlockedCommands(oldSettings.blockedCommands),
       currentProvider: DEFAULT_SETTINGS.currentProvider,
       providerConfigs: DEFAULT_SETTINGS.providerConfigs,
-      model: (oldSettings.model as ClaudeModel) ?? DEFAULT_SETTINGS.model,
+      model: (oldSettings.model as AgentModel) ?? DEFAULT_SETTINGS.model,
       thinkingBudget: (oldSettings.thinkingBudget as StoredCodianSettings['thinkingBudget']) ?? DEFAULT_SETTINGS.thinkingBudget,
       permissionMode: (oldSettings.permissionMode as StoredCodianSettings['permissionMode']) ?? DEFAULT_SETTINGS.permissionMode,
       excludedTags: oldSettings.excludedTags ?? DEFAULT_SETTINGS.excludedTags,
@@ -341,12 +341,11 @@ export class StorageService {
       allowedExportPaths: oldSettings.allowedExportPaths ?? DEFAULT_SETTINGS.allowedExportPaths,
       persistentExternalContextPaths: DEFAULT_SETTINGS.persistentExternalContextPaths,
       keyboardNavigation: oldSettings.keyboardNavigation as StoredCodianSettings['keyboardNavigation'] ?? DEFAULT_SETTINGS.keyboardNavigation,
-      claudeCliPath: oldSettings.claudeCliPath ?? DEFAULT_SETTINGS.claudeCliPath,
-      claudeCliPathsByHost: DEFAULT_SETTINGS.claudeCliPathsByHost,  // Migration to hostname-based handled in main.ts
-      loadUserClaudeSettings: oldSettings.loadUserClaudeSettings ?? DEFAULT_SETTINGS.loadUserClaudeSettings,
+      codexCliPath: oldSettings.claudeCliPath ?? DEFAULT_SETTINGS.codexCliPath,
+      codexCliPathsByHost: DEFAULT_SETTINGS.codexCliPathsByHost,
       enableAutoTitleGeneration: oldSettings.enableAutoTitleGeneration ?? DEFAULT_SETTINGS.enableAutoTitleGeneration,
       titleGenerationModel: oldSettings.titleGenerationModel ?? DEFAULT_SETTINGS.titleGenerationModel,
-      lastClaudeModel: DEFAULT_SETTINGS.lastClaudeModel,
+      lastCodexModel: DEFAULT_SETTINGS.lastCodexModel,
       lastCustomModel: DEFAULT_SETTINGS.lastCustomModel,
       lastEnvHash: DEFAULT_SETTINGS.lastEnvHash,
     };
@@ -395,8 +394,8 @@ export class StorageService {
     if (dataJson.lastEnvHash !== undefined && !claudian.lastEnvHash) {
       claudian.lastEnvHash = dataJson.lastEnvHash;
     }
-    if (dataJson.lastClaudeModel !== undefined && !claudian.lastClaudeModel) {
-      claudian.lastClaudeModel = dataJson.lastClaudeModel;
+    if (dataJson.lastClaudeModel !== undefined && !claudian.lastCodexModel) {
+      claudian.lastCodexModel = dataJson.lastClaudeModel;
     }
     if (dataJson.lastCustomModel !== undefined && !claudian.lastCustomModel) {
       claudian.lastCustomModel = dataJson.lastCustomModel;

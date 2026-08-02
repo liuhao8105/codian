@@ -5,9 +5,9 @@
 import type { RuntimeBeta } from '../runtime/contracts';
 
 /** Model identifier (string to support custom models via environment variables). */
-export type ClaudeModel = string;
+export type AgentModel = string;
 
-export const DEFAULT_CODEX_MODELS: { value: ClaudeModel; label: string; description: string }[] = [
+export const DEFAULT_CODEX_MODELS: { value: AgentModel; label: string; description: string }[] = [
   { value: 'gpt-5.6-sol', label: 'GPT-5.6-Sol', description: '最新旗舰 Agent 编码模型' },
   { value: 'gpt-5.6-terra', label: 'GPT-5.6-Terra', description: '适合日常工作的均衡 Agent 编码模型' },
   { value: 'gpt-5.6-luna', label: 'GPT-5.6-Luna', description: '快速且经济的 Agent 编码模型' },
@@ -16,13 +16,11 @@ export const DEFAULT_CODEX_MODELS: { value: ClaudeModel; label: string; descript
   { value: 'gpt-5.4-mini', label: 'GPT-5.4-Mini', description: '适合简单编码任务的轻量模型' },
 ];
 
-export const DEFAULT_CLAUDE_MODELS = DEFAULT_CODEX_MODELS;
-
 const RETIRED_CODEX_MODELS = new Set(['gpt-5.2', 'gpt-5.3-codex']);
 
 export interface CodexModelCatalog {
-  models: { value: ClaudeModel; label: string; description: string }[];
-  defaultModel: ClaudeModel;
+  models: { value: AgentModel; label: string; description: string }[];
+  defaultModel: AgentModel;
   thinkingBudgets: Record<string, ThinkingBudget>;
 }
 

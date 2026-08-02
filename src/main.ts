@@ -48,7 +48,7 @@ import { setupServiceCallbacks } from './features/chat/tabs/Tab';
 import { type InlineEditContext, InlineEditModal } from './features/inline-edit/ui/InlineEditModal';
 import { CodianSettingTab } from './features/settings/CodianSettings';
 import { setLocale } from './i18n';
-import { ClaudeCliResolver } from './utils/claudeCli';
+import { CodexCliResolver } from './utils/codexCli';
 import { buildCursorContext } from './utils/editor';
 import {
   buildProviderEnvironmentText,
@@ -208,7 +208,7 @@ export default class CodianPlugin extends Plugin {
   pluginManager: PluginManager;
   agentManager: AgentManager;
   storage: StorageService;
-  cliResolver: ClaudeCliResolver;
+  cliResolver: CodexCliResolver;
   private conversations: Conversation[] = [];
   private runtimeEnvironmentVariables = '';
   private codexModels = [...DEFAULT_CODEX_MODELS];
@@ -217,6 +217,7 @@ export default class CodianPlugin extends Plugin {
   };
 
   async onload() {
+    this.cliResolver = new CodexCliResolver();
     const vaultPath = (this.app.vault.adapter as any).basePath;
     await migrateVaultRoot({
       vaultRoot: vaultPath,
@@ -226,8 +227,6 @@ export default class CodianPlugin extends Plugin {
     });
 
     await this.loadSettings();
-
-    this.cliResolver = new ClaudeCliResolver();
 
     // Initialize MCP manager (shared for agent + UI)
     this.mcpManager = new McpServerManager(this.storage.mcp);
@@ -416,6 +415,7 @@ export default class CodianPlugin extends Plugin {
 
   /** Loads settings and conversations from persistent storage. */
   async loadSettings() {
+    this.cliResolver ??= new CodexCliResolver();
     // Initialize storage service (handles migration if needed)
     this.storage = new StorageService(this);
     const { claudian } = await this.storage.initialize();
@@ -463,24 +463,29 @@ export default class CodianPlugin extends Plugin {
     }
 
     // Initialize and migrate legacy CLI paths to hostname-based paths
-    this.settings.claudeCliPathsByHost ??= {};
+    this.settings.codexCliPathsByHost ??= {};
     const hostname = getHostnameKey();
     let didMigrateCliPath = false;
 
-    if (!this.settings.claudeCliPathsByHost[hostname]) {
+    if (!this.settings.codexCliPathsByHost[hostname]) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const platformPaths = (this.settings as any).claudeCliPaths as Record<string, string> | undefined;
-      const migratedPath = platformPaths?.[getCliPlatformKey()]?.trim() || this.settings.claudeCliPath?.trim();
+      const legacySinglePath = (this.settings as unknown as { claudeCliPath?: string }).claudeCliPath;
+      const migratedPath = platformPaths?.[getCliPlatformKey()]?.trim()
+        || this.settings.codexCliPath?.trim()
+        || legacySinglePath?.trim();
 
-      if (migratedPath) {
-        this.settings.claudeCliPathsByHost[hostname] = migratedPath;
-        this.settings.claudeCliPath = '';
+      const validatedPath = this.cliResolver.resolve({}, migratedPath, '');
+      if (validatedPath) {
+        this.settings.codexCliPathsByHost[hostname] = validatedPath;
+        this.settings.codexCliPath = '';
         didMigrateCliPath = true;
       }
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     delete (this.settings as any).claudeCliPaths;
+    delete (this.settings as unknown as { claudeCliPath?: string }).claudeCliPath;
 
     // Load all conversations from session files (legacy JSONL + native metadata)
     const { conversations: legacyConversations, failedCount } = await this.storage.sessions.loadAllConversations();
@@ -669,7 +674,7 @@ export default class CodianPlugin extends Plugin {
       if (selection.migrated) {
         this.settings.model = selection.model;
         this.settings.thinkingBudget = this.getDefaultThinkingBudgetForModel(selection.model) ?? 'off';
-        this.settings.lastClaudeModel = selection.model;
+        this.settings.lastCodexModel = selection.model;
         await this.saveSettings();
         new Notice(`原模型已不可用，已切换到 ${catalog.models.find((model) => model.value === selection.model)?.label ?? selection.model}。`);
       }
@@ -719,7 +724,7 @@ export default class CodianPlugin extends Plugin {
     const defaultThinkingBudget = this.getDefaultThinkingBudgetForModel(model);
     if (defaultThinkingBudget) {
       this.settings.thinkingBudget = defaultThinkingBudget;
-      this.settings.lastClaudeModel = model;
+      this.settings.lastCodexModel = model;
     } else {
       this.settings.lastCustomModel = model;
     }
@@ -748,10 +753,10 @@ export default class CodianPlugin extends Plugin {
     await this.applyRuntimeEnvironmentUpdate(baseNotice, changedNotice);
   }
 
-  getResolvedClaudeCliPath(): string | null {
+  getResolvedCodexCliPath(): string | null {
     return this.cliResolver.resolve(
-      this.settings.claudeCliPathsByHost,  // Per-device paths (preferred)
-      this.settings.claudeCliPath,          // Legacy path (fallback)
+      this.settings.codexCliPathsByHost,
+      this.settings.codexCliPath,
       this.getActiveEnvironmentVariables()
     );
   }
@@ -873,15 +878,10 @@ export default class CodianPlugin extends Plugin {
   private computeEnvHash(envText: string): string {
     const envVars = parseEnvironmentVariables(envText || '');
     const modelKeys = [
-      'ANTHROPIC_MODEL',
       'OPENAI_MODEL',
       'CODEX_MODEL',
-      'ANTHROPIC_DEFAULT_OPUS_MODEL',
-      'ANTHROPIC_DEFAULT_SONNET_MODEL',
-      'ANTHROPIC_DEFAULT_HAIKU_MODEL',
     ];
     const providerKeys = [
-      'ANTHROPIC_BASE_URL',
       'OPENAI_BASE_URL',
     ];
     const allKeys = [...modelKeys, ...providerKeys];

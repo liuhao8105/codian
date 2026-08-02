@@ -79,8 +79,8 @@ describe('ClaudianSettingsStorage', () => {
 
       const result = await storage.load();
 
-      expect(result.claudeCliPathsByHost['host-a']).toBe('/custom/path-a');
-      expect(result.claudeCliPathsByHost['host-b']).toBe('/custom/path-b');
+      expect(result.codexCliPathsByHost['host-a']).toBe('/custom/path-a');
+      expect(result.codexCliPathsByHost['host-b']).toBe('/custom/path-b');
     });
 
     it('should preserve legacy claudeCliPath field', async () => {
@@ -91,7 +91,7 @@ describe('ClaudianSettingsStorage', () => {
 
       const result = await storage.load();
 
-      expect(result.claudeCliPath).toBe('/legacy/path');
+      expect(result.codexCliPath).toBe('/legacy/path');
     });
 
     it('should restore valid settings from backup when the primary JSON is corrupt', async () => {
@@ -271,7 +271,7 @@ describe('ClaudianSettingsStorage', () => {
   });
 
   describe('setLastModel', () => {
-    it('should update lastClaudeModel for non-custom models', async () => {
+    it('should update the last Codex model for non-custom models', async () => {
       mockAdapter.exists.mockResolvedValue(true);
       mockAdapter.read.mockResolvedValue(JSON.stringify({}));
 
@@ -279,7 +279,7 @@ describe('ClaudianSettingsStorage', () => {
 
       const writeCall = mockAdapter.write.mock.calls[0];
       const writtenContent = JSON.parse(writeCall[1]);
-      expect(writtenContent.lastClaudeModel).toBe('claude-sonnet-4-5');
+      expect(writtenContent.lastCodexModel).toBe('claude-sonnet-4-5');
       // lastCustomModel keeps its default value (empty string)
     });
 

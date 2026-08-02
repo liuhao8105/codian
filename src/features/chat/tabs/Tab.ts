@@ -8,7 +8,7 @@ import {
   createInstructionRuntime,
   createTitleRuntime,
 } from '../../../core/runtime';
-import type { ChatMessage, ClaudeModel, Conversation, PermissionMode, SlashCommand, StreamChunk, ThinkingBudget } from '../../../core/types';
+import type { AgentModel, ChatMessage, Conversation, PermissionMode, SlashCommand, StreamChunk, ThinkingBudget } from '../../../core/types';
 import { getContextWindowSize } from '../../../core/types';
 import { t } from '../../../i18n';
 import type CodianPlugin from '../../../main';
@@ -457,7 +457,7 @@ function initializeInputToolbar(tab: TabData, plugin: CodianPlugin): void {
         tab.ui.thinkingBudgetSelector?.updateDisplay();
       }
     },
-    onModelChange: async (model: ClaudeModel) => {
+    onModelChange: async (model: AgentModel) => {
       await plugin.setCurrentModel(model);
       tab.ui.thinkingBudgetSelector?.updateDisplay();
       tab.ui.modelSelector?.updateDisplay();
@@ -466,7 +466,7 @@ function initializeInputToolbar(tab: TabData, plugin: CodianPlugin): void {
       // Recalculate context usage percentage for the new model's context window
       const currentUsage = tab.state.usage;
       if (currentUsage) {
-        const newContextWindow = getContextWindowSize(model, plugin.settings.show1MModel, plugin.settings.customContextLimits);
+        const newContextWindow = getContextWindowSize(model, false, plugin.settings.customContextLimits);
         const newPercentage = Math.min(100, Math.max(0, Math.round((currentUsage.contextTokens / newContextWindow) * 100)));
         tab.state.usage = {
           ...currentUsage,

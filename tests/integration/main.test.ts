@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as os from 'os';
 
 import { TOOL_SUBAGENT } from '@/core/tools';
@@ -157,7 +158,11 @@ describe('ClaudianPlugin', () => {
     });
 
     it('should migrate legacy cli path to hostname-based paths and clear old field', async () => {
-      const legacyPath = '/legacy/claude';
+      const legacyPath = '/legacy/codex';
+      (fs.existsSync as jest.Mock).mockImplementation((candidate: string) => candidate === legacyPath);
+      (fs.statSync as jest.Mock).mockImplementation((candidate: string) => ({
+        isFile: () => candidate === legacyPath,
+      }));
       mockFiles.set(
         '.claude/codian-settings.json',
         JSON.stringify({ claudeCliPath: legacyPath })
@@ -180,13 +185,12 @@ describe('ClaudianPlugin', () => {
 
       const hostname = os.hostname();
       // Should migrate to hostname-based path
-      expect(plugin.settings.claudeCliPathsByHost[hostname]).toBe(legacyPath);
-      // Should clear legacy field after migration
-      expect(plugin.settings.claudeCliPath).toBe('');
+      expect(plugin.settings.codexCliPathsByHost[hostname]).toBe(legacyPath);
+      expect(plugin.settings.codexCliPath).toBe('');
       // Should save settings with migrated path and cleared legacy field
       const savedSettings = JSON.parse(mockFiles.get('.claude/codian-settings.json') ?? '{}');
-      expect(savedSettings.claudeCliPathsByHost[hostname]).toBe(legacyPath);
-      expect(savedSettings.claudeCliPath).toBe('');
+      expect(savedSettings.codexCliPathsByHost[hostname]).toBe(legacyPath);
+      expect(savedSettings.codexCliPath).toBe('');
     });
   });
 
@@ -390,7 +394,7 @@ describe('ClaudianPlugin', () => {
       expect(content.enableBlocklist).toBe(false);
       expect(content).not.toHaveProperty('activeConversationId');
       expect(content).toHaveProperty('lastEnvHash');
-      expect(content).toHaveProperty('lastClaudeModel');
+      expect(content).toHaveProperty('lastCodexModel');
       expect(content).toHaveProperty('lastCustomModel');
       // Permissions are now in .claude/settings.json (CC format), not codian-settings.json
       expect(content).not.toHaveProperty('permissions');

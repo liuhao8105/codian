@@ -15,7 +15,6 @@ import { buildNavMappingText, parseNavMappings } from './keyboardNavigation';
 import { AgentSettings } from './ui/AgentSettings';
 import { EnvSnippetManager } from './ui/EnvSnippetManager';
 import { McpSettingsManager } from './ui/McpSettingsManager';
-import { PluginSettingsManager } from './ui/PluginSettingsManager';
 import { SlashCommandSettings } from './ui/SlashCommandSettings';
 
 function formatHotkey(hotkey: { modifiers: string[]; key: string }): string {
@@ -29,8 +28,6 @@ function formatHotkey(hotkey: { modifiers: string[]; key: string }): string {
 
   return isMac ? [...mods, key].join('') : [...mods, key].join('+');
 }
-
-export { CodianSettingTab as ClaudianSettingTab };
 
 function openHotkeySettings(app: App): void {
   const setting = (app as any).setting;
@@ -225,20 +222,20 @@ export class CodianSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.enableLocalMemory !== false)
           .onChange(async (value) => {
             this.plugin.settings.enableLocalMemory = value;
-            this.plugin.storage.localMemory.setBasePath(this.plugin.settings.localMemoryPath || '.claude/local-memory');
+            this.plugin.storage.localMemory.setBasePath(this.plugin.settings.localMemoryPath || '.codian/local-memory');
             await this.plugin.saveSettings();
           })
       );
 
     new Setting(containerEl)
       .setName('本地记忆目录')
-      .setDesc('保存本地记忆的仓库内目录。默认 .claude/local-memory。')
+      .setDesc('保存本地记忆的仓库内目录。默认 .codian/local-memory。')
       .addText((text) => {
         text
-          .setPlaceholder('.claude/local-memory')
-          .setValue(this.plugin.settings.localMemoryPath || '.claude/local-memory')
+          .setPlaceholder('.codian/local-memory')
+          .setValue(this.plugin.settings.localMemoryPath || '.codian/local-memory')
           .onChange(async (value) => {
-            this.plugin.settings.localMemoryPath = value.trim() || '.claude/local-memory';
+            this.plugin.settings.localMemoryPath = value.trim() || '.codian/local-memory';
             this.plugin.storage.localMemory.setBasePath(this.plugin.settings.localMemoryPath);
             await this.plugin.saveSettings();
           });
@@ -754,7 +751,7 @@ export class CodianSettingTab extends PluginSettingTab {
         ? 'C:\\path\\to\\codex.exe'
         : '/usr/local/bin/codex';
 
-      const currentValue = this.plugin.settings.claudeCliPathsByHost?.[hostnameKey] || '';
+      const currentValue = this.plugin.settings.codexCliPathsByHost?.[hostnameKey] || '';
 
       text
         .setPlaceholder(placeholder)
@@ -771,10 +768,10 @@ export class CodianSettingTab extends PluginSettingTab {
           }
 
           const trimmed = value.trim();
-          if (!this.plugin.settings.claudeCliPathsByHost) {
-            this.plugin.settings.claudeCliPathsByHost = {};
+          if (!this.plugin.settings.codexCliPathsByHost) {
+            this.plugin.settings.codexCliPathsByHost = {};
           }
-          this.plugin.settings.claudeCliPathsByHost[hostnameKey] = trimmed;
+          this.plugin.settings.codexCliPathsByHost[hostnameKey] = trimmed;
           await this.plugin.saveSettings();
           this.plugin.cliResolver?.reset();
           const view = this.plugin.getView();
@@ -793,64 +790,6 @@ export class CodianSettingTab extends PluginSettingTab {
       }
     });
 
-    this.renderCompatibilitySection(containerEl);
-  }
-
-  private renderCompatibilitySection(containerEl: HTMLElement): void {
-    const details = containerEl.createEl('details', {
-      cls: 'codian-settings-compatibility',
-    });
-
-    if (this.plugin.settings.loadUserClaudeSettings || this.plugin.settings.enableChrome) {
-      details.open = true;
-    }
-
-    const summary = details.createEl('summary', {
-      text: t('settings.plugins.name'),
-      cls: 'codian-settings-compatibility-summary',
-    });
-    summary.setAttr('aria-label', t('settings.plugins.name'));
-
-    const desc = details.createDiv({ cls: 'codian-sp-settings-desc' });
-    desc.createEl('p', {
-      text: t('settings.plugins.desc'),
-      cls: 'setting-item-description',
-    });
-
-    const legacySettingsContainer = details.createDiv();
-    new Setting(legacySettingsContainer)
-      .setName(t('settings.loadUserSettings.name'))
-      .setDesc(t('settings.loadUserSettings.desc'))
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.loadUserClaudeSettings)
-          .onChange(async (value) => {
-            this.plugin.settings.loadUserClaudeSettings = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    const pluginsHeading = details.createDiv({ cls: 'codian-plugin-settings-desc' });
-    pluginsHeading.createEl('p', {
-      text: t('settings.plugins.desc'),
-      cls: 'setting-item-description',
-    });
-
-    const pluginsContainer = details.createDiv({ cls: 'codian-plugins-container' });
-    new PluginSettingsManager(pluginsContainer, this.plugin);
-
-    const chromeSettingsContainer = details.createDiv();
-    new Setting(chromeSettingsContainer)
-      .setName(t('settings.enableChrome.name'))
-      .setDesc(t('settings.enableChrome.desc'))
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.enableChrome ?? false)
-          .onChange(async (value) => {
-            this.plugin.settings.enableChrome = value;
-            await this.plugin.saveSettings();
-          })
-      );
   }
 
   private renderSubagentsSection(containerEl: HTMLElement): void {

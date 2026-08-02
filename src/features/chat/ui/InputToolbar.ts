@@ -3,7 +3,7 @@ import * as path from 'path';
 
 import type { McpServerManager } from '../../../core/mcp';
 import type {
-  ClaudeModel,
+  AgentModel,
   CodianMcpServer,
   PermissionMode,
   ProviderId,
@@ -21,14 +21,14 @@ import { expandHomePath, normalizePathForFilesystem } from '../../../utils/path'
 
 export interface ToolbarSettings {
   provider: ProviderId;
-  model: ClaudeModel;
+  model: AgentModel;
   thinkingBudget: ThinkingBudget;
   permissionMode: PermissionMode;
 }
 
 export interface ToolbarCallbacks {
   onProviderChange: (provider: ProviderId) => Promise<void>;
-  onModelChange: (model: ClaudeModel) => Promise<void>;
+  onModelChange: (model: AgentModel) => Promise<void>;
   onThinkingBudgetChange: (budget: ThinkingBudget) => Promise<void>;
   onPermissionModeChange: (mode: PermissionMode) => Promise<void>;
   getSettings: () => ToolbarSettings;

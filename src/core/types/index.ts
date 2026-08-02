@@ -15,11 +15,10 @@ export {
 
 // Model types
 export {
+  type AgentModel,
   BETA_1M_CONTEXT,
-  type ClaudeModel,
   CONTEXT_WINDOW_1M,
   CONTEXT_WINDOW_STANDARD,
-  DEFAULT_CLAUDE_MODELS,
   DEFAULT_CODEX_MODELS,
   DEFAULT_THINKING_BUDGET,
   getContextWindowSize,
@@ -35,7 +34,6 @@ export {
   type ApprovalDecision,
   type CCPermissions,
   type CCSettings,
-  type ClaudianSettings,
   type CliPlatformKey,
   type CodianSettings,
   createPermissionRule,
