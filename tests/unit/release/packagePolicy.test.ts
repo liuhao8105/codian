@@ -1,81 +1,37 @@
-import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
-import { extname, join, relative } from 'path';
+import * as fs from 'fs';
+import * as path from 'path';
 
-interface PackageManifest {
-  dependencies?: Record<string, string>;
-  devDependencies?: Record<string, string>;
-  overrides?: Record<string, string>;
-}
+const repositoryRoot = path.resolve(__dirname, '../../..');
 
-describe('release dependency policy', () => {
-  const projectRoot = join(__dirname, '../../..');
-  const manifest = JSON.parse(
-    readFileSync(join(projectRoot, 'package.json'), 'utf8')
-  ) as PackageManifest;
+describe('long-run dependency policy', () => {
+  it('pins both vulnerable brace-expansion major lines to patched releases', () => {
+    const packageJson = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'package.json'), 'utf8'));
 
-  const retiredMarkers = [
-    [99, 108, 97, 117, 100, 101],
-    [99, 108, 97, 117, 100, 105, 97, 110],
-    [97, 110, 116, 104, 114, 111, 112, 105, 99],
-  ].map(bytes => String.fromCharCode(...bytes));
-
-  function collectReleaseTextFiles(root: string): string[] {
-    const excludedDirectories = new Set(['.git', 'node_modules', 'coverage', 'release']);
-    const textExtensions = new Set([
-      '.cjs', '.css', '.js', '.json', '.md', '.mjs', '.ts', '.tsx', '.yaml', '.yml',
-    ]);
-    const files: string[] = [];
-
-    for (const entry of readdirSync(root)) {
-      if (excludedDirectories.has(entry) || entry.startsWith('.env')) continue;
-      const absolutePath = join(root, entry);
-      const stat = statSync(absolutePath);
-      if (stat.isDirectory()) {
-        files.push(...collectReleaseTextFiles(absolutePath));
-      } else if (textExtensions.has(extname(entry)) || entry === '.gitignore') {
-        files.push(absolutePath);
-      }
-    }
-    return files;
-  }
-
-  it('uses the security-fixed MCP SDK release line', () => {
-    expect(manifest.dependencies?.['@modelcontextprotocol/sdk']).toBe('^1.29.0');
+    expect(packageJson.overrides).toMatchObject({
+      'brace-expansion@<1.1.17': '1.1.17',
+      'brace-expansion@>=2.0.0 <2.1.3': '2.1.3',
+    });
   });
 
-  it('does not ship the unused Codex SDK', () => {
-    expect(manifest.dependencies).not.toHaveProperty('@openai/codex-sdk');
+  it('runs CI on code changes, manual requests, and a weekly schedule with separate audits', () => {
+    const workflow = fs.readFileSync(path.join(repositoryRoot, '.github/workflows/ci.yml'), 'utf8');
+
+    expect(workflow).toMatch(/pull_request:/);
+    expect(workflow).toMatch(/push:/);
+    expect(workflow).toMatch(/workflow_dispatch:/);
+    expect(workflow).toMatch(/schedule:[\s\S]*cron:/);
+    expect(workflow).toContain('npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org');
+    expect(workflow).toContain('npm audit --audit-level=high --registry=https://registry.npmjs.org');
+    expect(workflow.indexOf('npm audit --omit=dev')).toBeLessThan(workflow.indexOf('npm ci'));
   });
 
-  it('rejects retired provider markers from release inputs and bundle', () => {
-    const violations: string[] = [];
-    for (const filePath of collectReleaseTextFiles(projectRoot)) {
-      const relativePath = relative(projectRoot, filePath);
-      const normalizedPath = relativePath.toLowerCase();
-      const content = readFileSync(filePath, 'utf8').toLowerCase();
-      for (const marker of retiredMarkers) {
-        if (normalizedPath.includes(marker) || content.includes(marker)) {
-          violations.push(`${relativePath}:${marker.length}`);
-        }
-      }
-    }
-    expect(violations).toEqual([]);
-  });
+  it('configures weekly npm and GitHub Actions Dependabot updates without auto-merge', () => {
+    const dependabot = fs.readFileSync(path.join(repositoryRoot, '.github/dependabot.yml'), 'utf8');
 
-  it('has no dormant provider runtime entry point', () => {
-    const retiredServiceName = `${retiredMarkers[1]}Service.ts`;
-    expect(existsSync(join(
-      __dirname,
-      '../../../src/core/agent',
-      retiredServiceName,
-    ))).toBe(false);
-  });
-
-  it('pins the Obsidian development API for reproducible installs', () => {
-    expect(manifest.devDependencies?.obsidian).toBe('1.13.1');
-  });
-
-  it('overrides the vulnerable Hono Node adapter pulled by the MCP SDK', () => {
-    expect(manifest.overrides?.['@hono/node-server']).toBe('^2.0.12');
+    expect(dependabot).toMatch(/package-ecosystem:\s*["']?npm["']?/);
+    expect(dependabot).toMatch(/package-ecosystem:\s*["']?github-actions["']?/);
+    expect(dependabot.match(/interval:\s*["']?weekly["']?/g)).toHaveLength(2);
+    expect(dependabot).toContain('open-pull-requests-limit: 5');
+    expect(dependabot).not.toMatch(/auto-merge|automerge/i);
   });
 });

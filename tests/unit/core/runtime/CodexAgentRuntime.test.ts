@@ -1,4 +1,30 @@
-import { CodexAgentRuntime } from '@/core/runtime/CodexAgentRuntime';
+import {
+  CodexAgentRuntime,
+  summarizeNotificationForLog,
+} from '@/core/runtime/CodexAgentRuntime';
+
+describe('CodexAgentRuntime diagnostic summaries', () => {
+  it('keeps notification structure without persisting content, arguments, paths, URLs, or stacks', () => {
+    const summary = summarizeNotificationForLog({
+      method: 'error',
+      params: {
+        willRetry: true,
+        content: 'private note body',
+        arguments: { token: 'secret-token' },
+        message: 'failed at /Users/example/private.md https://api.example.test?token=secret\n    at private stack',
+      },
+    });
+
+    expect(summary).toContain('method=error');
+    expect(summary).toContain('retry=true');
+    expect(summary).toContain('category=');
+    expect(summary).not.toContain('private note body');
+    expect(summary).not.toContain('secret-token');
+    expect(summary).not.toContain('/Users/example');
+    expect(summary).not.toContain('api.example.test');
+    expect(summary).not.toContain('private stack');
+  });
+});
 import type { AppServerNotification } from '@/core/runtime/CodexAppServerClient';
 import type { StreamChunk } from '@/core/types';
 
@@ -22,6 +48,10 @@ jest.mock('@/core/runtime/codexExec', () => ({
   normalizeCodexModelForRuntime: (model?: string | null) => model ?? null,
   resolveCodexCliPath: jest.fn(() => '/mock/codex'),
 }));
+
+import { discoverConfiguredCodexMcpServerNames } from '@/core/runtime/codexExec';
+
+const discoverConfiguredCodexMcpServerNamesMock = discoverConfiguredCodexMcpServerNames as jest.MockedFunction<typeof discoverConfiguredCodexMcpServerNames>;
 
 jest.mock('@/core/runtime/CodexAppServerClient', () => ({
   CodexAppServerClient: jest.fn().mockImplementation((_plugin, notificationHandler, _signal, options) => {
@@ -64,6 +94,40 @@ function createPlugin() {
     getActiveEnvironmentVariables: jest.fn(() => ''),
   } as any;
 }
+
+describe('CodexAgentRuntime MCP discovery freshness', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    discoverConfiguredCodexMcpServerNamesMock.mockResolvedValue(['blender', 'github']);
+  });
+
+  it('shares discovery inside 60 seconds and refreshes after the TTL', async () => {
+    const now = jest.spyOn(Date, 'now').mockReturnValue(1_000);
+    const runtime = new CodexAgentRuntime(createPlugin(), { loadServers: jest.fn() } as any);
+
+    await (runtime as any).getGlobalMcpNames();
+    await (runtime as any).getGlobalMcpNames();
+    expect(discoverConfiguredCodexMcpServerNamesMock).toHaveBeenCalledTimes(1);
+
+    now.mockReturnValue(61_001);
+    await (runtime as any).getGlobalMcpNames();
+    expect(discoverConfiguredCodexMcpServerNamesMock).toHaveBeenCalledTimes(2);
+
+    now.mockRestore();
+  });
+
+  it('clears discovery immediately when MCP servers are explicitly reloaded', async () => {
+    const mcpManager = { loadServers: jest.fn().mockResolvedValue(undefined) };
+    const runtime = new CodexAgentRuntime(createPlugin(), mcpManager as any);
+
+    await (runtime as any).getGlobalMcpNames();
+    await runtime.reloadMcpServers();
+    await (runtime as any).getGlobalMcpNames();
+
+    expect(mcpManager.loadServers).toHaveBeenCalledTimes(1);
+    expect(discoverConfiguredCodexMcpServerNamesMock).toHaveBeenCalledTimes(2);
+  });
+});
 
 async function collectChunks(generator: AsyncGenerator<StreamChunk>): Promise<StreamChunk[]> {
   const chunks: StreamChunk[] = [];

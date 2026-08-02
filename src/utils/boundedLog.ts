@@ -43,6 +43,28 @@ export function redactDiagnosticText(message: string): string {
     );
 }
 
+export function classifyDiagnosticError(message: string): string {
+  if (/unauthorized|forbidden|authentication|credential|api[_-]?key|token/i.test(message)) return 'auth';
+  if (/timed?\s*out|timeout|deadline/i.test(message)) return 'timeout';
+  if (/cancel|abort/i.test(message)) return 'cancelled';
+  if (/network|socket|dns|econn|tls|disconnect/i.test(message)) return 'network';
+  if (/invalid|unsupported|configuration|config\b|not found/i.test(message)) return 'config';
+  if (/parse|json|protocol|rpc/i.test(message)) return 'protocol';
+  return 'other';
+}
+
+/** Convert an error-like value into a single bounded line with no URLs or filesystem paths. */
+export function sanitizeDiagnosticValue(value: string, maxChars = 200): string {
+  const firstLine = value.split(/\r?\n/, 1)[0] || '';
+  const sanitized = redactDiagnosticText(firstLine)
+    .replace(/https?:\/\/[^\s<>'"]+/gi, '[url]')
+    .replace(/(?:^|\s)(?:\/[A-Za-z0-9._~:@%+,-]+)+/g, (match) => `${match.startsWith(' ') ? ' ' : ''}[path]`)
+    .replace(/(?:^|\s)[A-Za-z]:\\[^\s<>'"]+/g, (match) => `${match.startsWith(' ') ? ' ' : ''}[path]`)
+    .replace(/\s+/g, ' ')
+    .trim();
+  return sanitized.length <= maxChars ? sanitized : `${sanitized.slice(0, Math.max(0, maxChars - 3))}...`;
+}
+
 function boundMessage(message: string, maxBytes: number): string {
   const redacted = redactDiagnosticText(message);
   if (Buffer.byteLength(redacted) <= maxBytes) return redacted;

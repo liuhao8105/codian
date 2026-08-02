@@ -4,7 +4,11 @@ import * as path from 'path';
 import * as readline from 'readline';
 
 import type CodianPlugin from '../../main';
-import { appendBoundedLogSync } from '../../utils/boundedLog';
+import {
+  appendBoundedLogSync,
+  classifyDiagnosticError,
+  sanitizeDiagnosticValue,
+} from '../../utils/boundedLog';
 import { getEnhancedPath, parseEnvironmentVariables } from '../../utils/env';
 import {
   buildCodexConfigOverrideArgs,
@@ -71,6 +75,20 @@ function createJsonRpcId(): JsonRpcId {
   return `codian-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+export function summarizeSpawnForLog(input: {
+  provider: string;
+  modelConfigured: boolean;
+  baseUrlConfigured: boolean;
+  cliResolved: boolean;
+  disabledMcpCount: number;
+}): string {
+  return `spawn provider=${sanitizeDiagnosticValue(input.provider, 40)} modelConfigured=${input.modelConfigured} baseUrlConfigured=${input.baseUrlConfigured} cliResolved=${input.cliResolved} disabledMcpCount=${input.disabledMcpCount}`;
+}
+
+export function summarizeStderrForLog(line: string): string {
+  return `stderr category=${classifyDiagnosticError(line)} message=${sanitizeDiagnosticValue(line)}`;
+}
+
 export class CodexAppServerClient {
   private readonly child: ChildProcess;
   private readonly pending = new Map<JsonRpcId, PendingRequest>();
@@ -104,11 +122,13 @@ export class CodexAppServerClient {
         ]
       : [];
     const runtimeEnv = buildRuntimeEnv(plugin, codexPath);
-    appendDiagnosticLog(
-      `spawn provider=${plugin.settings.currentProvider} model=${plugin.settings.model} startupModel=${startupModel ?? 'null'} ` +
-      `baseUrl=${runtimeEnv.OPENAI_BASE_URL || 'none'} cli=${codexPath} ` +
-      `disabledMcpServers=${(options.disabledMcpServers ?? []).join(',') || 'none'}`
-    );
+    appendDiagnosticLog(summarizeSpawnForLog({
+      provider: plugin.settings.currentProvider,
+      modelConfigured: Boolean(plugin.settings.model?.trim()),
+      baseUrlConfigured: Boolean(runtimeEnv.OPENAI_BASE_URL?.trim()),
+      cliResolved: Boolean(codexPath),
+      disabledMcpCount: options.disabledMcpServers?.length ?? 0,
+    }));
 
     this.child = spawn(codexPath, [...startupArgs, 'app-server', '--listen', 'stdio://'], {
       env: runtimeEnv,
@@ -127,12 +147,13 @@ export class CodexAppServerClient {
     });
 
     this.child.on('error', (error) => {
-      appendDiagnosticLog(`child-error ${error.message}`);
+      appendDiagnosticLog(`child-error category=${classifyDiagnosticError(error.message)} message=${sanitizeDiagnosticValue(error.message)}`);
       this.rejectAll(this.withStderrContext(`启动 Codex App Server 失败：${error.message}`));
     });
 
     this.child.on('close', (code, signal) => {
-      appendDiagnosticLog(`child-close code=${code ?? 'unknown'} signal=${signal ?? 'none'} stderr=${this.stderrLines.slice(-3).join(' | ')}`);
+      const lastStderr = this.stderrLines.at(-1);
+      appendDiagnosticLog(`child-close code=${code ?? 'unknown'} signal=${signal ?? 'none'} stderrCount=${this.stderrLines.length} stderrCategory=${lastStderr ? classifyDiagnosticError(lastStderr) : 'none'}`);
       if (this.closed) return;
       const reason = code === 0
         ? new Error(this.withStderrContext('Codex App Server 已关闭。').message)
@@ -148,7 +169,7 @@ export class CodexAppServerClient {
         for (const line of text.split(/\r?\n/)) {
           const trimmed = line.trim();
           if (!trimmed) continue;
-          appendDiagnosticLog(`stderr ${trimmed}`);
+          appendDiagnosticLog(summarizeStderrForLog(trimmed));
           this.stderrLines.push(trimmed);
           if (this.stderrLines.length > 20) {
             this.stderrLines.shift();
@@ -195,7 +216,7 @@ export class CodexAppServerClient {
       this.child.stdin!.write(`${payload}\n`, (error) => {
         if (error) {
           this.pending.delete(id);
-          appendDiagnosticLog(`request-write-error ${method} ${error.message}`);
+          appendDiagnosticLog(`request-write-error method=${sanitizeDiagnosticValue(method, 80)} category=${classifyDiagnosticError(error.message)} message=${sanitizeDiagnosticValue(error.message)}`);
           reject(new Error(`发送 App Server 请求失败：${error.message}`));
         }
       });
@@ -209,7 +230,7 @@ export class CodexAppServerClient {
 
   kill(): void {
     if (this.closed) return;
-    appendDiagnosticLog(`client-kill stack=${new Error().stack?.replace(/\n/g, ' ← ') ?? 'none'}`);
+    appendDiagnosticLog('client-kill');
     this.closed = true;
     this.rejectAll(new Error('Cancelled'));
     this.readlineInterface.close();
@@ -242,7 +263,8 @@ export class CodexAppServerClient {
       this.pending.delete(message.id);
 
       if (message.error) {
-        appendDiagnosticLog(`response-error ${message.id} ${message.error.message || 'App Server 请求失败。'}`);
+        const responseError = message.error.message || 'App Server 请求失败。';
+        appendDiagnosticLog(`response-error category=${classifyDiagnosticError(responseError)} message=${sanitizeDiagnosticValue(responseError)}`);
         pending.reject(new Error(extractReadableCodexErrorMessage(message.error.message || 'App Server 请求失败。')));
         return;
       }
@@ -292,7 +314,7 @@ export class CodexAppServerClient {
     if (this.closed || !this.child.stdin?.writable) return;
     this.child.stdin.write(`${JSON.stringify(message)}\n`, (error) => {
       if (error) {
-        appendDiagnosticLog(`response-write-error ${error.message}`);
+        appendDiagnosticLog(`response-write-error category=${classifyDiagnosticError(error.message)} message=${sanitizeDiagnosticValue(error.message)}`);
       }
     });
   }

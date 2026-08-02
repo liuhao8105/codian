@@ -6,6 +6,7 @@ import {
   appendBoundedLog,
   appendBoundedLogSync,
   redactDiagnosticText,
+  sanitizeDiagnosticValue,
 } from '@/utils/boundedLog';
 
 describe('bounded diagnostic logs', () => {
@@ -95,5 +96,18 @@ describe('bounded diagnostic logs', () => {
 
     expect((await fs.stat(file)).size).toBeLessThanOrEqual(64);
     expect(await fs.readFile(file, 'utf8')).toContain('[TRUNCATED]');
+  });
+
+  it('sanitizes a structured diagnostic value to one bounded path-free and URL-free line', () => {
+    const value = sanitizeDiagnosticValue(
+      'failed token=secret at /Users/example/private.md https://api.example.test?q=1\n    at private stack',
+      80,
+    );
+
+    expect(value.length).toBeLessThanOrEqual(80);
+    expect(value).not.toContain('secret');
+    expect(value).not.toContain('/Users/example');
+    expect(value).not.toContain('api.example.test');
+    expect(value).not.toContain('private stack');
   });
 });

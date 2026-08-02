@@ -1,6 +1,9 @@
 name: CI
 
 on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 4 * * 0'
   pull_request:
   push:
     branches:
@@ -24,11 +27,14 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org
+
       - name: Install dependencies
         run: npm ci
 
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org
+      - name: Audit all development dependencies
+        run: npm audit --audit-level=high --registry=https://registry.npmjs.org
 
       - name: Type-check
         run: npm run typecheck

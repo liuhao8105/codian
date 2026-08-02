@@ -2,6 +2,8 @@ import type CodianPlugin from '../../main';
 import type { RecoveryState } from '../storage/RecoveryJournal';
 
 const MAX_DIAGNOSTIC_SCAN_ENTRIES = 20_000;
+const LARGE_STORAGE_BYTES = 512 * 1024 * 1024;
+const LARGE_STORAGE_FILE_COUNT = 10_000;
 
 interface StorageTotals {
   files: number;
@@ -32,6 +34,9 @@ export interface CodianDiagnosticsSnapshot {
     stored: boolean;
     readable: boolean;
     retainedLegacyPlaintext: boolean;
+  };
+  installation: {
+    historicalBackupDirectories: number;
   };
   storage: {
     root: '.codian';
@@ -67,11 +72,12 @@ export class CodianDiagnostics {
   constructor(private readonly plugin: CodianPlugin) {}
 
   async buildSnapshot(): Promise<CodianDiagnosticsSnapshot> {
-    const [secureStorage, codian, migration, recoveryEntries] = await Promise.all([
+    const [secureStorage, codian, migration, recoveryEntries, historicalBackupDirectories] = await Promise.all([
       this.plugin.storage.getSecretStorageStatus(),
       this.scanCodianStorage(),
       this.readMigrationStatus(),
       this.plugin.storage.recovery.getAll(),
+      this.countHistoricalPluginBackups(),
     ]);
     const recovery = countRecoveryStates(recoveryEntries.map(entry => entry.state));
     const warnings: string[] = [];
@@ -80,6 +86,9 @@ export class CodianDiagnostics {
     if (secureStorage.stored && !secureStorage.readable) warnings.push('secure-record-unreadable');
     if (secureStorage.retainedLegacyPlaintext) warnings.push('legacy-plaintext-retained');
     if (codian.truncated) warnings.push('storage-scan-truncated');
+    if (codian.bytes >= LARGE_STORAGE_BYTES) warnings.push('storage-large');
+    if (codian.files >= LARGE_STORAGE_FILE_COUNT) warnings.push('storage-file-count-large');
+    if (historicalBackupDirectories > 0) warnings.push('installed-backups-present');
     if (recovery.pending > 0) warnings.push('recovery-pending');
 
     return {
@@ -93,6 +102,9 @@ export class CodianDiagnostics {
         permissionMode: String(this.plugin.settings.permissionMode),
       },
       secureStorage,
+      installation: {
+        historicalBackupDirectories,
+      },
       storage: {
         root: '.codian',
         codian,
@@ -164,6 +176,21 @@ export class CodianDiagnostics {
       return totals;
     } catch {
       return { ...emptyStorageTotals(), truncated: true };
+    }
+  }
+
+  private async countHistoricalPluginBackups(): Promise<number> {
+    const adapter = this.plugin.app.vault.adapter;
+    const pluginDirectory = '.obsidian/plugins/codian';
+    try {
+      if (!(await adapter.exists(pluginDirectory))) return 0;
+      const listing = await adapter.list(pluginDirectory);
+      return listing.folders.filter((folder) => {
+        const normalized = folder.replace(/\\/g, '/');
+        return normalized.slice(normalized.lastIndexOf('/') + 1).startsWith('.backup-');
+      }).length;
+    } catch {
+      return 0;
     }
   }
 }
