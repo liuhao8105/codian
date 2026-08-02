@@ -17,6 +17,7 @@ import { CodexAppServerClient } from './core/runtime/CodexAppServerClient';
 // CODIAN_ICON_SVG kept in shared/icons.ts for reference
 import { normalizeCodexModelForRuntime } from './core/runtime/codexExec';
 import { StorageService } from './core/storage';
+import { migrateVaultRoot } from './core/storage/VaultRootMigration';
 import { isSubagentToolName, TOOL_TASK } from './core/tools/toolNames';
 import type {
   AsyncSubagentStatus,
@@ -216,6 +217,14 @@ export default class CodianPlugin extends Plugin {
   };
 
   async onload() {
+    const vaultPath = (this.app.vault.adapter as any).basePath;
+    await migrateVaultRoot({
+      vaultRoot: vaultPath,
+      sourceName: '.claude',
+      destinationName: '.codian',
+      receiptName: '.migration-receipt.json',
+    });
+
     await this.loadSettings();
 
     this.cliResolver = new ClaudeCliResolver();
@@ -225,7 +234,6 @@ export default class CodianPlugin extends Plugin {
     await this.mcpManager.loadServers();
 
     // Initialize plugin manager (reads from installed_plugins.json + settings.json)
-    const vaultPath = (this.app.vault.adapter as any).basePath;
     this.pluginManager = new PluginManager(vaultPath, this.storage.ccSettings);
     await this.pluginManager.loadPlugins();
 

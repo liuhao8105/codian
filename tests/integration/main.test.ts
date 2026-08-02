@@ -6,9 +6,16 @@ import * as sdkSession from '@/utils/sdkSession';
 
 // Mock fs for ClaudianService
 jest.mock('fs');
+jest.mock('@/core/storage/VaultRootMigration', () => ({
+  migrateVaultRoot: jest.fn(),
+}));
 
 // Now import the plugin after mocking
+import { StorageService } from '@/core/storage/StorageService';
+import { migrateVaultRoot } from '@/core/storage/VaultRootMigration';
 import ClaudianPlugin from '@/main';
+
+const mockedMigrateVaultRoot = migrateVaultRoot as jest.MockedFunction<typeof migrateVaultRoot>;
 
 describe('ClaudianPlugin', () => {
   let plugin: ClaudianPlugin;
@@ -67,6 +74,12 @@ describe('ClaudianPlugin', () => {
     // Create plugin instance with mocked app
     plugin = new ClaudianPlugin(mockApp, mockManifest);
     (plugin.loadData as jest.Mock).mockResolvedValue({});
+    mockedMigrateVaultRoot.mockResolvedValue({
+      status: 'not-needed',
+      fileCount: 0,
+      totalBytes: 0,
+      digest: '',
+    });
   });
 
   describe('onload', () => {
@@ -76,6 +89,30 @@ describe('ClaudianPlugin', () => {
       expect(plugin.settings).toBeDefined();
       expect(plugin.settings.enableBlocklist).toBe(DEFAULT_SETTINGS.enableBlocklist);
       expect(plugin.settings.blockedCommands).toEqual(DEFAULT_SETTINGS.blockedCommands);
+    });
+
+    it('runs vault-root migration before storage initialization', async () => {
+      const events: string[] = [];
+      mockedMigrateVaultRoot.mockImplementationOnce(async () => {
+        events.push('migration');
+        return {
+          status: 'migrated',
+          fileCount: 1,
+          totalBytes: 1,
+          digest: 'a'.repeat(64),
+        };
+      });
+      jest.spyOn(StorageService.prototype, 'initialize').mockImplementationOnce(async () => {
+        events.push('storage');
+        return {
+          cc: { permissions: { allow: [], deny: [], ask: [] } },
+          claudian: { ...DEFAULT_SETTINGS },
+        } as any;
+      });
+
+      await plugin.onload();
+
+      expect(events).toEqual(['migration', 'storage']);
     });
 
     // Note: With multi-tab, agentService is per-tab via TabManager, not on plugin
