@@ -19,15 +19,15 @@ describe('SessionStorage', () => {
   });
 
   describe('SESSIONS_PATH', () => {
-    it('should be .claude/sessions', () => {
-      expect(SESSIONS_PATH).toBe('.claude/sessions');
+    it('should be .codian/sessions', () => {
+      expect(SESSIONS_PATH).toBe('.codian/sessions');
     });
   });
 
   describe('getFilePath', () => {
     it('returns correct file path for conversation id', () => {
       const path = storage.getFilePath('conv-123');
-      expect(path).toBe('.claude/sessions/conv-123.jsonl');
+      expect(path).toBe('.codian/sessions/conv-123.jsonl');
     });
   });
 
@@ -38,7 +38,7 @@ describe('SessionStorage', () => {
       const result = await storage.loadConversation('conv-123');
 
       expect(result).toBeNull();
-      expect(mockAdapter.exists).toHaveBeenCalledWith('.claude/sessions/conv-123.jsonl');
+      expect(mockAdapter.exists).toHaveBeenCalledWith('.codian/sessions/conv-123.jsonl');
     });
 
     it('loads and parses conversation from JSONL file', async () => {
@@ -186,7 +186,7 @@ describe('SessionStorage', () => {
       await storage.saveConversation(conversation);
 
       expect(mockAdapter.write).toHaveBeenCalledWith(
-        '.claude/sessions/conv-456.jsonl',
+        '.codian/sessions/conv-456.jsonl',
         expect.any(String)
       );
 
@@ -332,16 +332,16 @@ describe('SessionStorage', () => {
     it('deletes the JSONL file', async () => {
       await storage.deleteConversation('conv-del');
 
-      expect(mockAdapter.delete).toHaveBeenCalledWith('.claude/sessions/conv-del.jsonl');
+      expect(mockAdapter.delete).toHaveBeenCalledWith('.codian/sessions/conv-del.jsonl');
     });
   });
 
   describe('listConversations', () => {
     it('returns metadata for all JSONL files', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/conv-1.jsonl',
-        '.claude/sessions/conv-2.jsonl',
-        '.claude/sessions/readme.txt', // Should be skipped
+        '.codian/sessions/conv-1.jsonl',
+        '.codian/sessions/conv-2.jsonl',
+        '.codian/sessions/readme.txt', // Should be skipped
       ]);
 
       mockAdapter.read.mockImplementation((path: string) => {
@@ -397,8 +397,8 @@ describe('SessionStorage', () => {
 
     it('skips files that fail to load', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/good.jsonl',
-        '.claude/sessions/bad.jsonl',
+        '.codian/sessions/good.jsonl',
+        '.codian/sessions/bad.jsonl',
       ]);
 
       mockAdapter.read.mockImplementation((path: string) => {
@@ -419,7 +419,7 @@ describe('SessionStorage', () => {
     });
 
     it('truncates long previews', async () => {
-      mockAdapter.listFiles.mockResolvedValue(['.claude/sessions/conv-long.jsonl']);
+      mockAdapter.listFiles.mockResolvedValue(['.codian/sessions/conv-long.jsonl']);
 
       const longContent = 'A'.repeat(100);
       mockAdapter.read.mockResolvedValue([
@@ -433,7 +433,7 @@ describe('SessionStorage', () => {
     });
 
     it('uses default preview for conversations without user messages', async () => {
-      mockAdapter.listFiles.mockResolvedValue(['.claude/sessions/conv-no-user.jsonl']);
+      mockAdapter.listFiles.mockResolvedValue(['.codian/sessions/conv-no-user.jsonl']);
 
       mockAdapter.read.mockResolvedValue([
         '{"type":"meta","id":"conv-no-user","title":"No User","createdAt":1700000000,"updatedAt":1700001000,"sessionId":null}',
@@ -446,7 +446,7 @@ describe('SessionStorage', () => {
     });
 
     it('preserves titleGenerationStatus in meta', async () => {
-      mockAdapter.listFiles.mockResolvedValue(['.claude/sessions/conv-status.jsonl']);
+      mockAdapter.listFiles.mockResolvedValue(['.codian/sessions/conv-status.jsonl']);
 
       mockAdapter.read.mockResolvedValue(
         '{"type":"meta","id":"conv-status","title":"Status Test","createdAt":1700000000,"updatedAt":1700001000,"sessionId":null,"titleGenerationStatus":"failed"}'
@@ -461,8 +461,8 @@ describe('SessionStorage', () => {
   describe('loadAllConversations', () => {
     it('loads full conversation data for all JSONL files', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/conv-a.jsonl',
-        '.claude/sessions/conv-b.jsonl',
+        '.codian/sessions/conv-a.jsonl',
+        '.codian/sessions/conv-b.jsonl',
       ]);
 
       mockAdapter.read.mockImplementation((path: string) => {
@@ -495,9 +495,9 @@ describe('SessionStorage', () => {
 
     it('skips non-JSONL files', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/conv.jsonl',
-        '.claude/sessions/notes.md',
-        '.claude/sessions/.DS_Store',
+        '.codian/sessions/conv.jsonl',
+        '.codian/sessions/notes.md',
+        '.codian/sessions/.DS_Store',
       ]);
 
       mockAdapter.read.mockResolvedValue(
@@ -522,8 +522,8 @@ describe('SessionStorage', () => {
 
     it('continues loading after individual file errors', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/good.jsonl',
-        '.claude/sessions/bad.jsonl',
+        '.codian/sessions/good.jsonl',
+        '.codian/sessions/bad.jsonl',
       ]);
 
       mockAdapter.read.mockImplementation((path: string) => {
@@ -548,8 +548,8 @@ describe('SessionStorage', () => {
   describe('hasSessions', () => {
     it('returns true if JSONL files exist', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/conv-1.jsonl',
-        '.claude/sessions/conv-2.jsonl',
+        '.codian/sessions/conv-1.jsonl',
+        '.codian/sessions/conv-2.jsonl',
       ]);
 
       const result = await storage.hasSessions();
@@ -559,8 +559,8 @@ describe('SessionStorage', () => {
 
     it('returns false if no JSONL files exist', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/readme.txt',
-        '.claude/sessions/.gitkeep',
+        '.codian/sessions/readme.txt',
+        '.codian/sessions/.gitkeep',
       ]);
 
       const result = await storage.hasSessions();
@@ -622,7 +622,7 @@ describe('SessionStorage', () => {
   describe('getMetadataPath', () => {
     it('returns correct file path for session id', () => {
       const path = storage.getMetadataPath('session-abc');
-      expect(path).toBe('.claude/sessions/session-abc.meta.json');
+      expect(path).toBe('.codian/sessions/session-abc.meta.json');
     });
   });
 
@@ -641,7 +641,7 @@ describe('SessionStorage', () => {
       await storage.saveMetadata(metadata);
 
       expect(mockAdapter.write).toHaveBeenCalledWith(
-        '.claude/sessions/session-456.meta.json',
+        '.codian/sessions/session-456.meta.json',
         expect.any(String)
       );
 
@@ -735,25 +735,25 @@ describe('SessionStorage', () => {
     it('deletes the meta.json file', async () => {
       await storage.deleteMetadata('session-del');
 
-      expect(mockAdapter.delete).toHaveBeenCalledWith('.claude/sessions/session-del.meta.json');
+      expect(mockAdapter.delete).toHaveBeenCalledWith('.codian/sessions/session-del.meta.json');
     });
   });
 
   describe('listNativeMetadata', () => {
     it('returns metadata for .meta.json files without .jsonl counterparts', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/native-1.meta.json',
-        '.claude/sessions/native-2.meta.json',
-        '.claude/sessions/legacy.jsonl',
-        '.claude/sessions/legacy.meta.json', // Has JSONL counterpart, skip
+        '.codian/sessions/native-1.meta.json',
+        '.codian/sessions/native-2.meta.json',
+        '.codian/sessions/legacy.jsonl',
+        '.codian/sessions/legacy.meta.json', // Has JSONL counterpart, skip
       ]);
 
       // native-1.meta.json and native-2.meta.json have no .jsonl
       // legacy.meta.json has .jsonl counterpart
       mockAdapter.exists.mockImplementation((path: string) => {
-        if (path === '.claude/sessions/native-1.jsonl') return Promise.resolve(false);
-        if (path === '.claude/sessions/native-2.jsonl') return Promise.resolve(false);
-        if (path === '.claude/sessions/legacy.jsonl') return Promise.resolve(true);
+        if (path === '.codian/sessions/native-1.jsonl') return Promise.resolve(false);
+        if (path === '.codian/sessions/native-2.jsonl') return Promise.resolve(false);
+        if (path === '.codian/sessions/legacy.jsonl') return Promise.resolve(true);
         return Promise.resolve(false);
       });
 
@@ -802,8 +802,8 @@ describe('SessionStorage', () => {
 
     it('skips files that fail to load', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/good.meta.json',
-        '.claude/sessions/bad.meta.json',
+        '.codian/sessions/good.meta.json',
+        '.codian/sessions/bad.meta.json',
       ]);
 
       mockAdapter.exists.mockResolvedValue(false); // No JSONL files
@@ -831,13 +831,13 @@ describe('SessionStorage', () => {
     it('merges legacy and native conversations', async () => {
       // Set up legacy JSONL files
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/legacy-1.jsonl',
-        '.claude/sessions/native-1.meta.json',
+        '.codian/sessions/legacy-1.jsonl',
+        '.codian/sessions/native-1.meta.json',
       ]);
 
       mockAdapter.exists.mockImplementation((path: string) => {
         // native-1 has no .jsonl counterpart
-        if (path === '.claude/sessions/native-1.jsonl') return Promise.resolve(false);
+        if (path === '.codian/sessions/native-1.jsonl') return Promise.resolve(false);
         return Promise.resolve(true);
       });
 
@@ -874,8 +874,8 @@ describe('SessionStorage', () => {
 
     it('legacy takes precedence over native with same ID', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/conv-1.jsonl',
-        '.claude/sessions/conv-1.meta.json', // Same ID, should be skipped
+        '.codian/sessions/conv-1.jsonl',
+        '.codian/sessions/conv-1.meta.json', // Same ID, should be skipped
       ]);
 
       mockAdapter.exists.mockResolvedValue(true); // .jsonl exists for conv-1
@@ -903,7 +903,7 @@ describe('SessionStorage', () => {
 
     it('native sessions have isNative flag and default preview', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/native-only.meta.json',
+        '.codian/sessions/native-only.meta.json',
       ]);
 
       mockAdapter.exists.mockResolvedValue(false); // No .jsonl
@@ -927,8 +927,8 @@ describe('SessionStorage', () => {
   describe('loadAllConversations - failedCount for unparseable JSONL', () => {
     it('increments failedCount when parseJSONL returns null', async () => {
       mockAdapter.listFiles.mockResolvedValue([
-        '.claude/sessions/good.jsonl',
-        '.claude/sessions/empty.jsonl',
+        '.codian/sessions/good.jsonl',
+        '.codian/sessions/empty.jsonl',
       ]);
 
       mockAdapter.read.mockImplementation((path: string) => {
@@ -951,7 +951,7 @@ describe('SessionStorage', () => {
 
   describe('listConversations - loadMetaOnly edge cases', () => {
     it('handles corrupted message lines in loadMetaOnly', async () => {
-      mockAdapter.listFiles.mockResolvedValue(['.claude/sessions/corrupted.jsonl']);
+      mockAdapter.listFiles.mockResolvedValue(['.codian/sessions/corrupted.jsonl']);
 
       mockAdapter.read.mockResolvedValue([
         '{"type":"meta","id":"corrupted","title":"Corrupted","createdAt":1700000000,"updatedAt":1700001000,"sessionId":null}',
@@ -968,7 +968,7 @@ describe('SessionStorage', () => {
     });
 
     it('returns empty when first line (meta) parse fails', async () => {
-      mockAdapter.listFiles.mockResolvedValue(['.claude/sessions/bad-meta.jsonl']);
+      mockAdapter.listFiles.mockResolvedValue(['.codian/sessions/bad-meta.jsonl']);
 
       mockAdapter.read.mockResolvedValue('not valid json at all');
 

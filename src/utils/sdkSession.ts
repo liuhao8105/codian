@@ -1,7 +1,7 @@
 /**
  * SDK Session Parser - Parses Claude Agent SDK native session files.
  *
- * The SDK stores sessions in ~/.claude/projects/{vault-path-encoded}/{sessionId}.jsonl
+ * The SDK stores sessions in ~/.codian/projects/{vault-path-encoded}/{sessionId}.jsonl
  * Each line is a JSON object with message data.
  *
  * This utility converts SDK native messages to Claudian's ChatMessage format
@@ -110,7 +110,7 @@ export function encodeVaultPathForSDK(vaultPath: string): string {
 }
 
 export function getSDKProjectsPath(): string {
-  return path.join(os.homedir(), '.claude', 'projects');
+  return path.join(os.homedir(), '.codian', 'projects');
 }
 
 function getCodexSessionsPath(): string {
@@ -323,7 +323,7 @@ function getSubagentSidecarPath(
  * Loads tool calls executed inside a subagent from SDK sidechain logs.
  *
  * File location:
- * ~/.claude/projects/{encoded-vault}/{sessionId}/subagents/agent-{agentId}.jsonl
+ * ~/.codian/projects/{encoded-vault}/{sessionId}/subagents/agent-{agentId}.jsonl
  */
 export async function loadSubagentToolCalls(
   vaultPath: string,

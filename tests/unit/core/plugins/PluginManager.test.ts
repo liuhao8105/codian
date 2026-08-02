@@ -23,8 +23,8 @@ import { PluginManager } from '@/core/plugins/PluginManager';
 
 const mockFs = fs as jest.Mocked<typeof fs>;
 
-// Create a mock CCSettingsStorage
-function createMockCCSettingsStorage() {
+// Create a mock RuntimeSettingsStorage
+function createMockRuntimeSettingsStorage() {
   return {
     getEnabledPlugins: jest.fn().mockResolvedValue({}),
     setPluginEnabled: jest.fn().mockResolvedValue(undefined),
@@ -43,7 +43,7 @@ describe('PluginManager', () => {
   describe('loadPlugins', () => {
     it('returns empty array when no installed_plugins.json exists', async () => {
       mockFs.existsSync.mockReturnValue(false);
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -75,7 +75,7 @@ describe('PluginManager', () => {
         return '{}';
       });
 
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -108,7 +108,7 @@ describe('PluginManager', () => {
       });
       mockFs.readFileSync.mockReturnValue(JSON.stringify(installedPlugins));
 
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -146,7 +146,7 @@ describe('PluginManager', () => {
         return '{}';
       });
 
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -175,7 +175,7 @@ describe('PluginManager', () => {
       });
       mockFs.readFileSync.mockReturnValue(JSON.stringify(installedPlugins));
 
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -211,7 +211,7 @@ describe('PluginManager', () => {
       });
       mockFs.readFileSync.mockReturnValue(JSON.stringify(installedPlugins));
 
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -242,7 +242,7 @@ describe('PluginManager', () => {
       });
       mockFs.readFileSync.mockReturnValue(JSON.stringify(installedPlugins));
 
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -279,7 +279,7 @@ describe('PluginManager', () => {
       });
       mockFs.readFileSync.mockReturnValue(JSON.stringify(installedPlugins));
 
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -311,7 +311,7 @@ describe('PluginManager', () => {
       });
       mockFs.readFileSync.mockReturnValue(JSON.stringify(installedPlugins));
 
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -325,7 +325,7 @@ describe('PluginManager', () => {
 
     it('does nothing when plugin not found', async () => {
       mockFs.existsSync.mockReturnValue(false);
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -360,7 +360,7 @@ describe('PluginManager', () => {
         return '{}';
       });
 
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -394,7 +394,7 @@ describe('PluginManager', () => {
       });
       mockFs.readFileSync.mockReturnValue(JSON.stringify(installedPlugins));
 
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -425,7 +425,7 @@ describe('PluginManager', () => {
       });
       mockFs.readFileSync.mockReturnValue(JSON.stringify(installedPlugins));
 
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -457,7 +457,7 @@ describe('PluginManager', () => {
         return '{}';
       });
 
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -491,7 +491,7 @@ describe('PluginManager', () => {
         return '{}';
       });
 
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -522,7 +522,7 @@ describe('PluginManager', () => {
       });
       mockFs.readFileSync.mockReturnValue(JSON.stringify(installedPlugins));
 
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -533,7 +533,7 @@ describe('PluginManager', () => {
 
     it('does nothing for nonexistent plugin', async () => {
       mockFs.existsSync.mockReturnValue(false);
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -563,7 +563,7 @@ describe('PluginManager', () => {
       });
       mockFs.readFileSync.mockReturnValue(JSON.stringify(installedPlugins));
 
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -599,7 +599,7 @@ describe('PluginManager', () => {
         return '{}';
       });
 
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -610,7 +610,7 @@ describe('PluginManager', () => {
 
     it('does nothing for nonexistent plugin', async () => {
       mockFs.existsSync.mockReturnValue(false);
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -655,7 +655,7 @@ describe('PluginManager', () => {
         return '{}';
       });
 
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -665,7 +665,7 @@ describe('PluginManager', () => {
 
     it('returns 0 when no plugins loaded', async () => {
       mockFs.existsSync.mockReturnValue(false);
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -694,7 +694,7 @@ describe('PluginManager', () => {
       });
       mockFs.readFileSync.mockReturnValue(JSON.stringify(installedPlugins));
 
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -704,7 +704,7 @@ describe('PluginManager', () => {
 
     it('returns false when no plugins exist', async () => {
       mockFs.existsSync.mockReturnValue(false);
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -733,7 +733,7 @@ describe('PluginManager', () => {
       });
       mockFs.readFileSync.mockReturnValue(JSON.stringify(installedPlugins));
 
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -754,7 +754,7 @@ describe('PluginManager', () => {
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readFileSync.mockReturnValue('not valid json {{{');
 
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -784,7 +784,7 @@ describe('PluginManager', () => {
       });
       mockFs.readFileSync.mockReturnValue(JSON.stringify(installedPlugins));
 
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();
@@ -819,7 +819,7 @@ describe('PluginManager', () => {
       // realpathSync returns the resolved path
       mockFs.realpathSync.mockReturnValue(vaultPath);
 
-      const ccSettings = createMockCCSettingsStorage();
+      const ccSettings = createMockRuntimeSettingsStorage();
       const manager = new PluginManager(vaultPath, ccSettings);
 
       await manager.loadPlugins();

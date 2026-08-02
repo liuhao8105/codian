@@ -238,7 +238,7 @@ export async function testMcpServer(server: CodianMcpServer): Promise<McpTestRes
     };
   }
 
-  const client = new Client({ name: 'claudian-tester', version: '1.0.0' });
+  const client = new Client({ name: 'codian-tester', version: '1.0.0' });
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
 

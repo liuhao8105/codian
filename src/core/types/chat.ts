@@ -111,7 +111,7 @@ export interface Conversation {
   titleGenerationStatus?: 'pending' | 'success' | 'failed';
   /** UI-enabled MCP servers for this session (context-saving servers activated via selector). */
   enabledMcpServers?: string[];
-  /** True if this conversation uses SDK-native storage (messages in ~/.claude/projects/). */
+  /** True if this conversation uses SDK-native storage (messages in ~/.codian/projects/). */
   isNative?: boolean;
   /** Timestamp of the last legacy JSONL message (used to merge SDK history). */
   legacyCutoffAt?: number;
@@ -146,7 +146,7 @@ export interface ConversationMeta {
 
 /**
  * Session metadata overlay for SDK-native storage.
- * Stored in vault/.claude/sessions/{id}.meta.json
+ * Stored in vault/.codian/sessions/{id}.meta.json
  * SDK handles message storage; this stores UI-only state.
  */
 export interface SessionMetadata {

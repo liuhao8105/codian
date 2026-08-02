@@ -11,7 +11,7 @@ import { Notice } from 'obsidian';
 import * as os from 'os';
 import * as path from 'path';
 
-import type { CCSettingsStorage } from '../storage/CCSettingsStorage';
+import type { RuntimeSettingsStorage } from '../storage/RuntimeSettingsStorage';
 import type { CodianPluginInfo, InstalledPluginEntry, InstalledPluginsFile, PluginScope } from '../types';
 
 const INSTALLED_PLUGINS_PATH = path.join(os.homedir(), '.claude', 'plugins', 'installed_plugins.json');
@@ -70,11 +70,11 @@ function extractPluginName(pluginId: string): string {
 }
 
 export class PluginManager {
-  private ccSettingsStorage: CCSettingsStorage;
+  private ccSettingsStorage: RuntimeSettingsStorage;
   private vaultPath: string;
   private plugins: CodianPluginInfo[] = [];
 
-  constructor(vaultPath: string, ccSettingsStorage: CCSettingsStorage) {
+  constructor(vaultPath: string, ccSettingsStorage: RuntimeSettingsStorage) {
     this.vaultPath = vaultPath;
     this.ccSettingsStorage = ccSettingsStorage;
   }

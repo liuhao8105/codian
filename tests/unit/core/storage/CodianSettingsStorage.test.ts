@@ -1,8 +1,8 @@
 import {
-  ClaudianSettingsStorage,
   CODIAN_SETTINGS_PATH,
+  CodianSettingsStorage,
   normalizeBlockedCommands,
-} from '@/core/storage/ClaudianSettingsStorage';
+} from '@/core/storage/CodianSettingsStorage';
 import type { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
 import { DEFAULT_SETTINGS, getDefaultBlockedCommands } from '@/core/types';
 
@@ -13,8 +13,8 @@ const mockAdapter = {
   restoreFromBackup: jest.fn(),
 } as unknown as jest.Mocked<VaultFileAdapter>;
 
-describe('ClaudianSettingsStorage', () => {
-  let storage: ClaudianSettingsStorage;
+describe('CodianSettingsStorage', () => {
+  let storage: CodianSettingsStorage;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -23,7 +23,7 @@ describe('ClaudianSettingsStorage', () => {
     mockAdapter.read.mockResolvedValue('{}');
     mockAdapter.write.mockResolvedValue(undefined);
     mockAdapter.restoreFromBackup.mockResolvedValue(undefined);
-    storage = new ClaudianSettingsStorage(mockAdapter);
+    storage = new CodianSettingsStorage(mockAdapter);
   });
 
   describe('load', () => {

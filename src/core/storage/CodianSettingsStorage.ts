@@ -1,7 +1,7 @@
 /**
- * ClaudianSettingsStorage - Handles claudian-settings.json read/write.
+ * CodianSettingsStorage - Handles codian-settings.json read/write.
  *
- * Manages the .claude/claudian-settings.json file for Claudian-specific settings.
+ * Manages the .codian/codian-settings.json file for Claudian-specific settings.
  * These settings are NOT shared with Claude Code CLI.
  *
  * Includes:
@@ -24,16 +24,15 @@ import { DEFAULT_SETTINGS, getDefaultBlockedCommands } from '../types';
 import type { VaultFileAdapter } from './VaultFileAdapter';
 
 /** Codian isolated settings file path relative to vault root. */
-export const CODIAN_SETTINGS_PATH = '.claude/codian-settings.json';
+export const CODIAN_SETTINGS_PATH = '.codian/codian-settings.json';
 /** Legacy shared settings file path used by Claudian-derived builds. */
-export const CLAUDIAN_SETTINGS_PATH = '.claude/claudian-settings.json';
+export const CLAUDIAN_SETTINGS_PATH = '.codian/codian-settings.json';
 
-/** Fields that are loaded separately (slash commands from .claude/commands/). */
+/** Fields that are loaded separately (slash commands from .codian/commands/). */
 type SeparatelyLoadedFields = 'slashCommands';
 
-/** Settings stored in .claude/claudian-settings.json. */
+/** Settings stored in .codian/codian-settings.json. */
 export type StoredCodianSettings = Omit<CodianSettings, SeparatelyLoadedFields>;
-export type StoredClaudianSettings = StoredCodianSettings;
 const SETTINGS_SAVE_DIAGNOSTIC_LOG = path.join(os.tmpdir(), 'codian-settings-save.log');
 
 function appendSettingsDiagnosticLog(message: string): void {
@@ -98,7 +97,7 @@ export class CodianSettingsStorage {
   constructor(private adapter: VaultFileAdapter) { }
 
   /**
-  * Load Claudian settings from .claude/claudian-settings.json.
+  * Load Claudian settings from .codian/codian-settings.json.
   * Returns default settings if file doesn't exist.
   * Throws if file exists but cannot be read or parsed.
   */
@@ -146,7 +145,7 @@ export class CodianSettingsStorage {
   }
 
   /**
-   * Read legacy activeConversationId from claudian-settings.json, if present.
+   * Read legacy activeConversationId from codian-settings.json, if present.
    * Used only for one-time migration to tabManagerState.
    */
   async getLegacyActiveConversationId(): Promise<string | null> {
@@ -167,7 +166,7 @@ export class CodianSettingsStorage {
   }
 
   /**
-   * Remove legacy activeConversationId from claudian-settings.json.
+   * Remove legacy activeConversationId from codian-settings.json.
    */
   async clearLegacyActiveConversationId(): Promise<void> {
     const activePath = await this.getExistingSettingsPath();
@@ -239,5 +238,3 @@ export class CodianSettingsStorage {
     }
   }
 }
-
-export { CodianSettingsStorage as ClaudianSettingsStorage };

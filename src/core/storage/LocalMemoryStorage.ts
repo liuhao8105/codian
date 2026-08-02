@@ -1,6 +1,6 @@
 import type { VaultFileAdapter } from './VaultFileAdapter';
 
-export const LOCAL_MEMORY_PATH = '.claude/local-memory';
+export const LOCAL_MEMORY_PATH = '.codian/local-memory';
 export const LOCAL_MEMORY_FILE = `${LOCAL_MEMORY_PATH}/memories.jsonl`;
 export const LOCAL_MEMORY_PROFILE_FILE = `${LOCAL_MEMORY_PATH}/profile.md`;
 

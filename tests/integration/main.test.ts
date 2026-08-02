@@ -67,7 +67,7 @@ describe('ClaudianPlugin', () => {
     };
 
     mockManifest = {
-      id: 'claudian',
+      id: 'codian',
       name: 'Claudian',
       version: '0.1.0',
     };
@@ -107,7 +107,7 @@ describe('ClaudianPlugin', () => {
         events.push('storage');
         return {
           cc: { permissions: { allow: [], deny: [], ask: [] } },
-          claudian: { ...DEFAULT_SETTINGS },
+          codian: { ...DEFAULT_SETTINGS },
         } as any;
       });
 
@@ -164,18 +164,18 @@ describe('ClaudianPlugin', () => {
         isFile: () => candidate === legacyPath,
       }));
       mockFiles.set(
-        '.claude/codian-settings.json',
+        '.codian/codian-settings.json',
         JSON.stringify({ claudeCliPath: legacyPath })
       );
       mockApp.vault.adapter.exists.mockImplementation(async (path: string) => {
         // claudeCliPath is now in codian-settings.json
-        return mockFiles.has(path) || path === '.claude/codian-settings.json';
+        return mockFiles.has(path) || path === '.codian/codian-settings.json';
       });
       mockApp.vault.adapter.read.mockImplementation(async (path: string) => {
         if (mockFiles.has(path)) {
           return mockFiles.get(path);
         }
-        if (path === '.claude/codian-settings.json') {
+        if (path === '.codian/codian-settings.json') {
           return JSON.stringify({ claudeCliPath: legacyPath });
         }
         return '';
@@ -188,7 +188,7 @@ describe('ClaudianPlugin', () => {
       expect(plugin.settings.codexCliPathsByHost[hostname]).toBe(legacyPath);
       expect(plugin.settings.codexCliPath).toBe('');
       // Should save settings with migrated path and cleared legacy field
-      const savedSettings = JSON.parse(mockFiles.get('.claude/codian-settings.json') ?? '{}');
+      const savedSettings = JSON.parse(mockFiles.get('.codian/codian-settings.json') ?? '{}');
       expect(savedSettings.codexCliPathsByHost[hostname]).toBe(legacyPath);
       expect(savedSettings.codexCliPath).toBe('');
     });
@@ -275,17 +275,17 @@ describe('ClaudianPlugin', () => {
     it('should merge saved data with defaults', async () => {
       // Mock codian-settings.json exists with custom values (Claudian-specific settings)
       mockFiles.set(
-        '.claude/codian-settings.json',
+        '.codian/codian-settings.json',
         JSON.stringify({ enableBlocklist: false })
       );
       mockApp.vault.adapter.exists.mockImplementation(async (path: string) => {
-        return mockFiles.has(path) || path === '.claude/codian-settings.json';
+        return mockFiles.has(path) || path === '.codian/codian-settings.json';
       });
       mockApp.vault.adapter.read.mockImplementation(async (path: string) => {
         if (mockFiles.has(path)) {
           return mockFiles.get(path);
         }
-        if (path === '.claude/codian-settings.json') {
+        if (path === '.codian/codian-settings.json') {
           return JSON.stringify({
             enableBlocklist: false,
           });
@@ -303,17 +303,17 @@ describe('ClaudianPlugin', () => {
     it('should normalize blockedCommands when stored value is partial', async () => {
       // Mock codian-settings.json exists with partial blockedCommands
       mockFiles.set(
-        '.claude/codian-settings.json',
+        '.codian/codian-settings.json',
         JSON.stringify({ blockedCommands: { unix: ['rm -rf', '  '] } })
       );
       mockApp.vault.adapter.exists.mockImplementation(async (path: string) => {
-        return mockFiles.has(path) || path === '.claude/codian-settings.json';
+        return mockFiles.has(path) || path === '.codian/codian-settings.json';
       });
       mockApp.vault.adapter.read.mockImplementation(async (path: string) => {
         if (mockFiles.has(path)) {
           return mockFiles.get(path);
         }
-        if (path === '.claude/codian-settings.json') {
+        if (path === '.codian/codian-settings.json') {
           return JSON.stringify({
             blockedCommands: { unix: ['rm -rf', '  '] },
           });
@@ -350,20 +350,20 @@ describe('ClaudianPlugin', () => {
     it('should reconcile model from environment and persist when changed', async () => {
       // Mock codian-settings.json with environment variables
       mockFiles.set(
-        '.claude/codian-settings.json',
+        '.codian/codian-settings.json',
         JSON.stringify({
           environmentVariables: 'ANTHROPIC_MODEL=custom-model',
           lastEnvHash: '',
         })
       );
       mockApp.vault.adapter.exists.mockImplementation(async (path: string) => {
-        return mockFiles.has(path) || path === '.claude/codian-settings.json';
+        return mockFiles.has(path) || path === '.codian/codian-settings.json';
       });
       mockApp.vault.adapter.read.mockImplementation(async (path: string) => {
         if (mockFiles.has(path)) {
           return mockFiles.get(path);
         }
-        if (path === '.claude/codian-settings.json') {
+        if (path === '.codian/codian-settings.json') {
           return JSON.stringify({
             environmentVariables: 'ANTHROPIC_MODEL=custom-model',
             lastEnvHash: '',
@@ -388,15 +388,15 @@ describe('ClaudianPlugin', () => {
 
       await plugin.saveSettings();
 
-      // Claudian-specific settings should be written to .claude/codian-settings.json
+      // Claudian-specific settings should be written to .codian/codian-settings.json
       // The written content should include state fields
-      const content = JSON.parse(mockFiles.get('.claude/codian-settings.json') ?? '{}');
+      const content = JSON.parse(mockFiles.get('.codian/codian-settings.json') ?? '{}');
       expect(content.enableBlocklist).toBe(false);
       expect(content).not.toHaveProperty('activeConversationId');
       expect(content).toHaveProperty('lastEnvHash');
       expect(content).toHaveProperty('lastCodexModel');
       expect(content).toHaveProperty('lastCustomModel');
-      // Permissions are now in .claude/settings.json (CC format), not codian-settings.json
+      // Permissions are now in .codian/settings.json (CC format), not codian-settings.json
       expect(content).not.toHaveProperty('permissions');
     });
   });
@@ -739,8 +739,8 @@ describe('ClaudianPlugin', () => {
         updatedAt: timestamp,
         sessionId: 'saved-session',
       });
-      mockFiles.set('.claude/codian-settings.json', JSON.stringify({}));
-      mockFiles.set('.claude/sessions/conv-saved-1.jsonl', sessionJsonl);
+      mockFiles.set('.codian/codian-settings.json', JSON.stringify({}));
+      mockFiles.set('.codian/sessions/conv-saved-1.jsonl', sessionJsonl);
 
       // Mock files exist
       mockApp.vault.adapter.exists.mockImplementation(async (path: string) => {
@@ -748,18 +748,18 @@ describe('ClaudianPlugin', () => {
           return true;
         }
         // Session files
-        if (path === '.claude/sessions' || path === '.claude/sessions/conv-saved-1.jsonl') {
+        if (path === '.codian/sessions' || path === '.codian/sessions/conv-saved-1.jsonl') {
           return true;
         }
         // codian-settings.json exists
-        if (path === '.claude/codian-settings.json') {
+        if (path === '.codian/codian-settings.json') {
           return true;
         }
         return false;
       });
       mockApp.vault.adapter.list.mockImplementation(async (path: string) => {
-        if (path === '.claude/sessions') {
-          return { files: ['.claude/sessions/conv-saved-1.jsonl'], folders: [] };
+        if (path === '.codian/sessions') {
+          return { files: ['.codian/sessions/conv-saved-1.jsonl'], folders: [] };
         }
         return { files: [], folders: [] };
       });
@@ -767,10 +767,10 @@ describe('ClaudianPlugin', () => {
         if (mockFiles.has(path)) {
           return mockFiles.get(path);
         }
-        if (path === '.claude/sessions/conv-saved-1.jsonl') {
+        if (path === '.codian/sessions/conv-saved-1.jsonl') {
           return sessionJsonl;
         }
-        if (path === '.claude/codian-settings.json') {
+        if (path === '.codian/codian-settings.json') {
           return JSON.stringify({});
         }
         return '';
@@ -797,23 +797,23 @@ describe('ClaudianPlugin', () => {
         sessionId: 'saved-session',
       });
       mockFiles.set(
-        '.claude/codian-settings.json',
+        '.codian/codian-settings.json',
         JSON.stringify({
           lastEnvHash: 'old-hash',
           environmentVariables: 'ANTHROPIC_BASE_URL=https://api.example.com',
         })
       );
-      mockFiles.set('.claude/sessions/conv-saved-1.jsonl', sessionJsonl);
+      mockFiles.set('.codian/sessions/conv-saved-1.jsonl', sessionJsonl);
 
       mockApp.vault.adapter.exists.mockImplementation(async (path: string) => {
         return mockFiles.has(path) ||
-          path === '.claude/codian-settings.json' ||
-          path === '.claude/sessions' ||
-          path === '.claude/sessions/conv-saved-1.jsonl';
+          path === '.codian/codian-settings.json' ||
+          path === '.codian/sessions' ||
+          path === '.codian/sessions/conv-saved-1.jsonl';
       });
       mockApp.vault.adapter.list.mockImplementation(async (path: string) => {
-        if (path === '.claude/sessions') {
-          return { files: ['.claude/sessions/conv-saved-1.jsonl'], folders: [] };
+        if (path === '.codian/sessions') {
+          return { files: ['.codian/sessions/conv-saved-1.jsonl'], folders: [] };
         }
         return { files: [], folders: [] };
       });
@@ -821,14 +821,14 @@ describe('ClaudianPlugin', () => {
         if (mockFiles.has(path)) {
           return mockFiles.get(path);
         }
-        if (path === '.claude/codian-settings.json') {
+        if (path === '.codian/codian-settings.json') {
           // All these fields are now in codian-settings.json
           return JSON.stringify({
             lastEnvHash: 'old-hash',
             environmentVariables: 'ANTHROPIC_BASE_URL=https://api.example.com',
           });
         }
-        if (path === '.claude/sessions/conv-saved-1.jsonl') {
+        if (path === '.codian/sessions/conv-saved-1.jsonl') {
           return sessionJsonl;
         }
         return '';
@@ -842,7 +842,7 @@ describe('ClaudianPlugin', () => {
       const loaded = await plugin.getConversationById('conv-saved-1');
       expect(loaded?.sessionId).toBeNull();
 
-      const savedSession = mockFiles.get('.claude/sessions/conv-saved-1.jsonl');
+      const savedSession = mockFiles.get('.codian/sessions/conv-saved-1.jsonl');
       expect(savedSession).toBeDefined();
       const metaLine = (savedSession as string).split(/\r?\n/)[0];
       const meta = JSON.parse(metaLine);
@@ -880,18 +880,18 @@ describe('ClaudianPlugin', () => {
         previousSdkSessionIds: ['session-A'],
         isNative: true,
       });
-      mockFiles.set('.claude/codian-settings.json', JSON.stringify({}));
-      mockFiles.set('.claude/sessions/conv-multi-session.meta.json', sessionMeta);
+      mockFiles.set('.codian/codian-settings.json', JSON.stringify({}));
+      mockFiles.set('.codian/sessions/conv-multi-session.meta.json', sessionMeta);
 
       mockApp.vault.adapter.exists.mockImplementation(async (path: string) => {
         return mockFiles.has(path) ||
-          path === '.claude/codian-settings.json' ||
-          path === '.claude/sessions' ||
-          path === '.claude/sessions/conv-multi-session.meta.json';
+          path === '.codian/codian-settings.json' ||
+          path === '.codian/sessions' ||
+          path === '.codian/sessions/conv-multi-session.meta.json';
       });
       mockApp.vault.adapter.list.mockImplementation(async (path: string) => {
-        if (path === '.claude/sessions') {
-          return { files: ['.claude/sessions/conv-multi-session.meta.json'], folders: [] };
+        if (path === '.codian/sessions') {
+          return { files: ['.codian/sessions/conv-multi-session.meta.json'], folders: [] };
         }
         return { files: [], folders: [] };
       });
@@ -899,10 +899,10 @@ describe('ClaudianPlugin', () => {
         if (mockFiles.has(path)) {
           return mockFiles.get(path);
         }
-        if (path === '.claude/sessions/conv-multi-session.meta.json') {
+        if (path === '.codian/sessions/conv-multi-session.meta.json') {
           return sessionMeta;
         }
-        if (path === '.claude/codian-settings.json') {
+        if (path === '.codian/codian-settings.json') {
           return JSON.stringify({});
         }
         return '';

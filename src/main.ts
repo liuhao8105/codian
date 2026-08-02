@@ -418,26 +418,26 @@ export default class CodianPlugin extends Plugin {
     this.cliResolver ??= new CodexCliResolver();
     // Initialize storage service (handles migration if needed)
     this.storage = new StorageService(this);
-    const { claudian } = await this.storage.initialize();
+    const { codian } = await this.storage.initialize();
 
     const slashCommands = await this.storage.loadAllSlashCommands();
 
     this.settings = {
       ...DEFAULT_SETTINGS,
-      ...claudian,
+      ...codian,
       slashCommands,
     };
     this.settings.currentProvider ??= DEFAULT_SETTINGS.currentProvider;
     this.settings.providerConfigs = {
       ...DEFAULT_SETTINGS.providerConfigs,
-      ...(claudian.providerConfigs || {}),
+      ...(codian.providerConfigs || {}),
       codex: {
         ...DEFAULT_SETTINGS.providerConfigs.codex,
-        ...(claudian.providerConfigs?.codex || {}),
+        ...(codian.providerConfigs?.codex || {}),
       },
       deepseek: {
         ...DEFAULT_SETTINGS.providerConfigs.deepseek,
-        ...(claudian.providerConfigs?.deepseek || {}),
+        ...(codian.providerConfigs?.deepseek || {}),
       },
     };
     const providerValidation = isProviderConfigured(this.settings, this.settings.currentProvider);

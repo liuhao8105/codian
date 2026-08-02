@@ -1,5 +1,5 @@
 /**
- * SessionStorage - Handles chat session files in vault/.claude/sessions/
+ * SessionStorage - Handles chat session files in vault/.codian/sessions/
  *
  * Each conversation is stored as a JSONL (JSON Lines) file.
  * First line contains metadata, subsequent lines contain messages.
@@ -24,7 +24,7 @@ import type {
 import type { VaultFileAdapter } from './VaultFileAdapter';
 
 /** Path to sessions folder relative to vault root. */
-export const SESSIONS_PATH = '.claude/sessions';
+export const SESSIONS_PATH = '.codian/sessions';
 
 /** Metadata record stored as first line of JSONL. */
 interface SessionMetaRecord {
@@ -317,7 +317,7 @@ export class SessionStorage {
       const metaFiles = files.filter(f => f.endsWith('.meta.json'));
 
       for (const filePath of metaFiles) {
-        // Extract ID from path: .claude/sessions/{id}.meta.json
+        // Extract ID from path: .codian/sessions/{id}.meta.json
         const fileName = filePath.split('/').pop() || '';
         const id = fileName.replace('.meta.json', '');
 

@@ -2,12 +2,12 @@
  * Migration Constants - Shared constants for storage migration.
  *
  * Single source of truth for fields that need to be migrated
- * from settings.json to claudian-settings.json.
+ * from settings.json to codian-settings.json.
  */
 
 /**
  * Fields that are Claudian-specific and should NOT be in CC settings.json.
- * These are migrated to claudian-settings.json and stripped from settings.json.
+ * These are migrated to codian-settings.json and stripped from settings.json.
  *
  * IMPORTANT: Keep this list updated when adding new Claudian settings!
  */

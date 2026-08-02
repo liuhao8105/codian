@@ -273,12 +273,12 @@ describe('McpStorage', () => {
   });
 
   describe('load/save', () => {
-    it('should preserve unknown top-level keys and merge _claudian', async () => {
+    it('should preserve unknown top-level keys and merge _codian', async () => {
       const initial = {
         mcpServers: {
           legacy: { command: 'node' },
         },
-        _claudian: {
+        _codian: {
           servers: {
             legacy: { enabled: false },
           },
@@ -313,7 +313,7 @@ describe('McpStorage', () => {
           headers: { Authorization: 'Bearer token' },
         },
       });
-      expect(saved._claudian).toEqual({
+      expect(saved._codian).toEqual({
         extra: { keep: true },
         servers: {
           'new-server': {
@@ -325,12 +325,12 @@ describe('McpStorage', () => {
       });
     });
 
-    it('should keep existing _claudian fields when metadata is defaulted', async () => {
+    it('should keep existing _codian fields when metadata is defaulted', async () => {
       const initial = {
         mcpServers: {
           legacy: { command: 'node' },
         },
-        _claudian: {
+        _codian: {
           extra: { keep: true },
         },
       };
@@ -348,7 +348,7 @@ describe('McpStorage', () => {
       await storage.save(servers);
 
       const saved = JSON.parse(files.get(MCP_CONFIG_PATH) || '{}') as Record<string, unknown>;
-      expect(saved._claudian).toEqual({ extra: { keep: true } });
+      expect(saved._codian).toEqual({ extra: { keep: true } });
       expect(saved.mcpServers).toEqual({ 'default-meta': { command: 'npx' } });
     });
 
@@ -358,7 +358,7 @@ describe('McpStorage', () => {
           stdio: { command: 'npx' },
           remote: { type: 'sse', url: 'http://localhost:3000/sse' },
         },
-        _claudian: {
+        _codian: {
           servers: {
             stdio: { enabled: false, contextSaving: false, description: 'Local tools' },
           },
@@ -386,7 +386,7 @@ describe('McpStorage', () => {
           valid: { command: 'npx' },
           invalid: { foo: 'bar' },
         },
-        _claudian: {
+        _codian: {
           servers: {
             invalid: { enabled: false },
           },
@@ -402,12 +402,12 @@ describe('McpStorage', () => {
       expect(servers[0].contextSaving).toBe(true);
     });
 
-    it('should remove _claudian when only servers metadata exists', async () => {
+    it('should remove _codian when only servers metadata exists', async () => {
       const initial = {
         mcpServers: {
           legacy: { command: 'node' },
         },
-        _claudian: {
+        _codian: {
           servers: {
             legacy: { enabled: false },
           },
@@ -427,7 +427,7 @@ describe('McpStorage', () => {
       await storage.save(servers);
 
       const saved = JSON.parse(files.get(MCP_CONFIG_PATH) || '{}') as Record<string, unknown>;
-      expect(saved._claudian).toBeUndefined();
+      expect(saved._codian).toBeUndefined();
     });
   });
 });

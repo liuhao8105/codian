@@ -1,7 +1,7 @@
 /**
- * CCSettingsStorage - Handles CC-compatible settings.json read/write.
+ * RuntimeSettingsStorage - Handles CC-compatible settings.json read/write.
  *
- * Manages the .claude/settings.json file in Claude Code compatible format.
+ * Manages the .codian/settings.json file in Claude Code compatible format.
  * This file is shared with Claude Code CLI for interoperability.
  *
  * Only CC-compatible fields are stored here:
@@ -9,7 +9,7 @@
  * - model (optional override)
  * - env (optional environment variables)
  *
- * Claudian-specific settings go in claudian-settings.json.
+ * Claudian-specific settings go in codian-settings.json.
  */
 
 import type {
@@ -27,7 +27,7 @@ import { CLAUDIAN_ONLY_FIELDS } from './migrationConstants';
 import type { VaultFileAdapter } from './VaultFileAdapter';
 
 /** Path to CC settings file relative to vault root. */
-export const CC_SETTINGS_PATH = '.claude/settings.json';
+export const RUNTIME_SETTINGS_PATH = '.codian/settings.json';
 
 /** Schema URL for CC settings. */
 const CC_SETTINGS_SCHEMA = 'https://json.schemastore.org/claude-code-settings.json';
@@ -86,20 +86,20 @@ function normalizePermissions(permissions: unknown): CCPermissions {
  * read-modify-write pattern. Concurrent calls may race and lose updates.
  * In practice this is fine since user interactions are sequential.
  */
-export class CCSettingsStorage {
+export class RuntimeSettingsStorage {
   constructor(private adapter: VaultFileAdapter) { }
 
   /**
-   * Load CC settings from .claude/settings.json.
+   * Load CC settings from .codian/settings.json.
    * Returns default settings if file doesn't exist.
    * Throws if file exists but cannot be read or parsed.
    */
   async load(): Promise<CCSettings> {
-    if (!(await this.adapter.exists(CC_SETTINGS_PATH))) {
+    if (!(await this.adapter.exists(RUNTIME_SETTINGS_PATH))) {
       return { ...DEFAULT_CC_SETTINGS };
     }
 
-    const content = await this.adapter.read(CC_SETTINGS_PATH);
+    const content = await this.adapter.read(RUNTIME_SETTINGS_PATH);
     const stored = JSON.parse(content) as Record<string, unknown>;
 
     // Check for legacy format and migrate if needed
@@ -123,7 +123,7 @@ export class CCSettingsStorage {
   }
 
   /**
-   * Save CC settings to .claude/settings.json.
+   * Save CC settings to .codian/settings.json.
    * Preserves unknown fields for CC compatibility.
    *
    * @param stripClaudianFields - If true, remove Claudian-only fields (only during migration)
@@ -131,9 +131,9 @@ export class CCSettingsStorage {
   async save(settings: CCSettings, stripClaudianFields: boolean = false): Promise<void> {
     // Load existing to preserve CC-specific fields we don't manage
     let existing: Record<string, unknown> = {};
-    if (await this.adapter.exists(CC_SETTINGS_PATH)) {
+    if (await this.adapter.exists(RUNTIME_SETTINGS_PATH)) {
       try {
-        const content = await this.adapter.read(CC_SETTINGS_PATH);
+        const content = await this.adapter.read(RUNTIME_SETTINGS_PATH);
         const parsed = JSON.parse(content) as Record<string, unknown>;
 
         // Only strip Claudian-only fields during explicit migration
@@ -168,11 +168,11 @@ export class CCSettingsStorage {
     }
 
     const content = JSON.stringify(merged, null, 2);
-    await this.adapter.write(CC_SETTINGS_PATH, content);
+    await this.adapter.write(RUNTIME_SETTINGS_PATH, content);
   }
 
   async exists(): Promise<boolean> {
-    return this.adapter.exists(CC_SETTINGS_PATH);
+    return this.adapter.exists(RUNTIME_SETTINGS_PATH);
   }
 
   async getPermissions(): Promise<CCPermissions> {
@@ -232,7 +232,7 @@ export class CCSettingsStorage {
 
   /**
    * Set plugin enabled state.
-   * Writes to .claude/settings.json so CLI respects the state.
+   * Writes to .codian/settings.json so CLI respects the state.
    *
    * @param pluginId - Full plugin ID (e.g., "plugin-name@source")
    * @param enabled - true to enable, false to disable

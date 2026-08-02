@@ -2,8 +2,8 @@
  * Agent load order (earlier sources take precedence for duplicate IDs):
  * 0. Built-in agents: dynamically provided via SDK init message
  * 1. Plugin agents: {installPath}/agents/*.md (namespaced as plugin-name:agent-name)
- * 2. Vault agents: {vaultPath}/.claude/agents/*.md
- * 3. Global agents: ~/.claude/agents/*.md
+ * 2. Vault agents: {vaultPath}/.codian/agents/*.md
+ * 3. Global agents: ~/.codian/agents/*.md
  */
 
 import * as fs from 'fs';
@@ -14,8 +14,8 @@ import type { PluginManager } from '../plugins';
 import type { AgentDefinition } from '../types';
 import { buildAgentFromFrontmatter, parseAgentFile } from './AgentStorage';
 
-const GLOBAL_AGENTS_DIR = path.join(os.homedir(), '.claude', 'agents');
-const VAULT_AGENTS_DIR = '.claude/agents';
+const GLOBAL_AGENTS_DIR = path.join(os.homedir(), '.codian', 'agents');
+const VAULT_AGENTS_DIR = '.codian/agents';
 const PLUGIN_AGENTS_DIR = 'agents';
 
 // Fallback built-in agent names for before the init message arrives.

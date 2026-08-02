@@ -51,7 +51,7 @@ describe('run-jest Node compatibility', () => {
 
     expect(spawnedArgs).not.toHaveLength(0);
     expect(spawnedArgs[0]).not.toContain(
-      '--localstorage-file=/tmp/claudian-localstorage'
+      '--localstorage-file=/tmp/codian-localstorage'
     );
   });
 });

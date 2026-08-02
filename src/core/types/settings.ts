@@ -170,7 +170,7 @@ export function createPermissionRule(rule: string): PermissionRule {
 
 /**
  * CC-compatible permissions object.
- * Stored in .claude/settings.json for interoperability with Claude Code CLI.
+ * Stored in .codian/settings.json for interoperability with Claude Code CLI.
  */
 export interface CCPermissions {
   /** Rules that auto-approve tool actions */
@@ -186,7 +186,7 @@ export interface CCPermissions {
 }
 
 /**
- * CC-compatible settings stored in .claude/settings.json.
+ * CC-compatible settings stored in .codian/settings.json.
  * These settings are shared with Claude Code CLI.
  */
 export interface CCSettings {
@@ -230,7 +230,7 @@ export interface SlashCommand {
   model?: AgentModel;          // Override model for this command
   content: string;             // Prompt template with placeholders
   source?: SlashCommandSource; // Origin of the command (builtin, user, plugin, sdk)
-  // Skill fields (from .claude/skills/ definitions)
+  // Skill fields (from .codian/skills/ definitions)
   disableModelInvocation?: boolean;  // Disable model invocation for this skill
   userInvocable?: boolean;           // Whether user can invoke this skill directly
   context?: 'fork';                  // Subagent execution mode
@@ -249,7 +249,7 @@ export interface KeyboardNavigationSettings {
 export type TabBarPosition = 'input' | 'header';
 
 /**
- * Codian-specific settings stored in .claude/claudian-settings.json.
+ * Codian-specific settings stored in .codian/codian-settings.json.
  * These settings are NOT shared with Claude Code CLI.
  */
 export interface CodianSettings {
@@ -311,7 +311,7 @@ export interface CodianSettings {
   lastCustomModel?: AgentModel;
   lastEnvHash?: string;
 
-  // Slash commands (loaded separately from .claude/commands/)
+  // Slash commands (loaded separately from .codian/commands/)
   slashCommands: SlashCommand[];
 
   // UI preferences

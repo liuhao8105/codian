@@ -2,18 +2,18 @@
  * StorageService - Main coordinator for distributed storage system.
  *
  * Manages:
- * - CC settings in .claude/settings.json (CC-compatible, shareable)
- * - Claudian settings in .claude/claudian-settings.json (Claudian-specific)
- * - Slash commands in .claude/commands/*.md
- * - Chat sessions in .claude/sessions/*.jsonl
- * - MCP configs in .claude/mcp.json
- * - Local memories in .claude/local-memory/
+ * - CC settings in .codian/settings.json (CC-compatible, shareable)
+ * - Claudian settings in .codian/codian-settings.json (Claudian-specific)
+ * - Slash commands in .codian/commands/*.md
+ * - Chat sessions in .codian/sessions/*.jsonl
+ * - MCP configs in .codian/mcp.json
+ * - Local memories in .codian/local-memory/
  *
  * Handles migration from legacy formats:
  * - Old settings.json with Claudian fields → split into CC + Claudian files
- * - Old .claudian/claudian-settings.json → .claude/claudian-settings.json
+ * - Old .codian/codian-settings.json → .codian/codian-settings.json
  * - Old permissions array → CC permissions object
- * - data.json state → claudian-settings.json
+ * - data.json state → codian-settings.json
  */
 
 import type { App, Plugin } from 'obsidian';
@@ -42,13 +42,12 @@ import {
   legacyPermissionsToCCPermissions,
 } from '../types';
 import { AGENTS_PATH, AgentVaultStorage } from './AgentVaultStorage';
-import { CC_SETTINGS_PATH, CCSettingsStorage, isLegacyPermissionsFormat } from './CCSettingsStorage';
 import {
   CODIAN_SETTINGS_PATH,
   CodianSettingsStorage,
   normalizeBlockedCommands,
   type StoredCodianSettings,
-} from './ClaudianSettingsStorage';
+} from './CodianSettingsStorage';
 import { LOCAL_MEMORY_PATH, LocalMemoryStorage } from './LocalMemoryStorage';
 import { McpStorage } from './McpStorage';
 import {
@@ -57,19 +56,20 @@ import {
   mergeEnvironmentVariables,
 } from './migrationConstants';
 import { RecoveryJournal } from './RecoveryJournal';
+import { isLegacyPermissionsFormat,RUNTIME_SETTINGS_PATH, RuntimeSettingsStorage } from './RuntimeSettingsStorage';
 import { SESSIONS_PATH, SessionStorage } from './SessionStorage';
 import { SKILLS_PATH, SkillStorage } from './SkillStorage';
 import { COMMANDS_PATH, SlashCommandStorage } from './SlashCommandStorage';
 import { VaultFileAdapter } from './VaultFileAdapter';
 
 /** Base path for all Claudian storage. */
-export const CLAUDE_PATH = '.claude';
+export const CODIAN_ROOT = '.codian';
 
 /** Legacy Claudian/Codian settings path used by older builds. */
-export const LEGACY_CLAUDIAN_SETTINGS_PATH = '.claudian/claudian-settings.json';
+export const LEGACY_CLAUDIAN_SETTINGS_PATH = '.codian/codian-settings.json';
 
 /** Legacy settings path (now CC settings). */
-export const SETTINGS_PATH = CC_SETTINGS_PATH;
+export const SETTINGS_PATH = RUNTIME_SETTINGS_PATH;
 
 /**
  * Combined settings for the application.
@@ -79,7 +79,7 @@ export interface CombinedSettings {
   /** CC-compatible settings (permissions, etc.) */
   cc: CCSettings;
   /** Claudian-specific settings */
-  claudian: StoredCodianSettings;
+  codian: StoredCodianSettings;
 }
 
 export interface CodianSecretStorageStatus extends SecretStorageStatus {
@@ -136,7 +136,7 @@ interface LegacyDataJson {
 // CLAUDIAN_ONLY_FIELDS is imported from ./migrationConstants
 
 export class StorageService {
-  readonly ccSettings: CCSettingsStorage;
+  readonly ccSettings: RuntimeSettingsStorage;
   readonly codianSettings: CodianSettingsStorage;
   readonly commands: SlashCommandStorage;
   readonly skills: SkillStorage;
@@ -157,7 +157,7 @@ export class StorageService {
     this.app = plugin.app;
     this.secretStorage = secretStorage;
     this.adapter = new VaultFileAdapter(this.app);
-    this.ccSettings = new CCSettingsStorage(this.adapter);
+    this.ccSettings = new RuntimeSettingsStorage(this.adapter);
     this.codianSettings = new CodianSettingsStorage(this.adapter);
     this.commands = new SlashCommandStorage(this.adapter);
     this.skills = new SkillStorage(this.adapter);
@@ -173,13 +173,13 @@ export class StorageService {
     await this.runMigrations();
 
     const cc = await this.ccSettings.load();
-    let claudian = await this.codianSettings.load();
+    let codian = await this.codianSettings.load();
     if (!(await this.adapter.exists(CODIAN_SETTINGS_PATH))) {
-      await this.codianSettings.save(claudian);
+      await this.codianSettings.save(codian);
     }
-    claudian = await this.hydrateAndMigrateSecrets(claudian);
+    codian = await this.hydrateAndMigrateSecrets(codian);
 
-    return { cc, claudian };
+    return { cc, codian };
   }
 
   async getSecretStorageStatus(): Promise<CodianSecretStorageStatus> {
@@ -233,7 +233,7 @@ export class StorageService {
       const hasState = this.hasStateToMigrate(dataJson);
       const hasLegacyContent = this.hasLegacyContentToMigrate(dataJson);
 
-      // Migrate data.json state to claudian-settings.json
+      // Migrate data.json state to codian-settings.json
       if (hasState) {
         await this.migrateFromDataJson(dataJson);
       }
@@ -268,7 +268,7 @@ export class StorageService {
   }
 
   /**
-   * Migrate settings written by older builds under .claudian/.
+   * Migrate settings written by older builds under .codian/.
    *
    * This keeps user-configured memory/rules paths when the plugin moves to the
    * .claude-compatible storage layout.
@@ -293,13 +293,13 @@ export class StorageService {
    * Migrate from old settings.json (with Claudian fields) to split format.
    *
    * Handles:
-   * - Legacy Claudian fields (userName, model, etc.) → claudian-settings.json
+   * - Legacy Claudian fields (userName, model, etc.) → codian-settings.json
    * - Legacy permissions array → CC permissions object
    * - CC env object → Claudian environmentVariables string
    * - Preserves existing CC permissions if already in CC format
    */
   private async migrateFromOldSettingsJson(): Promise<void> {
-    const content = await this.adapter.read(CC_SETTINGS_PATH);
+    const content = await this.adapter.read(RUNTIME_SETTINGS_PATH);
     const oldSettings = JSON.parse(content) as LegacySettingsJson;
 
     const hasClaudianFields = Array.from(CLAUDIAN_ONLY_FIELDS).some(
@@ -356,7 +356,7 @@ export class StorageService {
     // Verify Claudian settings were saved
     const savedClaudian = await this.codianSettings.load();
     if (!savedClaudian || savedClaudian.userName === undefined) {
-      throw new Error('Failed to verify claudian-settings.json was saved correctly');
+      throw new Error('Failed to verify codian-settings.json was saved correctly');
     }
 
     // Handle permissions: convert legacy format OR preserve existing CC format
@@ -388,20 +388,20 @@ export class StorageService {
   }
 
   private async migrateFromDataJson(dataJson: LegacyDataJson): Promise<void> {
-    const claudian = await this.codianSettings.load();
+    const codian = await this.codianSettings.load();
 
-    // Only migrate if not already set (claudian-settings.json takes precedence)
-    if (dataJson.lastEnvHash !== undefined && !claudian.lastEnvHash) {
-      claudian.lastEnvHash = dataJson.lastEnvHash;
+    // Only migrate if not already set (codian-settings.json takes precedence)
+    if (dataJson.lastEnvHash !== undefined && !codian.lastEnvHash) {
+      codian.lastEnvHash = dataJson.lastEnvHash;
     }
-    if (dataJson.lastClaudeModel !== undefined && !claudian.lastCodexModel) {
-      claudian.lastCodexModel = dataJson.lastClaudeModel;
+    if (dataJson.lastClaudeModel !== undefined && !codian.lastCodexModel) {
+      codian.lastCodexModel = dataJson.lastClaudeModel;
     }
-    if (dataJson.lastCustomModel !== undefined && !claudian.lastCustomModel) {
-      claudian.lastCustomModel = dataJson.lastCustomModel;
+    if (dataJson.lastCustomModel !== undefined && !codian.lastCustomModel) {
+      codian.lastCustomModel = dataJson.lastCustomModel;
     }
 
-    await this.codianSettings.save(claudian);
+    await this.codianSettings.save(codian);
   }
 
   private async migrateLegacyDataJsonContent(dataJson: LegacyDataJson): Promise<{ hadErrors: boolean }> {
@@ -471,7 +471,7 @@ export class StorageService {
   }
 
   async ensureDirectories(): Promise<void> {
-    await this.adapter.ensureFolder(CLAUDE_PATH);
+    await this.adapter.ensureFolder(CODIAN_ROOT);
     await this.adapter.ensureFolder(COMMANDS_PATH);
     await this.adapter.ensureFolder(SKILLS_PATH);
     await this.adapter.ensureFolder(SESSIONS_PATH);
@@ -543,7 +543,7 @@ export class StorageService {
   }
 
   /**
-   * Get legacy activeConversationId from storage (claudian-settings.json or data.json).
+   * Get legacy activeConversationId from storage (codian-settings.json or data.json).
    */
   async getLegacyActiveConversationId(): Promise<string | null> {
     const fromSettings = await this.codianSettings.getLegacyActiveConversationId();

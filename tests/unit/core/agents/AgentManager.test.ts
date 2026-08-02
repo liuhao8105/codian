@@ -74,8 +74,8 @@ Body.`;
 describe('AgentManager', () => {
   const VAULT_PATH = '/test/vault';
   const HOME_DIR = '/home/user';
-  const GLOBAL_AGENTS_DIR = path.join(HOME_DIR, '.claude', 'agents');
-  const VAULT_AGENTS_DIR = path.join(VAULT_PATH, '.claude/agents');
+  const GLOBAL_AGENTS_DIR = path.join(HOME_DIR, '.codian', 'agents');
+  const VAULT_AGENTS_DIR = path.join(VAULT_PATH, '.codian/agents');
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -560,7 +560,7 @@ describe('AgentManager', () => {
       // Vault has an agent file matching an init agent name
       mockFs.existsSync.mockReturnValue(true);
       (mockFs.readdirSync as jest.Mock).mockImplementation((dir: string) => {
-        if (dir.includes('.claude/agents')) {
+        if (dir.includes('.codian/agents')) {
           return [createMockDirent('custom.md', true)];
         }
         return [];

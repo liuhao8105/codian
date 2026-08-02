@@ -55,7 +55,7 @@ export interface McpConfigFile {
 
 /** Extended config file with Codian metadata. */
 export interface CodianMcpConfigFile extends McpConfigFile {
-  _claudian?: {
+  _codian?: {
     /** Per-server Codian-specific settings. */
     servers: Record<
       string,

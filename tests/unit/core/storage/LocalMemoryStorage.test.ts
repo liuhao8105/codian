@@ -31,7 +31,7 @@ describe('LocalMemoryStorage', () => {
 
     await storage.add('用户喜欢简洁回答', { tags: ['preference'] });
 
-    const content = files.get('.claude/local-memory/memories.jsonl') ?? '';
+    const content = files.get('.codian/local-memory/memories.jsonl') ?? '';
     expect(content).toContain('用户喜欢简洁回答');
     expect(content).toContain('preference');
   });

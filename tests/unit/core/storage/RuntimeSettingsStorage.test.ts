@@ -1,5 +1,5 @@
 
-import { CC_SETTINGS_PATH,CCSettingsStorage } from '../../../../src/core/storage/CCSettingsStorage';
+import { RUNTIME_SETTINGS_PATH,RuntimeSettingsStorage } from '../../../../src/core/storage/RuntimeSettingsStorage';
 import type { VaultFileAdapter } from '../../../../src/core/storage/VaultFileAdapter';
 import { createPermissionRule } from '../../../../src/core/types';
 
@@ -9,12 +9,12 @@ const mockAdapter = {
     write: jest.fn(),
 } as unknown as jest.Mocked<VaultFileAdapter>;
 
-describe('CCSettingsStorage', () => {
-    let storage: CCSettingsStorage;
+describe('RuntimeSettingsStorage', () => {
+    let storage: RuntimeSettingsStorage;
 
     beforeEach(() => {
         jest.clearAllMocks();
-        storage = new CCSettingsStorage(mockAdapter);
+        storage = new RuntimeSettingsStorage(mockAdapter);
     });
 
     describe('load', () => {
@@ -87,7 +87,7 @@ describe('CCSettingsStorage', () => {
             await storage.removeRule(createPermissionRule('rule1'));
 
             expect(mockAdapter.write).toHaveBeenCalledWith(
-                CC_SETTINGS_PATH,
+                RUNTIME_SETTINGS_PATH,
                 expect.stringContaining('"allow": []')
             );
         });
