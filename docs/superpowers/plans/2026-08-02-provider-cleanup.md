@@ -35,6 +35,10 @@
 - Produces: `migrateVaultRoot(options: VaultRootMigrationOptions): Promise<VaultRootMigrationResult>`
 - `VaultRootMigrationOptions` contains `vaultRoot`, `sourceName`, `destinationName`, and `receiptName`.
 - `VaultRootMigrationResult` contains `status: 'migrated' | 'already-migrated' | 'not-needed'`, `fileCount`, `totalBytes`, and `digest`.
+- The bridge copies user payload directories and neutral Codian files, transforms
+  plugin-owned settings/MCP JSON keys, and excludes `.git`, the retired plugin
+  manifest directory, and retired settings backups from the active destination.
+  The excluded entries remain in the external full backup made in Task 7.
 - The bridge is temporary and must be deleted in Task 7 after live Stage A validation.
 
 - [ ] **Step 1: Write failing migration tests**
@@ -71,6 +75,21 @@ it('rejects symbolic links before promotion', async () => {
   await expect(migrateVaultRoot(options)).rejects.toThrow('unsupported entry');
   await expect(fs.stat(destination)).rejects.toMatchObject({ code: 'ENOENT' });
 });
+
+it('keeps payload bytes but filters retired repository and plugin metadata', async () => {
+  await writeFixture(source, {
+    'skills/example/SKILL.md': 'user payload',
+    '.git/config': 'external history metadata',
+    '.legacy-plugin/plugin.json': '{}',
+    'retired-settings.json.bak': '{}',
+  });
+  await migrateVaultRoot(options);
+  expect(await fs.readFile(path.join(destination, 'skills/example/SKILL.md'), 'utf8'))
+    .toBe('user payload');
+  expect(await pathExists(path.join(destination, '.git'))).toBe(false);
+  expect(await pathExists(path.join(destination, '.legacy-plugin'))).toBe(false);
+  expect(await pathExists(path.join(destination, 'retired-settings.json.bak'))).toBe(false);
+});
 ```
 
 - [ ] **Step 2: Run tests and verify RED**
@@ -93,8 +112,14 @@ Expected: PASS with all migration cases green.
 
 ```ts
 it('runs the vault-root bridge before StorageService initialization', async () => {
+  const events: string[] = [];
+  migrateVaultRoot.mockImplementation(async () => { events.push('migration'); });
+  StorageService.prototype.initialize.mockImplementation(async () => {
+    events.push('storage');
+    return defaultCombinedSettings;
+  });
   await plugin.onload();
-  expect(migrateVaultRoot).toHaveBeenCalledBefore(StorageService.prototype.initialize as jest.Mock);
+  expect(events.slice(0, 2)).toEqual(['migration', 'storage']);
 });
 ```
 
@@ -347,7 +372,15 @@ Expected: FAIL because current paths use the old root.
 
 - [ ] **Step 3: Rename storage classes and change every live path**
 
-Keep data formats stable unless a field itself encodes retired provider support. Rename plugin-owned metadata keys such as `_claudian` to `_codian` in Stage A after copying.
+Keep data formats stable unless a field itself encodes retired provider support.
+Stage A must perform explicit structured transformations:
+
+- rename the MCP metadata key to `_codian` without changing `mcpServers`;
+- map the configured executable path only when it is a valid Codex binary;
+- map the last selected model to the neutral Codex field;
+- remove the user-level legacy-settings and browser-compatibility switches;
+- omit retired settings backup filenames from the active destination while the
+  external full backup retains them.
 
 - [ ] **Step 4: Replace global legacy discovery with Codian/Codex sources**
 
@@ -465,7 +498,10 @@ Expected: all user/third-party payload files match byte-for-byte; only documente
 
 - [ ] **Step 6: Move the source directory to external backup**
 
-After validation, move the source directory to the exact external timestamped backup path. Confirm the active vault contains `.codian` and no old root. This move is recoverable and must not erase the external copy.
+After validation, quit Obsidian, move the source directory to the exact external
+timestamped backup path, and relaunch only after the move completes. Confirm the
+active vault contains `.codian` and no old root. This move is recoverable and
+must not erase the external copy.
 
 - [ ] **Step 7: Record evidence in the task log, not the final source tree**
 
