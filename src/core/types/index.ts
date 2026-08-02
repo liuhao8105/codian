@@ -10,7 +10,7 @@ export {
   type SessionMetadata,
   type StreamChunk,
   type UsageInfo,
-  VIEW_TYPE_CLAUDIAN,
+  VIEW_TYPE_CODIAN,
 } from './chat';
 
 // Model types
@@ -107,15 +107,6 @@ export {
   type McpStdioServerConfig,
   type ParsedMcpConfig,
 } from './mcp';
-
-// Plugin types
-export {
-  type ClaudianPlugin,
-  type CodianPluginInfo,
-  type InstalledPluginEntry,
-  type InstalledPluginsFile,
-  type PluginScope,
-} from './plugins';
 
 // Agent types
 export {

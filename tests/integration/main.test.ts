@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 
 import { TOOL_SUBAGENT } from '@/core/tools';
-import { DEFAULT_SETTINGS, VIEW_TYPE_CLAUDIAN } from '@/core/types';
+import { DEFAULT_SETTINGS, VIEW_TYPE_CODIAN } from '@/core/types';
 import * as sdkSession from '@/utils/sdkSession';
 
 // Mock fs for ClaudianService
@@ -122,7 +122,7 @@ describe('ClaudianPlugin', () => {
       await plugin.onload();
 
       expect((plugin.registerView as jest.Mock)).toHaveBeenCalledWith(
-        VIEW_TYPE_CLAUDIAN,
+        VIEW_TYPE_CODIAN,
         expect.any(Function)
       );
     });
@@ -226,7 +226,7 @@ describe('ClaudianPlugin', () => {
 
       expect(mockApp.workspace.getRightLeaf).toHaveBeenCalledWith(false);
       expect(mockRightLeaf.setViewState).toHaveBeenCalledWith({
-        type: VIEW_TYPE_CLAUDIAN,
+        type: VIEW_TYPE_CODIAN,
         active: true,
       });
     });
@@ -255,7 +255,7 @@ describe('ClaudianPlugin', () => {
       expect(mockApp.workspace.getLeaf).toHaveBeenCalledWith('tab');
       expect(mockApp.workspace.getRightLeaf).not.toHaveBeenCalled();
       expect(mockMainLeaf.setViewState).toHaveBeenCalledWith({
-        type: VIEW_TYPE_CLAUDIAN,
+        type: VIEW_TYPE_CODIAN,
         active: true,
       });
     });

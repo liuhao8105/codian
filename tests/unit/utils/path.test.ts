@@ -376,25 +376,25 @@ describe('getPathAccessType', () => {
     expect(getPathAccessType(vaultPath, [], [], vaultPath)).toBe('vault');
   });
 
-  it('returns vault for ~/.claude safe subdirectory', () => {
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'settings.json'), [], [], vaultPath)).toBe('vault');
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'sessions', 'abc.jsonl'), [], [], vaultPath)).toBe('vault');
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'projects', 'test'), [], [], vaultPath)).toBe('vault');
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'commands', 'cmd.md'), [], [], vaultPath)).toBe('vault');
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'agents', 'agent.md'), [], [], vaultPath)).toBe('vault');
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'skills', 'skill'), [], [], vaultPath)).toBe('vault');
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'plans', 'plan.md'), [], [], vaultPath)).toBe('vault');
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'mcp.json'), [], [], vaultPath)).toBe('vault');
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'codian-settings.json'), [], [], vaultPath)).toBe('vault');
+  it('returns vault for ~/.codian safe subdirectory', () => {
+    expect(getPathAccessType(path.join(os.homedir(), '.codian', 'settings.json'), [], [], vaultPath)).toBe('vault');
+    expect(getPathAccessType(path.join(os.homedir(), '.codian', 'sessions', 'abc.jsonl'), [], [], vaultPath)).toBe('vault');
+    expect(getPathAccessType(path.join(os.homedir(), '.codian', 'projects', 'test'), [], [], vaultPath)).toBe('vault');
+    expect(getPathAccessType(path.join(os.homedir(), '.codian', 'commands', 'cmd.md'), [], [], vaultPath)).toBe('vault');
+    expect(getPathAccessType(path.join(os.homedir(), '.codian', 'agents', 'agent.md'), [], [], vaultPath)).toBe('vault');
+    expect(getPathAccessType(path.join(os.homedir(), '.codian', 'skills', 'skill'), [], [], vaultPath)).toBe('vault');
+    expect(getPathAccessType(path.join(os.homedir(), '.codian', 'plans', 'plan.md'), [], [], vaultPath)).toBe('vault');
+    expect(getPathAccessType(path.join(os.homedir(), '.codian', 'mcp.json'), [], [], vaultPath)).toBe('vault');
+    expect(getPathAccessType(path.join(os.homedir(), '.codian', 'codian-settings.json'), [], [], vaultPath)).toBe('vault');
   });
 
-  it('returns context (read-only) for unknown ~/.claude paths', () => {
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'credentials'), [], [], vaultPath)).toBe('context');
-    expect(getPathAccessType(path.join(os.homedir(), '.claude', 'secrets.json'), [], [], vaultPath)).toBe('context');
+  it('returns context (read-only) for unknown ~/.codian paths', () => {
+    expect(getPathAccessType(path.join(os.homedir(), '.codian', 'credentials'), [], [], vaultPath)).toBe('context');
+    expect(getPathAccessType(path.join(os.homedir(), '.codian', 'secrets.json'), [], [], vaultPath)).toBe('context');
   });
 
-  it('returns context for ~/.claude directory itself', () => {
-    expect(getPathAccessType(path.join(os.homedir(), '.claude'), [], [], vaultPath)).toBe('context');
+  it('returns context for ~/.codian directory itself', () => {
+    expect(getPathAccessType(path.join(os.homedir(), '.codian'), [], [], vaultPath)).toBe('context');
   });
 
   it('returns context for path in context paths only', () => {

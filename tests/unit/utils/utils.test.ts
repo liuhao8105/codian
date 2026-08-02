@@ -771,23 +771,23 @@ describe('utils.ts', () => {
       expect(getPathAccessType('/tmp/shared/file.md', allowedContextPaths, allowedExportPaths, '/vault')).toBe('readwrite');
     });
 
-    it('should allow vault access to safe ~/.claude/ subdirectories', () => {
+    it('should allow vault access to safe ~/.codian/ subdirectories', () => {
       jest.spyOn(os, 'homedir').mockReturnValue('/home/test');
       const realpathSpy = jest.spyOn(fs, 'realpathSync').mockImplementation((p: any) => String(p) as any);
       (fs.realpathSync as any).native = realpathSpy;
 
-      expect(getPathAccessType('/home/test/.claude', [], [], '/vault')).toBe('context');
-      expect(getPathAccessType('/home/test/.claude/settings.json', [], [], '/vault')).toBe('vault');
-      expect(getPathAccessType('/home/test/.claude/hooks/pre-commit.sh', [], [], '/vault')).toBe('context');
+      expect(getPathAccessType('/home/test/.codian', [], [], '/vault')).toBe('context');
+      expect(getPathAccessType('/home/test/.codian/settings.json', [], [], '/vault')).toBe('vault');
+      expect(getPathAccessType('/home/test/.codian/hooks/pre-commit.sh', [], [], '/vault')).toBe('context');
     });
 
-    it('should allow access to ~/.claude/ via tilde expansion', () => {
+    it('should allow access to ~/.codian/ via tilde expansion', () => {
       jest.spyOn(os, 'homedir').mockReturnValue('/home/test');
       const realpathSpy = jest.spyOn(fs, 'realpathSync').mockImplementation((p: any) => String(p) as any);
       (fs.realpathSync as any).native = realpathSpy;
 
-      expect(getPathAccessType('~/.claude', [], [], '/vault')).toBe('context');
-      expect(getPathAccessType('~/.claude/sessions/abc.jsonl', [], [], '/vault')).toBe('vault');
+      expect(getPathAccessType('~/.codian', [], [], '/vault')).toBe('context');
+      expect(getPathAccessType('~/.codian/sessions/abc.jsonl', [], [], '/vault')).toBe('vault');
     });
 
     it('should block other home directory paths', () => {
@@ -916,10 +916,10 @@ describe('utils.ts', () => {
       )).toBe('readwrite');
     });
 
-    it('treats ~/.claude paths as vault access after normalization', () => {
+    it('treats ~/.codian paths as vault access after normalization', () => {
       jest.spyOn(os, 'homedir').mockReturnValue('C:\\Users\\test');
       expect(getPathAccessType(
-        'C:\\Users\\test\\.claude\\settings.json',
+        'C:\\Users\\test\\.codian\\settings.json',
         [],
         [],
         'C:\\Users\\test\\vault'

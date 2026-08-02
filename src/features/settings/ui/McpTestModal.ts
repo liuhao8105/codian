@@ -8,13 +8,13 @@ function formatToggleError(error: unknown): string {
 
   const msg = error.message.toLowerCase();
   if (msg.includes('permission') || msg.includes('eacces')) {
-    return 'Permission denied. Check the vault .claude folder permissions.';
+    return 'Permission denied. Check the vault .codian folder permissions.';
   }
   if (msg.includes('enospc') || msg.includes('disk full') || msg.includes('no space')) {
     return 'Disk full. Free up space and try again.';
   }
   if (msg.includes('json') || msg.includes('syntax')) {
-    return 'Config file corrupted. Check the vault .claude/mcp.json';
+    return 'Config file corrupted. Check the vault .codian/mcp.json';
   }
   return error.message || 'Failed to update tool setting';
 }

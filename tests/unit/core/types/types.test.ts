@@ -24,13 +24,13 @@ import {
   legacyPermissionToCCRule,
   parseCCPermissionRule,
   resolveModelWithBetas,
-  VIEW_TYPE_CLAUDIAN
+  VIEW_TYPE_CODIAN
 } from '@/core/types';
 
 describe('types.ts', () => {
-  describe('VIEW_TYPE_CLAUDIAN', () => {
+  describe('VIEW_TYPE_CODIAN', () => {
     it('should be defined as the correct view type', () => {
-      expect(VIEW_TYPE_CLAUDIAN).toBe('codian-view');
+      expect(VIEW_TYPE_CODIAN).toBe('codian-view');
     });
   });
 

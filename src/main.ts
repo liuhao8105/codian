@@ -11,7 +11,6 @@ import { Notice, Plugin } from 'obsidian';
 import { AgentManager } from './core/agents';
 import { CodianDiagnostics } from './core/diagnostics';
 import { McpServerManager } from './core/mcp';
-import { PluginManager } from './core/plugins';
 import { createAgentRuntime } from './core/runtime';
 import { CodexAppServerClient } from './core/runtime/CodexAppServerClient';
 // CODIAN_ICON_SVG kept in shared/icons.ts for reference
@@ -37,7 +36,7 @@ import {
   getCliPlatformKey,
   getHostnameKey,
   type ThinkingBudget,
-  VIEW_TYPE_CLAUDIAN,
+  VIEW_TYPE_CODIAN,
 } from './core/types';
 import {
   fetchCodexModelCatalog,
@@ -205,7 +204,6 @@ function ensureTaskToolCall(
 export default class CodianPlugin extends Plugin {
   settings: CodianSettings;
   mcpManager: McpServerManager;
-  pluginManager: PluginManager;
   agentManager: AgentManager;
   storage: StorageService;
   cliResolver: CodexCliResolver;
@@ -232,16 +230,11 @@ export default class CodianPlugin extends Plugin {
     this.mcpManager = new McpServerManager(this.storage.mcp);
     await this.mcpManager.loadServers();
 
-    // Initialize plugin manager (reads from installed_plugins.json + settings.json)
-    this.pluginManager = new PluginManager(vaultPath, this.storage.ccSettings);
-    await this.pluginManager.loadPlugins();
-
-    // Initialize agent manager (loads plugin agents from plugin install paths)
-    this.agentManager = new AgentManager(vaultPath, this.pluginManager);
+    this.agentManager = new AgentManager(vaultPath);
     await this.agentManager.loadAgents();
 
     this.registerView(
-      VIEW_TYPE_CLAUDIAN,
+      VIEW_TYPE_CODIAN,
       (leaf) => new CodianView(leaf, this)
     );
 
@@ -313,7 +306,7 @@ export default class CodianPlugin extends Plugin {
       id: 'new-tab',
       name: 'New tab',
       checkCallback: (checking: boolean) => {
-        const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_CLAUDIAN)[0];
+        const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_CODIAN)[0];
         if (!leaf) return false;
 
         const view = leaf.view as CodianView;
@@ -333,7 +326,7 @@ export default class CodianPlugin extends Plugin {
       id: 'new-session',
       name: 'New session (in current tab)',
       checkCallback: (checking: boolean) => {
-        const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_CLAUDIAN)[0];
+        const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_CODIAN)[0];
         if (!leaf) return false;
 
         const view = leaf.view as CodianView;
@@ -356,7 +349,7 @@ export default class CodianPlugin extends Plugin {
       id: 'close-current-tab',
       name: 'Close current tab',
       checkCallback: (checking: boolean) => {
-        const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_CLAUDIAN)[0];
+        const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_CODIAN)[0];
         if (!leaf) return false;
 
         const view = leaf.view as CodianView;
@@ -393,7 +386,7 @@ export default class CodianPlugin extends Plugin {
 
   async activateView() {
     const { workspace } = this.app;
-    let leaf = workspace.getLeavesOfType(VIEW_TYPE_CLAUDIAN)[0];
+    let leaf = workspace.getLeavesOfType(VIEW_TYPE_CODIAN)[0];
 
     if (!leaf) {
       const newLeaf = this.settings.openInMainTab
@@ -401,7 +394,7 @@ export default class CodianPlugin extends Plugin {
         : workspace.getRightLeaf(false);
       if (newLeaf) {
         await newLeaf.setViewState({
-          type: VIEW_TYPE_CLAUDIAN,
+          type: VIEW_TYPE_CODIAN,
           active: true,
         });
         leaf = newLeaf;
@@ -1388,7 +1381,7 @@ export default class CodianPlugin extends Plugin {
 
   /** Returns the active Codian view from workspace, if open. */
   getView(): CodianView | null {
-    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CLAUDIAN);
+    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CODIAN);
     if (leaves.length > 0) {
       return leaves[0].view as CodianView;
     }
@@ -1397,7 +1390,7 @@ export default class CodianPlugin extends Plugin {
 
   /** Returns all open Codian views in the workspace. */
   getAllViews(): CodianView[] {
-    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CLAUDIAN);
+    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CODIAN);
     return leaves.map(leaf => leaf.view as CodianView);
   }
 

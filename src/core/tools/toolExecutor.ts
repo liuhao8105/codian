@@ -299,8 +299,8 @@ function validateWriteTarget(filePath: string, vaultPath: string): ValidationRes
     }
   }
 
-  // Block hidden directories (except .claude/)
-  const hiddenDirMatch = normalized.match(/(^|\/)\.(?!claude\/)([^/]+)/);
+  // Block hidden directories except Codian-owned storage.
+  const hiddenDirMatch = normalized.match(/(^|\/)\.(?!codian\/)([^/]+)/);
   if (hiddenDirMatch) {
     return { allowed: false, reason: `不允许写入隐藏目录 ".${hiddenDirMatch[2]}/"。` };
   }

@@ -190,7 +190,7 @@ export function createVaultRestrictionHook(vaultPath: string): HookCallbackMatch
           hookSpecificOutput: {
             hookEventName: 'PreToolUse' as const,
             permissionDecision: 'deny' as const,
-            permissionDecisionReason: `Access denied: Path "${filePath}" is outside allowed paths. Inline edit is restricted to vault and ~/.claude/ directories.`,
+            permissionDecisionReason: `Access denied: Path "${filePath}" is outside allowed paths. Inline edit is restricted to vault and ~/.codian/ directories.`,
           },
         };
       },

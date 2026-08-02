@@ -729,24 +729,24 @@ export function getPathAccessType(
     return 'vault';
   }
 
-  // Allow access to specific safe subdirectories under ~/.claude/
-  const claudeDir = normalizePathForComparison(resolveRealPath(path.join(os.homedir(), '.claude')));
-  if (resolvedCandidate === claudeDir || resolvedCandidate.startsWith(claudeDir + '/')) {
+  // Allow access to specific safe subdirectories under ~/.codian/.
+  const codianDir = normalizePathForComparison(resolveRealPath(path.join(os.homedir(), '.codian')));
+  if (resolvedCandidate === codianDir || resolvedCandidate.startsWith(codianDir + '/')) {
     const safeSubdirs = ['sessions', 'projects', 'commands', 'agents', 'skills', 'plans'];
-    const safeFiles = ['mcp.json', 'settings.json', 'settings.local.json', 'codian-settings.json', 'codian-settings.json'];
-    const relativeToClaude = resolvedCandidate.slice(claudeDir.length + 1);
+    const safeFiles = ['mcp.json', 'settings.json', 'settings.local.json', 'codian-settings.json'];
+    const relativeToCodian = resolvedCandidate.slice(codianDir.length + 1);
 
-    if (!relativeToClaude) {
-      // ~/.claude/ itself — read-only
+    if (!relativeToCodian) {
+      // ~/.codian/ itself is read-only.
       return 'context';
     }
 
-    const topSegment = relativeToClaude.split('/')[0];
+    const topSegment = relativeToCodian.split('/')[0];
     if (safeSubdirs.includes(topSegment) || safeFiles.includes(topSegment)) {
       return 'vault';
     }
 
-    // Other paths under ~/.claude/ are read-only
+    // Other paths under ~/.codian/ are read-only.
     return 'context';
   }
 

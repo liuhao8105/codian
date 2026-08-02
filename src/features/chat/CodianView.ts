@@ -1,7 +1,7 @@
 import type { EventRef, WorkspaceLeaf } from 'obsidian';
 import { ItemView, Notice, setIcon } from 'obsidian';
 
-import { VIEW_TYPE_CLAUDIAN } from '../../core/types';
+import { VIEW_TYPE_CODIAN } from '../../core/types';
 import type CodianPlugin from '../../main';
 import { LOGO_SVG } from './constants';
 import { TabBar, TabManager, updatePlanModeUI } from './tabs';
@@ -66,7 +66,7 @@ export class CodianView extends ItemView {
   }
 
   getViewType(): string {
-    return VIEW_TYPE_CLAUDIAN;
+    return VIEW_TYPE_CODIAN;
   }
 
   getDisplayText(): string {
@@ -614,5 +614,3 @@ export class CodianView extends ItemView {
     return this.tabManager;
   }
 }
-
-export { CodianView as ClaudianView };
