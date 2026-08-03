@@ -78,6 +78,7 @@ function createPlugin() {
     settings: {
       currentProvider: 'codex',
       model: 'gpt-5.5',
+      thinkingBudget: 'low',
       mediaFolder: '',
       strongRulesPrompt: '',
       systemPrompt: '',
@@ -258,6 +259,47 @@ describe('CodexAgentRuntime retryable App Server errors', () => {
     expect(clientConstructor.mock.calls[0][3]).toEqual(expect.objectContaining({
       disabledMcpServers: ['blender', 'github'],
     }));
+  });
+
+  it('uses native developer instructions and the selected reasoning effort', async () => {
+    const plugin = createPlugin();
+    plugin.settings.strongRulesPrompt = 'Always use Chinese.';
+    plugin.settings.thinkingBudget = 'low';
+    const runtime = new CodexAgentRuntime(plugin, { getActiveServers: jest.fn(() => ({})) } as any);
+
+    await collectChunks(runtime.query('hello'));
+
+    const threadStart = requestMock.mock.calls.find(([method]) => method === 'thread/start');
+    const turnStart = requestMock.mock.calls.find(([method]) => method === 'turn/start');
+    const input = turnStart?.[1]?.input as Array<Record<string, unknown>>;
+
+    expect(turnStart?.[1]?.effort).toBe('low');
+    expect(threadStart?.[1]?.developerInstructions).toEqual(expect.stringContaining('Codian'));
+    expect(threadStart?.[1]?.developerInstructions).toEqual(expect.stringContaining('Always use Chinese.'));
+    expect(input[0]).toEqual(expect.objectContaining({ type: 'text', text: 'hello' }));
+  });
+
+  it('refreshes native developer instructions when resuming a thread', async () => {
+    const plugin = createPlugin();
+    plugin.settings.systemPrompt = 'Keep answers concise.';
+    const runtime = new CodexAgentRuntime(plugin, { getActiveServers: jest.fn(() => ({})) } as any);
+    runtime.setSessionId('thread-existing');
+
+    await collectChunks(runtime.query('hello'));
+
+    const threadResume = requestMock.mock.calls.find(([method]) => method === 'thread/resume');
+    expect(threadResume?.[1]?.developerInstructions).toEqual(expect.stringContaining('Keep answers concise.'));
+  });
+
+  it('does not override App Server reasoning effort when thinking is off', async () => {
+    const plugin = createPlugin();
+    plugin.settings.thinkingBudget = 'off';
+    const runtime = new CodexAgentRuntime(plugin, { getActiveServers: jest.fn(() => ({})) } as any);
+
+    await collectChunks(runtime.query('hello'));
+
+    const turnStart = requestMock.mock.calls.find(([method]) => method === 'turn/start');
+    expect(turnStart?.[1]).not.toHaveProperty('effort');
   });
 
   it.each([

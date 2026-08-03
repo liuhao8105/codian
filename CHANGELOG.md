@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.89-latency-optimization
+
+- Applied the selected Codex reasoning effort to every App Server turn instead of leaving the selector disconnected from runtime behavior.
+- Moved stable Codian rules into native App Server developer instructions for new and resumed threads.
+- Started Codex App Server from the Obsidian vault instead of the CLI installation directory, preventing unrelated project-config discovery.
+- Reduced the default fixed prompt while preserving Obsidian, path, safety, context, web, link, and image boundaries.
+- Kept model selection, conversation history, current-note behavior, MCP gating, permissions, settings, and user data unchanged.
+
 ## 1.3.87-settings-sanitization
 
 - Restricted persisted settings to the currently supported schema.
