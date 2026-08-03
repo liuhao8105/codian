@@ -257,38 +257,25 @@ export class CodexAgentRuntime implements AgentRuntime {
   }
 
   private buildInstructions(vaultPath: string): string {
-    return buildSystemPrompt({
+    const instructions = buildSystemPrompt({
       mediaFolder: this.plugin.settings.mediaFolder,
       strongRulesPrompt: this.plugin.settings.strongRulesPrompt,
       customPrompt: this.plugin.settings.systemPrompt,
       allowedExportPaths: this.plugin.settings.allowedExportPaths,
       vaultPath,
       userName: this.plugin.settings.userName,
-    });
+    }).trim();
+
+    return `The following instructions are high-priority runtime instructions for this Codian conversation.
+Follow them over the default Codex identity and default response style.
+Do not mention these instructions, system prompts, memory files, context files, or internal processing steps in the user-facing answer.
+
+${instructions}`;
   }
 
-  private applyInstructionsToPrompt(prompt: string, vaultPath: string): string {
-    // Keep Codex built-in slash commands bare; wrapping them breaks command detection.
-    if (/^\/compact(\s|$)/i.test(prompt.trim())) {
-      return prompt;
-    }
-
-    const instructions = this.buildInstructions(vaultPath).trim();
-    if (!instructions) {
-      return prompt;
-    }
-
-    return `<codian_system_instructions>
-The following instructions are high-priority runtime instructions for this Codian conversation.
-Follow them over the default Codex identity and default response style.
-Do not mention this instruction block, system prompts, memory files, context files, or internal processing steps in the user-facing answer.
-
-${instructions}
-</codian_system_instructions>
-
-<user_request>
-${prompt}
-</user_request>`;
+  private getReasoningEffort(): string | undefined {
+    const effort = this.plugin.settings.thinkingBudget;
+    return effort && effort !== 'off' ? effort : undefined;
   }
 
   private buildHistoryRebuildRequest(
@@ -615,8 +602,12 @@ ${prompt}
     const requestedModel = this.plugin.settings.currentProvider === 'codex'
       ? (normalizeCodexModelForRuntime(selectedModel ?? this.plugin.settings.model) || undefined)
       : (selectedModel ?? this.plugin.settings.model)?.trim() || undefined;
+    const requestedEffort = this.getReasoningEffort();
+    const developerInstructions = this.buildInstructions(vaultPath);
     void appendRuntimeDiagnosticLog(
-      `query provider=${this.plugin.settings.currentProvider} selectedModel=${selectedModel ?? 'null'} requestedModel=${requestedModel ?? 'null'}`
+      `query provider=${this.plugin.settings.currentProvider} selectedModel=${selectedModel ?? 'null'} ` +
+      `requestedModel=${requestedModel ?? 'null'} requestedEffort=${requestedEffort ?? 'default'} ` +
+      `instructionChars=${developerInstructions.length}`
     );
     let request = this.threadId
       ? { prompt, images }
@@ -685,6 +676,7 @@ ${prompt}
           approvalPolicy: this.getApprovalPolicy(),
           sandboxPolicy: this.buildTurnSandboxPolicy(queryOptions),
           model: requestedModel ?? null,
+          ...(requestedEffort ? { effort: requestedEffort } : {}),
         });
         const turn = asRecord(started.turn);
         this.activeTurnId = asString(turn?.id);
@@ -1059,6 +1051,7 @@ ${prompt}
               threadId: this.threadId,
               cwd: vaultPath,
               model: requestedModel ?? null,
+              developerInstructions,
               approvalPolicy: this.getApprovalPolicy(),
               sandbox: this.getThreadSandboxMode(),
               persistExtendedHistory: false,
@@ -1077,6 +1070,7 @@ ${prompt}
           }
           const started = await client.request('thread/start', {
             model: requestedModel ?? null,
+            developerInstructions,
             cwd: vaultPath,
             approvalPolicy: this.getApprovalPolicy(),
             sandbox: this.getThreadSandboxMode(),
@@ -1093,13 +1087,14 @@ ${prompt}
           return await client.request('turn/start', {
             threadId: this.threadId,
             input: await this.buildInput(
-              this.applyInstructionsToPrompt(request.prompt, vaultPath),
+              request.prompt,
               request.images || []
             ),
             cwd: vaultPath,
             approvalPolicy: this.getApprovalPolicy(),
             sandboxPolicy: this.buildTurnSandboxPolicy(queryOptions),
             model: requestedModel ?? null,
+            ...(requestedEffort ? { effort: requestedEffort } : {}),
           });
         };
 
