@@ -31,6 +31,8 @@
 
 `mainAgent.ts` 继续负责生成 Obsidian 专属规则，但删除 Codex 已自带的 Read/Edit/Bash、子代理、任务列表和 Skill 使用手册。保留强规则和自定义指令，并继续置于固定提示词末尾。
 
+App Server 子进程以 Obsidian 仓库根目录作为工作目录，不再以 Codex CLI 安装目录作为工作目录，避免扫描无关的项目级配置。
+
 ## 兼容与错误处理
 
 - 不新增设置字段，不迁移 `data.json`。
@@ -42,4 +44,3 @@
 ## 验证
 
 先写失败测试验证 `effort`、`developerInstructions` 和纯净用户输入，再实现代码。随后运行单元/集成测试、类型检查、lint、生产构建、发布校验和依赖审计。安装前备份插件运行文件和 `data.json`，安装后重启 Obsidian，核对版本、文件哈希、设置哈希，并用短问候实测首字延迟和总耗时。
-

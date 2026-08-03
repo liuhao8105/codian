@@ -19,6 +19,8 @@ jest.mock('child_process', () => ({
   spawn: jest.fn(() => child),
 }));
 
+import { spawn } from 'child_process';
+
 const readlineOn = jest.fn();
 jest.mock('readline', () => ({
   createInterface: jest.fn(() => ({
@@ -69,6 +71,13 @@ describe('CodexAppServerClient diagnostic summaries', () => {
 
 function createPlugin() {
   return {
+    app: {
+      vault: {
+        adapter: {
+          basePath: '/mock/vault',
+        },
+      },
+    },
     manifest: {
       version: '1.3.83-stability-hardening',
     },
@@ -88,6 +97,16 @@ describe('CodexAppServerClient server requests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     child.stdin.writable = true;
+  });
+
+  it('starts App Server from the vault instead of the CLI installation directory', () => {
+    new CodexAppServerClient(createPlugin(), jest.fn());
+
+    expect(spawn).toHaveBeenCalledWith(
+      '/mock/codex',
+      expect.any(Array),
+      expect.objectContaining({ cwd: '/mock/vault' }),
+    );
   });
 
   it('routes server-initiated approval requests and writes the result response', async () => {

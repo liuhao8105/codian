@@ -59,6 +59,8 @@ Expected: FAIL because the runtime currently wraps instructions into user input 
 
 Build developer instructions once per query attempt. Pass them to `thread/start` and `thread/resume`. Pass `thinkingBudget` to every `turn/start` as `effort` when it is not `off`. Send the rebuilt request directly through `buildInput` without XML-wrapping the fixed instructions.
 
+Start the App Server child process with the Obsidian vault root as `cwd`; cover this with `CodexAppServerClient.test.ts` so the CLI installation directory cannot become the project context again.
+
 - [ ] **Step 2: Verify GREEN**
 
 Run: `npm test -- --runInBand tests/unit/core/runtime/CodexAgentRuntime.test.ts`
@@ -128,4 +130,3 @@ Restart Obsidian, confirm loaded version/provider and installed hashes, then sen
 - [ ] **Step 5: Commit and push**
 
 Review the diff, commit the scoped changes on `codex/1.3.89-latency-optimization`, and push without force.
-

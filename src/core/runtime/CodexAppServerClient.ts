@@ -10,6 +10,7 @@ import {
   sanitizeDiagnosticValue,
 } from '../../utils/boundedLog';
 import { getEnhancedPath, parseEnvironmentVariables } from '../../utils/env';
+import { getVaultPath } from '../../utils/path';
 import {
   buildCodexConfigOverrideArgs,
   buildCodexMcpDisableOverrideArgs,
@@ -122,6 +123,7 @@ export class CodexAppServerClient {
         ]
       : [];
     const runtimeEnv = buildRuntimeEnv(plugin, codexPath);
+    const runtimeCwd = getVaultPath(plugin.app) ?? path.dirname(codexPath);
     appendDiagnosticLog(summarizeSpawnForLog({
       provider: plugin.settings.currentProvider,
       modelConfigured: Boolean(plugin.settings.model?.trim()),
@@ -134,7 +136,7 @@ export class CodexAppServerClient {
       env: runtimeEnv,
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
-      cwd: path.dirname(codexPath),
+      cwd: runtimeCwd,
     });
 
     this.readlineInterface = readline.createInterface({
