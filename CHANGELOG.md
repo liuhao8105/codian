@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.90-deepseek-latency
+
+- Prevented ordinary DeepSeek chat turns from waiting for external MCP discovery before the API request starts.
+- Limited explicit DeepSeek MCP discovery to servers selected through an `@server-name` mention or the MCP selector.
+- Preserved DeepSeek's built-in vault tools and existing MCP configurations without enabling, disabling, or deleting servers.
+- Added regression coverage for both ordinary chat and explicitly selected MCP turns.
+
 ## 1.3.89-latency-optimization
 
 - Applied the selected Codex reasoning effort to every App Server turn instead of leaving the selector disconnected from runtime behavior.
