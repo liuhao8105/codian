@@ -45,6 +45,21 @@ describe('systemPrompt', () => {
       expect(prompt).toContain('lead with a direct answer first');
     });
 
+    it('keeps all Codian safety boundaries in a compact fixed prompt', () => {
+      const prompt = buildSystemPrompt();
+
+      expect(prompt).toContain('Codian');
+      expect(prompt).toContain('## Path Rules');
+      expect(prompt).toContain('<current_note>');
+      expect(prompt).toContain('<context_files>');
+      expect(prompt).toContain('stay inside the vault');
+      expect(prompt).toContain('Do NOT use WebSearch');
+      expect(prompt).toContain('use wikilink format');
+      expect(prompt).toContain('never overwrite data without understanding context');
+      expect(prompt).toContain('## Embedded Images in Notes');
+      expect(prompt.length).toBeLessThan(9_000);
+    });
+
     it('should include allowed export paths instructions when configured', () => {
       const prompt = buildSystemPrompt({ allowedExportPaths: ['~/Desktop', '/tmp'] });
       expect(prompt).toContain('# Allowed Export Paths');
