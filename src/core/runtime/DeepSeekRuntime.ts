@@ -718,7 +718,7 @@ export class DeepSeekRuntime implements AgentRuntime {
     prompt: string,
     images?: ImageAttachment[],
     conversationHistory?: ChatMessage[],
-    _queryOptions?: QueryOptions
+    queryOptions?: QueryOptions
   ): AsyncGenerator<StreamChunk> {
     const config = this.plugin.settings.providerConfigs.deepseek;
     const validation = isProviderConfigured(this.plugin.settings, 'deepseek');
@@ -742,13 +742,17 @@ export class DeepSeekRuntime implements AgentRuntime {
     const baseUrl = config.baseUrl.replace(/\/+$/, '');
     const systemPrompt = this.buildSystemPromptContent();
 
-    // Enumerate MCP tools (read-only only) and merge with built-in tools
+    const requestedMcpNames = new Set([
+      ...(queryOptions?.mcpMentions ?? []),
+      ...(queryOptions?.enabledMcpServers ?? []),
+    ]);
+
+    // Discover external MCP tools only when the user explicitly enables a server.
     let mcpTools: DeepSeekToolDefinition[] = [];
-    if (this.mcpManager) {
+    if (this.mcpManager && requestedMcpNames.size > 0) {
       try {
-        const servers = this.mcpManager.getServers();
-        console.debug(`[Codian MCP] discovering tools from ${servers.length} servers`);
-        mcpTools = await enumerateMcpToolsForDeepSeek(this.mcpManager);
+        console.debug(`[Codian MCP] discovering tools from ${requestedMcpNames.size} requested servers`);
+        mcpTools = await enumerateMcpToolsForDeepSeek(this.mcpManager, requestedMcpNames);
         console.debug(`[Codian MCP] discovery complete: ${mcpTools.length} read-only tools`);
       } catch (err) {
         console.warn('[Codian MCP] discovery failed:', err instanceof Error ? err.message : String(err));

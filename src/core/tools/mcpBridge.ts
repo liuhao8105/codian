@@ -216,12 +216,20 @@ function createTransport(config: McpServerConfig, serverType: 'stdio' | 'sse' | 
  */
 export async function enumerateMcpToolsForDeepSeek(
   mcpManager: McpServerManager,
+  requestedNames?: ReadonlySet<string>,
 ): Promise<DeepSeekToolDefinition[]> {
   const servers: CodianMcpServer[] = mcpManager.getServers();
   const allTools: DeepSeekToolDefinition[] = [];
+  const normalizedRequestedNames = requestedNames
+    ? new Set(Array.from(requestedNames, (name) => name.toLocaleLowerCase()))
+    : null;
 
   for (const server of servers) {
     if (!server.enabled) continue;
+    if (
+      normalizedRequestedNames
+      && !normalizedRequestedNames.has(server.name.toLocaleLowerCase())
+    ) continue;
 
     const serverType = getMcpServerType(server.config);
     let client: Client | null = null;

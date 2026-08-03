@@ -1,5 +1,12 @@
+jest.mock('@/core/tools/mcpBridge', () => ({
+  classifyMcpToolRisk: jest.fn(() => ({ level: 'read-only', reason: 'test' })),
+  enumerateMcpToolsForDeepSeek: jest.fn(),
+}));
+
+import type { McpServerManager } from '@/core/mcp';
 import {
   appendWithinDeepSeekStreamLimit,
+  DeepSeekRuntime,
   fetchDeepSeekResponseWithTimeout,
   parseDeepSeekDSMLToolCalls,
   parseSSEStream,
@@ -8,6 +15,110 @@ import {
   shouldForceDeepSeekWriteAfterToolRounds,
   stripDeepSeekDSMLToolCallBlocks,
 } from '@/core/runtime/DeepSeekRuntime';
+import { enumerateMcpToolsForDeepSeek } from '@/core/tools/mcpBridge';
+import { DEFAULT_SETTINGS } from '@/core/types/settings';
+import type CodianPlugin from '@/main';
+
+const enumerateMcpToolsForDeepSeekMock = enumerateMcpToolsForDeepSeek as jest.MockedFunction<
+  typeof enumerateMcpToolsForDeepSeek
+>;
+
+function createDeepSeekRuntime(mcpManager?: McpServerManager): DeepSeekRuntime {
+  const settings = {
+    ...DEFAULT_SETTINGS,
+    providerConfigs: {
+      ...DEFAULT_SETTINGS.providerConfigs,
+      deepseek: {
+        enabled: true,
+        apiKey: 'sk-test',
+        baseUrl: 'https://api.deepseek.example/v1',
+        model: 'deepseek-chat',
+      },
+    },
+  };
+  const plugin = {
+    settings,
+    app: { vault: { adapter: { basePath: '/mock/vault' } } },
+  } as unknown as CodianPlugin;
+  return new DeepSeekRuntime(plugin, mcpManager);
+}
+
+describe('DeepSeekRuntime MCP discovery gating', () => {
+  afterEach(() => {
+    enumerateMcpToolsForDeepSeekMock.mockReset();
+  });
+
+  it('starts an ordinary chat without waiting for unrequested MCP discovery', async () => {
+    let finishDiscovery!: (value: []) => void;
+    enumerateMcpToolsForDeepSeekMock.mockReturnValue(new Promise((resolve) => {
+      finishDiscovery = resolve;
+    }));
+    const mcpManager = {
+      getServers: () => [
+        { name: 'eagle-mcp', enabled: true },
+        { name: 'zhipu-web-search', enabled: true },
+      ],
+    } as unknown as McpServerManager;
+    const iterator = createDeepSeekRuntime(mcpManager).query('你好');
+
+    let firstChunkSettled = false;
+    const firstChunkPromise = iterator.next().then((result) => {
+      firstChunkSettled = true;
+      return result;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(firstChunkSettled).toBe(true);
+
+    finishDiscovery([]);
+    await expect(firstChunkPromise).resolves.toMatchObject({
+      value: { type: 'runtime_user_sent' },
+      done: false,
+    });
+  });
+
+  it('does not let an unselected MCP server delay an explicitly selected server', async () => {
+    let finishUnfilteredDiscovery!: (value: []) => void;
+    enumerateMcpToolsForDeepSeekMock.mockImplementation(((_manager, requestedNames?: Set<string>) => {
+      if (
+        requestedNames?.size === 1
+        && requestedNames.has('eagle-mcp')
+      ) {
+        return Promise.resolve([]);
+      }
+      return new Promise((resolve) => {
+        finishUnfilteredDiscovery = resolve;
+      });
+    }) as typeof enumerateMcpToolsForDeepSeek);
+    const mcpManager = {
+      getServers: () => [
+        { name: 'eagle-mcp', enabled: true },
+        { name: 'zhipu-web-search', enabled: true },
+      ],
+    } as unknown as McpServerManager;
+    const iterator = createDeepSeekRuntime(mcpManager).query(
+      '使用 Eagle 查询素材',
+      undefined,
+      undefined,
+      { enabledMcpServers: new Set(['eagle-mcp']) },
+    );
+
+    let firstChunkSettled = false;
+    const firstChunkPromise = iterator.next().then((result) => {
+      firstChunkSettled = true;
+      return result;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(firstChunkSettled).toBe(true);
+
+    if (finishUnfilteredDiscovery) finishUnfilteredDiscovery([]);
+    await expect(firstChunkPromise).resolves.toMatchObject({
+      value: { type: 'runtime_user_sent' },
+      done: false,
+    });
+  });
+});
 
 describe('DeepSeekRuntime network liveness', () => {
   beforeEach(() => {
